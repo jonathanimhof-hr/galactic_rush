@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Galactic Rush V6</title>
+<title>Galactic Rush V7</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Saira+Semi+Condensed:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -180,6 +180,116 @@ textarea.save { width: 100%; min-height: 70px; background: rgba(0,0,0,.35); colo
   .logo { font-size: 40px; } #hStand { display: none; } .h-tl { min-width: 0; } .speed b { font-size: 38px; } .h-bl { width: 210px; }
   #minimap { width: 120px; height: 120px; } .btn { min-width: 0; width: 100%; } .h-tr { min-width: 0; }
 }
+/* ---------- V7: career, garage, upgrades, paint shop, inventory, cosmetic shop ---------- */
+.between { justify-content: space-between; }
+.screen.still { animation: none; }
+.wallet { display: inline-flex; border: 1px solid var(--line-2); font: 600 11px var(--f-num); letter-spacing: .14em; white-space: nowrap; }
+.wallet span { padding: 4px 10px; display: inline-flex; gap: 6px; align-items: baseline; }
+.wallet .cr { color: var(--signal); } .wallet .st { color: var(--ion); border-left: 1px solid var(--line-2); }
+.wallet b { color: var(--ink); font-weight: 600; font-size: 14px; letter-spacing: .04em; }
+b.cr, .rw-top b.cr, .rw-line b.cr { color: var(--signal); } b.st, .rw-line b.st { color: var(--ion); } b.good, .rw-line b.good { color: var(--good); }
+.lede.small { font-size: 13px; max-width: 60ch; }
+.reason { color: #ffb4a8; font-size: 13px; margin: 0; }
+.btn.sm { min-width: 0; padding: 7px 14px 7px 12px; font-size: 13px; letter-spacing: .1em; border: 1px solid var(--line-2); border-left-width: 2px; }
+.btn.sm:hover, .btn.sm:focus-visible { padding-left: 14px; }
+.btn[disabled], .btn[disabled]:hover { opacity: .42; cursor: not-allowed; background: transparent; padding-left: 12px; }
+.btn.primary[disabled] { background: rgba(255,181,71,.35); }
+.btn.buy { border-color: rgba(255,181,71,.55); color: var(--signal); }
+.btn.buy.armed { background: var(--signal); color: #1a1104; border-color: #fff; }
+.btn.danger { color: var(--alert); border-left-color: var(--alert); }
+.garage .gcol { width: min(560px, 100%); gap: 14px; }
+.ghead { display: grid; gap: 12px; } .ghead h2 { font-size: clamp(24px, 3.4vw, 34px); }
+.tabs .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); vertical-align: middle; margin-left: 4px; }
+.gbody { display: grid; gap: 12px; }
+.notice { min-height: 18px; font: 500 13.5px var(--f-ui); color: var(--dim); }
+.notice.good { color: var(--good); } .notice.warn { color: #ffb4a8; }
+.stats.up i u { position: absolute; top: 0; bottom: 0; background: var(--signal); }
+.stats em small { color: var(--signal); margin-left: 3px; font-size: 9px; }
+.kv { display: grid; gap: 4px; } .kv div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(160,210,255,.07); padding: 5px 0; }
+.kv span { color: var(--dim); font: 600 11px var(--f-num); letter-spacing: .14em; text-transform: uppercase; } .kv b { font-weight: 600; text-align: right; }
+.swatch { display: inline-block; width: 14px; height: 14px; border: 1px solid rgba(255,255,255,.4); vertical-align: -2px; margin-right: 6px; }
+.upgs { display: grid; gap: 8px; }
+.upg { background: var(--plate); border: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 5px; }
+.upg .uh { display: flex; align-items: center; gap: 12px; } .upg .uh b { font: 700 14px var(--f-ui); letter-spacing: .14em; text-transform: uppercase; } .upg .uh em { margin-left: auto; font: 600 11px var(--f-num); color: var(--dim); font-style: normal; }
+.pips { display: inline-flex; gap: 3px; } .pips i { width: 20px; height: 6px; background: rgba(255,255,255,.1); } .pips i.on { background: var(--cyan); } .pips i.next { box-shadow: inset 0 0 0 1px var(--signal); }
+.upg .ud { color: var(--dim); font-size: 13px; } .upg .ue { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font: 500 13.5px var(--f-num); } .upg .ue b { color: var(--good); font-weight: 600; }
+.upg .ur { font-size: 12.5px; color: var(--dim); }
+.stattab td.upv { color: var(--good); }
+details.panel summary { cursor: pointer; font: 600 11.5px var(--f-num); letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+details.panel[open] summary { margin-bottom: 8px; }
+.seg.wide { display: flex; } .seg.wide button { flex: 1; }
+.seg.sm button { padding: 5px 10px; font-size: 12px; letter-spacing: .08em; }
+.seg.wrap { flex-wrap: wrap; } .filters .seg { flex-wrap: wrap; }
+.pbody { display: grid; gap: 10px; }
+.slots { display: flex; gap: 6px; flex-wrap: wrap; }
+.slot { background: transparent; border: 1px solid var(--line-2); color: var(--ink); padding: 7px 12px; font: 600 13px var(--f-ui); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; display: inline-flex; align-items: center; }
+.slot[aria-pressed="true"] { border-color: var(--signal); background: rgba(255,181,71,.12); }
+.swatches { display: grid; grid-template-columns: repeat(9, 30px); gap: 7px; }
+.sw { aspect-ratio: 1; min-width: 0; border: 1px solid rgba(255,255,255,.22); background: var(--c); cursor: pointer; padding: 0; }
+.sw[aria-pressed="true"], .sw:hover, .sw:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+input.hue, input.shade { -webkit-appearance: none; appearance: none; height: 10px; border: 1px solid var(--line-2); width: 220px; }
+input.hue { background: linear-gradient(90deg, #f33, #ff3, #3f3, #3ff, #33f, #f3f, #f33); }
+input.shade { background: linear-gradient(90deg, #000, var(--c, #888), #fff); }
+input.hue::-webkit-slider-thumb, input.shade::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 18px; background: #fff; border: 2px solid #05070b; }
+input.hue::-moz-range-thumb, input.shade::-moz-range-thumb { width: 10px; height: 16px; background: #fff; border: 2px solid #05070b; border-radius: 0; }
+input.hex { width: 92px; background: rgba(0,0,0,.35); color: var(--ink); border: 1px solid var(--line-2); font: 13px var(--f-num); padding: 6px 8px; user-select: text; }
+.paints { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lab { font: 600 10.5px var(--f-num); letter-spacing: .2em; color: var(--dim); text-transform: uppercase; margin-right: 2px; }
+.chipbtn { background: transparent; border: 1px solid var(--line-2); color: var(--ink); padding: 5px 10px; font: 600 12.5px var(--f-ui); letter-spacing: .05em; cursor: pointer; }
+.chipbtn[aria-pressed="true"] { border-color: var(--signal); background: rgba(255,181,71,.14); }
+.icards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.icard { background: var(--plate); border: 1px solid var(--line); padding: 9px 10px; text-align: left; cursor: pointer; display: grid; gap: 3px; color: var(--ink); font: inherit; transition: border-color .15s, background .15s; min-width: 0; }
+.icard:hover, .icard:focus-visible { border-color: var(--cyan); outline: none; } .icard[aria-pressed="true"] { border-color: var(--signal); background: rgba(255,181,71,.09); }
+.icard .nm { font: 600 14px/1.2 var(--f-ui); letter-spacing: .03em; } .icard.locked .nm { color: #b8c3d0; } .icard .st { font: 500 12px var(--f-num); color: var(--dim); }
+.icard.prem { border-style: dashed; border-color: rgba(255,198,110,.4); }
+.rar { font: 600 10px var(--f-num); letter-spacing: .16em; text-transform: uppercase; color: var(--rc); white-space: nowrap; }
+.rar::before { content: ""; display: inline-block; width: 6px; height: 6px; background: var(--rc); margin-right: 5px; vertical-align: 1px; }
+.price { font: 600 13px var(--f-num); white-space: nowrap; } .price.cr { color: var(--signal); } .price.st { color: var(--ion); }
+.badge { font: 600 10.5px var(--f-num); letter-spacing: .14em; text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--line-2); color: var(--dim); white-space: nowrap; }
+.badge.eq { color: var(--good); border-color: rgba(115,247,174,.5); } .badge.own { color: var(--cyan); } .badge.prem { color: #ffd38a; border-color: rgba(255,198,110,.45); white-space: normal; text-align: right; } .badge.lock { color: var(--dim); }
+.viewbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; } .viewbar .zoom { display: inline-flex; align-items: center; gap: 6px; } .viewbar input[type=range] { width: 110px; }
+.pstate p { margin: 6px 0 0; }
+.leavebar { display: grid; gap: 8px; border-color: var(--signal); }
+/* the action row of a screen that scrolls stays in view while the content scrolls under it */
+.actbar { display: grid; gap: 8px; } .actbar .notice:empty { display: none; }
+.screen.scrolls { scroll-padding-bottom: 130px; }
+.screen.scrolls .actbar { position: sticky; bottom: 0; z-index: 3; padding: 18px 0 12px; }
+.screen.scrolls .actbar::before { content: ""; position: absolute; z-index: -1; pointer-events: none; top: 0; left: -16px; right: -16px; bottom: calc(-1 * max(24px, env(safe-area-inset-bottom)));
+  background: linear-gradient(90deg, rgba(5,7,11,0), rgba(5,7,11,.97) 16px, rgba(5,7,11,.97) calc(100% - 16px), rgba(5,7,11,0));
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 18px); mask-image: linear-gradient(180deg, transparent, #000 18px); }
+.dragzone { position: absolute; top: 0; bottom: 0; right: 0; left: min(640px, 60%); cursor: grab; touch-action: none; }
+.dragzone.drag { cursor: grabbing; }
+@media (max-width: 760px), (max-aspect-ratio: 6/5) { .dragzone { display: none; } .swatches { grid-template-columns: repeat(6, 30px); } input.hue, input.shade { width: 150px; } }
+.filters { display: grid; gap: 6px; }
+.ilist { display: grid; gap: 6px; }
+.irow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; background: var(--plate); border: 1px solid var(--line); padding: 9px 12px; }
+.irow .ii b { font: 600 14px var(--f-ui); } .irow .ii p { margin: 3px 0 0; color: var(--dim); font-size: 12.5px; } .irow .cat { color: var(--dim); font: 500 11px var(--f-num); margin-left: 6px; }
+.irow .ia { display: grid; gap: 6px; justify-items: end; align-content: start; max-width: 230px; }
+.detail { display: grid; gap: 8px; } .detail .dh { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.detail .dh b { font: 400 16px var(--f-display); letter-spacing: .05em; text-transform: uppercase; } .detail .cat { color: var(--dim); font: 500 11px var(--f-num); letter-spacing: .1em; } .detail p { margin: 0; color: var(--dim); font-size: 13.5px; }
+.buyline { display: flex; gap: 16px; flex-wrap: wrap; font: 500 13px var(--f-num); color: var(--dim); } .buyline b { font-weight: 600; }
+.prem-note { border-left: 2px solid #ffc66e; padding-left: 10px; color: var(--ink) !important; }
+.rewards { display: grid; gap: 6px; }
+.rw-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font: 600 12px var(--f-num); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); } .rw-top b { font: 400 24px var(--f-display); letter-spacing: .02em; }
+.rw-parts { display: flex; flex-wrap: wrap; gap: 4px 8px; font: 500 12px var(--f-num); color: var(--dim); } .rw-parts b { color: var(--ink); font-weight: 600; } .rw-parts i { font-style: normal; color: var(--line-2); }
+.rw-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; border-top: 1px solid rgba(160,210,255,.07); padding-top: 5px; }
+.rw-bal { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 7px; border-top: 1px solid var(--line); font: 600 11px var(--f-num); letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+.ladder { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.rung { background: var(--plate); border: 1px solid var(--line); padding: 10px 12px; text-align: left; display: grid; gap: 3px; color: var(--ink); cursor: pointer; font: inherit; min-width: 0; }
+.rung b { font: 400 16px var(--f-display); letter-spacing: .06em; text-transform: uppercase; } .rung span { font-size: 13px; color: var(--dim); } .rung em { font: 500 11.5px var(--f-num); font-style: normal; color: var(--signal); }
+.rung[aria-pressed="true"] { border-color: var(--signal); background: rgba(255,181,71,.09); } .rung[disabled] { opacity: .55; cursor: not-allowed; }
+.split2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; align-items: start; }
+.split2 .panel h3 { margin-bottom: 8px; }
+.unlockbar { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--good); background: rgba(115,247,174,.08); }
+.unlockbar b { font: 400 18px var(--f-display); color: var(--good); letter-spacing: .06em; text-transform: uppercase; } .unlockbar.ace { border-color: var(--signal); background: rgba(255,181,71,.08); } .unlockbar.ace b { color: var(--signal); }
+.career-line { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: baseline; font-size: 13.5px; color: var(--dim); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; } .kpis .panel { padding: 10px 12px; display: grid; gap: 2px; }
+.kpis span { font: 600 10.5px var(--f-num); letter-spacing: .16em; color: var(--dim); text-transform: uppercase; } .kpis b { font: 400 22px var(--f-display); } .kpis small { color: var(--dim); font: 500 11px var(--f-num); }
+tr.sum td { border-top: 1px solid var(--line); }
+@media (max-width: 760px) { .ladder { grid-template-columns: 1fr; } .irow { grid-template-columns: 1fr; } .irow .ia { justify-items: start; max-width: none; }
+  .seg.wide button { padding: 7px 4px; letter-spacing: .06em; min-width: 0; }
+  .actbar .row { gap: 8px; } .actbar .btn { width: auto; flex: 1 1 auto; min-width: 0; font-size: 15px; letter-spacing: .1em; padding: 9px 16px 9px 14px; } .actbar .btn.sm { font-size: 12.5px; padding: 7px 10px; } }
+@media (max-height: 800px) { .col { gap: 14px; } .menu .btn { padding-top: 7px; padding-bottom: 7px; } .menu .btn small { margin-top: 0; } }
 @media (prefers-reduced-motion: reduce) { .screen, .bn, #msg div, #reticle svg { animation: none !important; } }
 </style>
 <div id="app">
@@ -962,13 +1072,13 @@ class Race {
     this.events = []; this.projectiles = []; this.finishOrder = []; this.postFinish = 0;
     for (const c of t.cells) { c.active = true; c.timer = 0; }
     this.racers = o.racers.map((cfg, k) => {
-      const def = scaleDef(shipById(cfg.shipId), this.H), ship = createShipState(def);
+      const def = scaleDef(cfg.def || shipById(cfg.shipId), this.H), ship = createShipState(def); // V7: cfg.def = the player's effective (upgraded) stats, rebuilt from base stats for every race
       const row = Math.floor(k / 2), col = k % 2 ? 1 : -1;
       const gi = t.wrapIdx(-5 - row * 6), lx = col * Math.min(9, t.w[gi] * 0.4), ly = 0;
       t.pointAt(gi, lx, ly, ship.pos); ship.prevPos.copy(ship.pos);
       ship.quat.fromBasis(tmp.copy(t.bin[gi]).scale(-1), t.nrm[gi], t.tan[gi]); ship.prevQuat.copy(ship.quat);
       const r = {
-        id: k, name: cfg.name, isPlayer: !!cfg.isPlayer, paint: cfg.paint, ship, ti: gi, lx, ly, s: gi * t.D,
+        id: k, name: cfg.name, isPlayer: !!cfg.isPlayer, paint: cfg.paint, livery: cfg.livery, ship, ti: gi, lx, ly, s: gi * t.D,
         prog: -(t.length - gi * t.D), cpNext: 0, lap: 0, lapStart: 0, lapTimes: [], bestLap: Infinity,
         finished: false, finishTime: 0, place: k + 1, wrecked: false, wreckTimer: 0, wrongTime: 0, wrongWay: false,
         stuckT: 0, stuckProg: 0, stuckCheck: 0, ammo: 3, shieldCharges: 2, fireCD: 0, resetCD: 0, ctrl: NOCTRL,
@@ -1337,6 +1447,9 @@ uniform vec3 uCam, uSunDir, uSunCol, uFogCol, uRim; uniform vec4 uEng0, uEng1, u
 uniform samplerCube uEnv; uniform sampler2DShadow uShadow; uniform mat4 uShadowVP; uniform float uShadowOn;
 uniform vec4 uPL[4]; uniform vec3 uPLc[4]; uniform int uNPL;
 uniform sampler2D uDecal; uniform vec4 uDecalBox; uniform float uDecalOn; uniform vec2 uFade, uFogH;
+#ifdef M_CUSTOM
+uniform vec4 uCu0; uniform vec3 uCuC[8]; /* V7 paint job (src/progress/customize.js): x on, y pattern, z finish, w special paint; primary, secondary, accent, secondary reference, paint second colour, engine glow, pattern frame (centre x, tail and nose z of the primary paint), part offset (control-surface hinge) */
+#endif
 out vec4 o;
 ${NOISE}
 float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
@@ -1360,6 +1473,33 @@ vec3 bump(vec3 p, vec3 n, float h, float k){ vec3 dx = dFdx(p), dy = dFdy(p); fl
 float seams(vec3 p, vec3 n, vec3 s){ vec3 g = abs(fract(p/s) - .5); vec3 an = abs(n);
   float a = an.x > an.y && an.x > an.z ? max(g.y, g.z) : an.y > an.z ? max(g.x, g.z) : max(g.x, g.y);
   vec3 w = fwidth(p/s); float aa = max(max(w.x, w.y), w.z); return smoothstep(.5 - aa*1.5 - .012, .5 - .012, a)*(1. - smoothstep(.3, .6, aa)); }
+#ifdef M_CUSTOM
+// V7 paint patterns in the ship's own coordinates (metres; nose +z, up +y, starboard -x), centred on the primary paint's own
+// centre line fr.x and spanning its length fr.y..fr.z. Returns how much of the secondary colour (x) and of the accent colour
+// (y) covers this point. aa is the pixel footprint in metres: every edge is anti-aliased, and fine patterns fade to their
+// average with distance instead of shimmering.
+float cuBand(float x, float w, float aa){ return 1. - smoothstep(w - aa, w + aa, x); }
+vec2 cuUV(vec3 p, vec3 a){ return a.y >= a.x && a.y >= a.z ? p.xz : a.x >= a.z ? p.zy : p.xy; }
+vec2 cuPattern(float id, vec3 p, vec3 nl, float aa, vec3 fr){
+  p.x -= fr.x; vec3 a = abs(nl); float wy = smoothstep(.25, .45, a.y);
+  if (id < 1.5) return vec2(0.); // factory livery (its stripe is uStripe) and solid
+  if (id < 2.5) return vec2(cuBand(abs(p.x), .15, aa), cuBand(abs(abs(p.x) - .2), .018, aa))*wy; // racing stripes
+  if (id < 3.5) return vec2(cuBand(abs(abs(p.x) - .14), .06, aa), cuBand(abs(abs(p.x) - .225), .014, aa))*wy; // double stripes
+  if (id < 4.5) { float c = p.z + .8*abs(p.x), d = abs(fract(c/.95) - .5)*.95; return vec2(cuBand(d, .17, aa*1.3), cuBand(abs(d - .2), .014, aa)); } // chevrons
+  if (id < 5.5) { float l = cuBand(abs(p.x), .018, aa); return vec2(smoothstep(aa, -aa, p.x)*(1. - l), l); } // split: starboard secondary
+  vec2 uv = cuUV(p, a);
+  if (id < 6.5) { vec2 q = uv/.55, sk = vec2(q.x - q.y*.57735, q.y*1.1547), c = floor(sk), f = fract(sk); float up = step(1., f.x + f.y); // geometric triangles in three tones
+    float t = h2(c*1.7 + up*13.1 + 3.), e = min(min(f.x, f.y), abs(1. - f.x - f.y))*.55*.866, k = smoothstep(.02, .05, aa), tone = t < .42 ? 0. : t < .76 ? 1. : .5;
+    return vec2(mix(tone, .45, k), cuBand(e, .011, aa)*(1. - k)); }
+  if (id < 7.5) { vec2 r = uv/.3, sg = vec2(1., 1.7320508), g1 = mod(r, sg) - sg*.5, g2 = mod(r - sg*.5, sg) - sg*.5, g = dot(g1, g1) < dot(g2, g2) ? g1 : g2, ag = abs(g); // honeycomb
+    float hd = max(dot(ag, vec2(.5, .8660254)), ag.x), k = smoothstep(.015, .045, aa), wall = cuBand(.5 - hd, .055, aa/.3), fill = step(h2(floor((r - g)*2. + .5)), .2)*.55;
+    return vec2(mix(max(wall, fill), .3, k), 0.); }
+  if (id < 8.5) { float nz = h2(floor(uv/.3) + 7.)*.6 + h2(floor(uv/.12) + 31.)*.4, k = smoothstep(.02, .06, aa); return vec2(mix(nz < .4 ? 0. : nz < .66 ? 1. : .5, .45, k), 0.); } // digital camouflage
+  float L = fr.z - fr.y, z0 = fr.y + .3*L, z1 = fr.z - .17*L; // industrial hazard: diagonal bands over the tail and the nose
+  float zone = max(smoothstep(-aa, aa, z0 - p.z), smoothstep(-aa, aa, p.z - z1)), d = abs(fract((uv.x + uv.y)/.26) - .5)*.26;
+  float st = cuBand(d, .065, aa), ln = cuBand(abs(p.z - z0), .014, aa) + cuBand(abs(p.z - z1), .014, aa);
+  return vec2(zone*(1. - st), min(1., zone*st + ln)); }
+#endif
 float D_GGX(float nh, float a){ float a2 = a*a, d = nh*nh*(a2 - 1.) + 1.; return a2/(3.14159*d*d); }
 vec2 envBRDF(float r, float nv){ vec4 c0 = vec4(-1., -.0275, -.572, .022), c1 = vec4(1., .0425, 1.04, -.04); vec4 r4 = r*c0 + c1;
   float a004 = min(r4.x*r4.x, exp2(-9.28*nv))*r4.x + r4.y; return vec2(-1.04, 1.04)*a004 + r4.zw; }
@@ -1376,9 +1516,32 @@ void main(){
   vec3 gn = cross(dFdx(vW), dFdy(vW)); if (dot(gn, v) < 0.) gn = -gn; if (dot(n, gn) < 0.) n = -n;
   vec3 alb = pow(vC.rgb, vec3(2.2)); float emi = vC.a, metal = vM.x, rough = vM.y, det = vM.w; float ao = 1., clear = 0., so = .3, trans = 0.;
   float occ = 1.; if (det > 24.5 && det < 29.5) { occ = (det - 25.)*.25; det = 0.; } /* baked interiors: how much sun and sky reach in through the opening */
+#ifdef M_CUSTOM
+  float cuOn = uCu0.x, cuR = cuOn > .5 ? floor(fract(det)*10. + .5) : 0., cuAA = length(fwidth(vL))*.7; vec2 cuM = vec2(0.); /* paint region tagged in models.js */
+  if (cuOn > .5 && det > .35 && det < .45) alb = pow(.55 + .45*uCuC[5], vec3(2.2)); // engine glow in the accent or exhaust colour
+#endif
 #ifdef M_HULL
   if (det > .5 && det < 1.5) { // ship hull: livery stripe, panels, rivets, grime, wear, clearcoat
     vec3 q = vL*uDS*.5;
+#ifdef M_CUSTOM
+    float fWearLo = .7, fWearHi = .86, fWearK = .7, fTrail = 1., fClear = 1.; // finish parameters; these defaults are the V6 paint
+    if (cuOn > .5) { // V7 paint job: colours per region, pattern and special paint on the primary paint, finish on all painted panels
+      if (cuR > .5 && cuR < 1.5) { float pt = uCu0.w, fr = 1. - max(dot(n, v), 0.); vec3 base = uCuC[0];
+        if (pt > .5 && pt < 1.5) base = mix(uCuC[0], uCuC[4], smoothstep(.1, .85, fr)); else if (pt > 1.5 && pt < 2.5) base = mix(uCuC[0], uCuC[4], fr*fr*.75); // colour-shift and pearl paints
+        cuM = cuPattern(uCu0.y, vL + uCuC[7], normalize(vLN), cuAA, uCuC[6]);
+        alb = mix(mix(pow(base, vec3(2.2)), pow(uCuC[1], vec3(2.2)), clamp(cuM.x, 0., 1.)), pow(uCuC[2], vec3(2.2)), clamp(cuM.y, 0., 1.));
+        if (pt > 2.5) emi = max(emi, .22*(1. - max(cuM.x, cuM.y))); } // neon paint: a soft self-glow
+      else if (cuR > 1.5 && cuR < 2.5) alb = pow(min(vC.rgb*uCuC[1]/max(uCuC[3], vec3(.02)), vec3(1.)), vec3(2.2)); // trim tinted relative to its factory colour
+      else if (cuR > 2.5 && cuR < 3.5) alb = pow(uCuC[2], vec3(2.2));
+      if (vM.z > .5) { float fin = uCu0.z;
+        if (fin > .5 && fin < 1.5) { metal = .04; rough = .74; fClear = 0.; } // matte
+        else if (fin > 1.5 && fin < 2.5) { metal = .68; rough = .3; fClear = .75; } // metallic: metal flake in a tinted coat (keeps some diffuse colour)
+        else if (fin > 2.5 && fin < 3.5) { metal = .86; rough = .4; fClear = 0.; fWearK = .2; } // brushed metal
+        else if (fin > 3.5) { fWearLo = .5; fWearHi = .74; fWearK = .95; fTrail = 1.8; fClear = .35; alb = mix(alb, vec3(dot(alb, vec3(.3, .59, .11)))*1.1, .3); } } // worn paint
+    }
+#else
+    const float fWearLo = .7, fWearHi = .86, fWearK = .7, fTrail = 1., fClear = 1.;
+#endif
     if (vM.z > .5 && uStripe.w > 0. && abs(vLN.y) > .3) alb = mix(alb, pow(uStripe.rgb, vec3(2.2)), 1. - smoothstep(uStripe.w*.85, uStripe.w, abs(vL.x)));
     alb = mix(vec3(dot(alb, vec3(.3, .59, .11))), alb, .8); // weathered, film-like paint rather than toy-bright
     float fq = length(fwidth(q));
@@ -1393,18 +1556,28 @@ void main(){
     float gr = fbmL(q*3.1, fq*3.1, .15); float h = (1. - s)*.4 - riv*.25 + gr*.1; n = bump(vW/vO.w, n, h, .45/max(uDS, .01));
     alb *= mix(.74, 1., 1. - s*.8)*(.9 + .2*gr); alb = mix(alb, fract(hv*31.) > .5 ? vec3(.62, .5, .2) : vec3(.6, .6, .58), mark*.75);
     // grime swept back along the hull from its seams and edges (the flow runs along local z), lighter on navy ships
-    vec4 Gz = texture(uNoise, vec3(vL.x*.8, vL.y*.8, vL.z*.08) + .41); float trail = smoothstep(.48, .74, Gz.r)*(.55 + .45*s)*(1. - .5*max(vLN.y, 0.))*(uFaction > .5 ? .35 : 1.);
+    vec4 Gz = texture(uNoise, vec3(vL.x*.8, vL.y*.8, vL.z*.08) + .41); float trail = smoothstep(.48, .74, Gz.r)*(.55 + .45*s)*(1. - .5*max(vLN.y, 0.))*(uFaction > .5 ? .35 : 1.)*fTrail;
     alb *= 1. - trail*.2; rough = rough + trail*.12;
-    float wear = smoothstep(.7, .86, fbmL(q*3.2 + 3., fq*3.2, .3))*.7*(.35 + .65*max(smoothstep(.3, .95, vLN.z), s)); // wear lives on leading edges and seams
+    float wear = smoothstep(fWearLo, fWearHi, fbmL(q*3.2 + 3., fq*3.2, .3))*fWearK*(.35 + .65*max(smoothstep(.3, .95, vLN.z), s)); // wear lives on leading edges and seams
     alb = mix(alb, vec3(.42, .43, .45), wear*.5*(1. - metal)); rough = clamp(rough + gr*.25 - .1 + wear*.25, .08, 1.); metal = mix(metal, .9, wear*.6);
-    clear = 1. - wear; float sc = uDamage > 0. ? smoothstep(.55, .75, fbmL(q*2.3 + 9., fq*2.3, .3))*uDamage : 0.; /* scorch noise only on damaged hulls */ alb *= 1. - sc*.85; rough = mix(rough, 1., sc);
+    clear = (1. - wear)*fClear;
+#ifdef M_CUSTOM
+    if (cuOn > .5 && vM.z > .5) { float fin = uCu0.z;
+      if (fin > 2.5 && fin < 3.5) { float bs = texture(uNoise, vec3(vL.x*7., vL.y*7., vL.z*.22) + .29).g; rough = clamp(rough + (bs - .5)*.32, .2, .7); alb *= .9 + .2*bs; } // brushing along the hull
+      else if (fin > 1.5 && fin < 2.5) { float fl = h2(floor(vL.xz*140.) + floor(vL.y*140.)*.37), fk = 1. - smoothstep(.002, .006, cuAA); rough = clamp(rough + (fl - .5)*.2*fk, .15, 1.); } } // metal flake, close up only
+#endif
+    float sc = uDamage > 0. ? smoothstep(.55, .75, fbmL(q*2.3 + 9., fq*2.3, .3))*uDamage : 0.; /* scorch noise only on damaged hulls */ alb *= 1. - sc*.85; rough = mix(rough, 1., sc);
     float heat = 0., soot = 0.; // tempering colours close to each nozzle, a soot ring just beyond
     for (int i = 0; i < 3; i++) { vec4 e = i == 0 ? uEng0 : i == 1 ? uEng1 : uEng2; if (e.w <= 0.) continue; float dl = length(vL - e.xyz);
       heat = max(heat, smoothstep(e.w*2.3, e.w*.9, dl)); soot = max(soot, smoothstep(e.w*3.4, e.w*1.1, dl)); }
     vec3 temper = mix(vec3(.62, .45, .22), vec3(.28, .3, .62), smoothstep(.3, .9, heat));
     alb = mix(alb, temper*.55, heat*.6); metal = mix(metal, .95, heat*.7); rough = mix(rough, .38, heat*.5); clear *= 1. - heat; alb *= 1. - soot*(1. - heat)*.4*(.6 + .4*gr);
-    if (uFaction > .5) { alb = mix(alb, vec3(dot(alb, vec3(.3, .59, .11)))*.9, .65); rough *= .8; wear *= .3; } // navy: clean, glossy, near-monochrome greys
-    else { vec3 pc = floor(q*1.6/vec3(1.3, .55, 1.1)); float pv = h2(pc.xz + pc.y*7.31 + uSeedS*13.); alb *= mix(1., .72 + .5*pv, .6*(1. - s)); alb = mix(alb, vec3(.36, .37, .38), step(.86, pv)*.7*(1. - s)); } // independents: patched, mismatched panels
+    float cuDs = 1., cuPt = 1.;
+#ifdef M_CUSTOM
+    if (cuOn > .5) { cuDs = 0.; cuPt = uCu0.z > 3.5 ? 1. : 0.; } // a custom paint job keeps its colours: no navy greying; patched grey panels only on worn paint
+#endif
+    if (uFaction > .5) { alb = mix(alb, vec3(dot(alb, vec3(.3, .59, .11)))*.9, .65*cuDs); rough *= .8; wear *= .3; } // navy: clean, glossy, near-monochrome greys
+    else { vec3 pc = floor(q*1.6/vec3(1.3, .55, 1.1)); float pv = h2(pc.xz + pc.y*7.31 + uSeedS*13.); alb *= mix(1., .72 + .5*pv, .6*(1. - s)*(.4 + .6*cuPt)); alb = mix(alb, vec3(.36, .37, .38), step(.86, pv)*.7*(1. - s)*cuPt); } // independents: patched, mismatched panels
   }
   if (det > 1.5 && det < 2.5) { // canopy: coated glass (warm at grazing angles), a centre spine and frame ribs, faint instrument glow inside
     float fwc = length(fwidth(vL)), fr = max(1. - smoothstep(.035, .05 + fwc, abs(vL.x)), smoothstep(.455 - fwc, .47, abs(fract(vL.z*1.15) - .5)));
@@ -1953,7 +2126,7 @@ class GFX {
     this.cf = this.hdr ? gl.RGBA16F : gl.RGBA8; this.ct = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
     const P = (fs, vs = VS) => this.prog(vs, fs);
     const V = defs => PBR_FS.replace('precision highp float;', defs.split(' ').map(d => '#define ' + d).join('\n') + '\nprecision highp float;');
-    this.P = { pbr: P(V('M_HULL M_ROCK M_STRUCT M_FACADE M_CAPITAL')), pbrFade: P(V('FADE M_CAPITAL M_STRUCT')), pbrCity: P(V('M_STRUCT M_FACADE')), pbrRock: P(V('M_ROCK M_STRUCT')), pbrStruct: P(V('M_STRUCT')), pbrShip: P(V('M_HULL M_STRUCT')), planet: P(PLANET_FS), planetBake: P(PLANET_BAKE_FS, FS_TRI), ring: P(RING_FS), unlit: P(UNLIT_FS), hex: P(HEX_FS), depth: P(DEPTH_FS),
+    this.P = { pbr: P(V('M_HULL M_ROCK M_STRUCT M_FACADE M_CAPITAL')), pbrFade: P(V('FADE M_CAPITAL M_STRUCT')), pbrCity: P(V('M_STRUCT M_FACADE')), pbrRock: P(V('M_ROCK M_STRUCT')), pbrStruct: P(V('M_STRUCT')), pbrShip: P(V('M_HULL M_STRUCT M_CUSTOM')), planet: P(PLANET_FS), planetBake: P(PLANET_BAKE_FS, FS_TRI), ring: P(RING_FS), unlit: P(UNLIT_FS), hex: P(HEX_FS), depth: P(DEPTH_FS),
       sky: P(SKY_FS, FS_TRI), prefilter: P(PREFILTER_FS, FS_TRI), bb: P(BB_FS, BB_VS), bright: P(BRIGHT_FS, FS_TRI), down: P(DOWN_FS, FS_TRI), up: P(UP_FS, FS_TRI),
       shaft: P(SHAFT_FS, FS_TRI), ao: P(AO_FS, FS_TRI), blur: P(BLUR_FS, FS_TRI), comp: P(COMP_FS, FS_TRI), noise3: P(NOISE3_FS, FS_TRI), haze: P(HAZE_FS, HAZE_VS), hazec: P(HAZEC_FS, FS_TRI) };
     gl.vertexAttrib4f(3, 1, 0, 0, 0); gl.vertexAttrib4f(4, 0, 1, 0, 0); gl.vertexAttrib4f(5, 0, 0, 1, 0); gl.vertexAttrib4f(6, 0, 0, 0, 1); gl.vertexAttrib4f(7, 1, 1, 1, 1); gl.vertexAttrib4f(8, 0, 0.6, 1, 0);
@@ -2304,6 +2477,7 @@ class GFX {
     if (u.uDS) gl.uniform1f(u.uDS, it.ds || 1);
     if (u.uEng0) { const e = it.eng || ZERO12; gl.uniform4f(u.uEng0, e[0], e[1], e[2], e[3]); gl.uniform4f(u.uEng1, e[4], e[5], e[6], e[7]); gl.uniform4f(u.uEng2, e[8], e[9], e[10], e[11]); gl.uniform1f(u.uFaction, it.faction || 0); gl.uniform1f(u.uSeedS, it.seedS || 0); }
     if (u.uStripe) gl.uniform4fv(u.uStripe, it.stripe || ZERO4);
+    if (u.uCu0) { const c = it.cust; if (c) { gl.uniform4f(u.uCu0, 1, c.pattern, c.finish, c.paint); gl.uniform3fv(u.uCuC, c.data); } else gl.uniform4f(u.uCu0, 0, 0, 0, 0); } // V7 paint job, reset for every other ship
     if (u.uInt) gl.uniform1f(u.uInt, it.intensity ?? 1);
     if (u.uMode) gl.uniform1f(u.uMode, it.mode || 0);
     if (u.uDecalOn) { const d = it.decal; gl.uniform1f(u.uDecalOn, d ? 1 : 0); gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, d ? d.tex.tex : this.white.tex); gl.uniform1i(u.uDecal, 3);
@@ -2654,7 +2828,7 @@ class Geo {
   }
   raw(p, n, col) {
     this.p.push(p.x, p.y, p.z); this.n.push(n.x, n.y, n.z); this.c.push(col[0], col[1], col[2], col[3] ?? 0);
-    const M = this.M; this.m.push(M[0], M[1], M[2], M[3]); return this.p.length / 3 - 1;
+    const M = this.M; this.m.push(M[0], M[1], M[2], M[3] + (col.reg || 0)); return this.p.length / 3 - 1; // V7: colours may carry a paint-region tag (models.js)
   }
   vw(p, n, col) { return this.raw(p, n, col); }
   tri(a, b, c) { this.i.push(a, b, c); }
@@ -3054,6 +3228,10 @@ function buildHangar(gfx) {
   const base = items.slice();
   const H = {
     get items() { return this.mode === 'podium' ? base.concat(podIt, nums) : base.concat(showIt); }, env, floorIt, mode: 'showcase', show: [], spin: 0,
+    // V7 garage preview: turntable angle (auto spin, or eased to a chosen angle), tilt toward the camera and zoom on the ship
+    view: { auto: true, tYaw: null, tilt: 0, tTilt: 0, zoom: 1, tZoom: 1 },
+    setView(o) { Object.assign(this.view, o); },
+    resetView() { this.view = { auto: true, tYaw: null, tilt: 0, tTilt: 0, zoom: 1, tZoom: 1 }; },
     lights: [{ pos: v3(-7, 4, 5), col: [1.2, 1.5, 2.2], range: 24 }, { pos: v3(2, 5, -9), col: [3, 2.4, 1.8], range: 26 }, { pos: v3(0, 0.6, 0), col: [0.3, 0.8, 1.1], range: 8 }],
     // vis: ShipVisual list; showcase uses vis[0], podium uses three
     setShow(list, mode) { this.show = list; this.mode = mode; },
@@ -3062,11 +3240,16 @@ function buildHangar(gfx) {
       return [{ x: 0, y: 1.9, z: 0 }];
     },
     update(dt, t, fx, cam) {
-      this.spin = this.freezeSpin ?? this.spin + dt * 0.32; // freezeSpin: test hook for silhouette sheets
+      const V = this.view, TAU = Math.PI * 2, e = Math.min(1, dt * 6);
+      if (this.freezeSpin != null) this.spin = this.freezeSpin; // freezeSpin: test hook for silhouette sheets
+      else if (V.tYaw != null) this.spin += ((((V.tYaw - this.spin) % TAU) + TAU * 1.5) % TAU - Math.PI) * e;
+      else if (V.auto) this.spin += dt * 0.32;
+      V.tilt += (V.tTilt - V.tilt) * e; V.zoom += (V.tZoom - V.zoom) * e;
+      const ax = cam ? new Vec3(cam.pos.z, 0, -cam.pos.x).normalize() : new Vec3(1, 0, 0), tq = new Quat().setAxisAngle(ax.x, ax.y, ax.z, V.tilt); // tilt about the horizontal axis across the line of sight
       const poses = this.poses(), out = [];
       this.show.forEach((vis, k) => {
         const p = poses[k] || poses[0], bob = Math.sin(t * 1.3 + k) * 0.08;
-        const q = this.mode === 'podium' ? QY(160 + k * 12 * (k === 1 ? 1 : -1)).multiply(QX(-4)) : new Quat().setAxisAngle(0, 1, 0, this.spin).multiply(QX(-3));
+        const q = this.mode === 'podium' ? QY(160 + k * 12 * (k === 1 ? 1 : -1)).multiply(QX(-4)) : (V.tilt ? tq.clone() : new Quat()).multiply(new Quat().setAxisAngle(0, 1, 0, this.spin)).multiply(QX(-3));
         vis.update(dt, t, { pos: v3(p.x, p.y + bob, p.z), quat: q, vel: v3(0, 0, 0), ctrl: { pitch: Math.sin(t * 0.7) * 0.3, yaw: Math.sin(t * 0.5) * 0.3, roll: 0 }, throttle: 0.35, hull01: 1, shield: 0, stun: 0, pad: 0, boosting: false }, fx, cam.pos, 1);
         for (const it of vis.items) if (it.visible) out.push(it, mirror(it));
       });
@@ -3077,7 +3260,9 @@ function buildHangar(gfx) {
       if (this.mode === 'podium') return { pos: v3(Math.sin(t * 0.1) * 3, 6.5, 19), at: v3(0, 2.6, 0), fov: 42 };
       const wide = innerWidth / innerHeight > 1.2;
       // wide screens: ship centred at ~65% of the width, about a third of the screen across, clear of the menu rail
-      return wide ? { pos: v3(4.4, 2.15, 6.6), at: v3(-1.16, 1.35, 0.77), fov: 36 } : { pos: v3(3.5, 2.25, 5.8), at: v3(0, 1.0, 0), fov: 52 };
+      const c = wide ? { pos: v3(4.4, 2.15, 6.6), at: v3(-1.16, 1.35, 0.77), fov: 36 } : { pos: v3(3.5, 2.25, 5.8), at: v3(0, 1.0, 0), fov: 52 };
+      const z = this.view.zoom; if (Math.abs(z - 1) > 1e-4) { const sp = v3(0, 1.9, 0); c.pos = sp.clone().addScaled(c.pos.sub(sp), z); c.at = sp.clone().addScaled(c.at.sub(sp), z); } // V7 zoom: scale the rig about the ship so it stays framed
+      return c;
     },
   };
   return H;
@@ -3102,13 +3287,18 @@ const __m__src_render_models_js = (() => {
 const { Vec3, Quat } = __m__src_math_js;
 const { Geo, QX, QY, QZ, DET } = __m__src_render_geo_js;
 const SHIP_EXTENT = 2.3;
-const DARK = [0.13, 0.135, 0.15, 0], GUN = [0.26, 0.27, 0.29, 0], STEEL = [0.62, 0.62, 0.64, 0], SOOT = [0.07, 0.07, 0.075, 0], GLASS = [0.05, 0.08, 0.1, 0];
+// V7 paint regions for the garage paint shop (src/progress): a colour array may carry a tag that Geo adds to the vertex
+// detail code (hull 1.1 primary, 1.2 secondary, 1.3 accent; engine glow 0.4). The hull shader reads it only for a ship with a
+// custom paint job; geometry, factory colours and every other surface are unchanged.
+const REGION = { primary: 0.1, secondary: 0.2, accent: 0.3, glow: 0.4 };
+const tag = (c, r) => Object.assign(c, { reg: r });
+const DARK = tag([0.13, 0.135, 0.15, 0], REGION.secondary), GUN = tag([0.26, 0.27, 0.29, 0], REGION.secondary), STEEL = [0.62, 0.62, 0.64, 0], SOOT = [0.07, 0.07, 0.075, 0], GLASS = [0.05, 0.08, 0.1, 0];
 const deg = r => r * 180 / Math.PI;
 
 class Builder {
   constructor(def, paint, accent) {
     this.g = new Geo(); this.flaps = []; this.engines = []; this.nav = []; this.tips = [];
-    this.P = [...paint, 0]; this.A = [...accent, 0]; this.Aglow = [...accent.map(c => 0.55 + c * 0.45), 1];
+    this.P = tag([...paint, 0], REGION.primary); this.A = tag([...accent, 0], REGION.accent); this.Aglow = tag([...accent.map(c => 0.55 + c * 0.45), 1], REGION.glow);
   }
   paint() { return this.g.mat(0.35, 0.3, 1, DET.hull); }
   dark() { return this.g.mat(0.75, 0.5, 0, DET.hull); }
@@ -3160,7 +3350,12 @@ class Builder {
     if (this.eye) T(this.eye);
     const box = [(decal[0] - c.z) * S, (decal[1] - c.y) * S, decal[2] * S, decal[3] * S];
     const tris = this.g.i.length / 3 + this.flaps.reduce((a, f) => a + f.geo.i.length / 3, 0);
-    return { geo: this.g.build(), flaps: this.flaps, engines: this.engines, nav: this.nav, tips: this.tips, eye: this.eye || { x: 0, y: 0.6, z: 0.4 }, decal: { box, maxX: (decal[4] - 0) * S }, scale: S, tris };
+    // V7 pattern frame: centre line (x) and length (z) of the primary paint, so paint patterns sit on each ship's own
+    // spine and ends (Wisp and Corsair carry their main hull off-centre)
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; const M = this.g.m;
+    for (let k = 0, v = 0; k < P.length; k += 3, v++) if (Math.abs(M[v * 4 + 3] - (DET.hull + REGION.primary)) < 1e-4) { x0 = Math.min(x0, P[k]); x1 = Math.max(x1, P[k]); z0 = Math.min(z0, P[k + 2]); z1 = Math.max(z1, P[k + 2]); }
+    const frame = isFinite(x0) ? [(x0 + x1) / 2, z0, z1] : [0, -SHIP_EXTENT, SHIP_EXTENT];
+    return { geo: this.g.build(), flaps: this.flaps, engines: this.engines, nav: this.nav, tips: this.tips, eye: this.eye || { x: 0, y: 0.6, z: 0.4 }, decal: { box, maxX: (decal[4] - 0) * S }, scale: S, tris, frame };
   }
 }
 
@@ -3170,7 +3365,7 @@ const RED = [1, 0.12, 0.08], GRN = [0.15, 1, 0.3], WHT = [1, 1, 1];
 // Kestrel = elite crescent wing with root-integrated engines; Wisp = asymmetric experimental ring craft;
 // Lancer = needle interceptor with forward mandibles; Halberd = broad armoured heavy racer with four engines;
 // Corsair = independent build from mismatched hulls on an exposed truss.
-const CER = [0.82, 0.8, 0.76, 0], RUST = [0.42, 0.27, 0.16, 0], OLIVE = [0.33, 0.35, 0.27, 0];
+const CER = tag([0.82, 0.8, 0.76, 0], REGION.secondary), RUST = [0.42, 0.27, 0.16, 0], OLIVE = tag([0.33, 0.35, 0.27, 0], REGION.secondary);
 function kestrel(B) {
   const P = B.P, A = B.A, d = Math.PI / 180;
   B.paint().at(0, 0, 0).lathe([[0.35, -2.3], [0.5, -1.8], [0.56, -0.6], [0.52, 0.8], [0.4, 1.9], [0.22, 3.0], [0.07, 3.8], [0.01, 4.1]], 28, P, 1, 0.78);
@@ -3307,7 +3502,7 @@ function buildCockpit() {
   return { body: g.build(), screen: screen.build(), glass: glass.build() };
 }
 
-return { Vec3, QY, SHIP_EXTENT, buildShip, buildCockpit };
+return { Vec3, QY, SHIP_EXTENT, REGION, buildShip, buildCockpit };
 })();
 const __m__src_render_shipvis_js = (() => {
 // Everything drawn for one racer: hull with livery, animated control surfaces, engine glow and afterburner,
@@ -3336,31 +3531,52 @@ function shipModel(gfx, def, paint, accent) {
   return S.models.get(key);
 }
 
+// V7: a custom paint job's race-number band lives in one texture per ship, redrawn in place when the accent changes,
+// so trying colours in the garage never piles up textures
+function playerDecal(gfx, livery) {
+  const S = shared(gfx); if (!S.pdecals) S.pdecals = new Map();
+  let e = S.pdecals.get(livery.decalSlot); const sig = [livery.number, livery.band.map(v => v.toFixed(3))].join('|');
+  if (!e) { e = { tex: gfx.texture(liveryDecal(livery.number, '', livery.band)), sig }; S.pdecals.set(livery.decalSlot, e); }
+  else if (e.sig !== sig) { gfx.updateTexture(e.tex, liveryDecal(livery.number, '', livery.band)); e.sig = sig; }
+  return e.tex;
+}
+// a paint job's uniforms with this model's pattern frame (centre line and length of its primary paint); control surfaces
+// are separate meshes built around their hinge, so they pass the hinge position to keep patterns lined up with the hull
+function custFor(model, c, pivot) { if (!c) return null; const data = Float32Array.from(c.data); data.set(model.frame, 18); if (pivot) data.set([pivot.x, pivot.y, pivot.z], 21); return { ...c, data }; }
+function decalTex(gfx, livery, accent) {
+  if (livery.decalSlot && livery.band) return playerDecal(gfx, livery);
+  const key = [livery.number, livery.callsign, livery.band || accent, livery.ink].join('|'), S2 = shared(gfx);
+  if (!S2.decals) S2.decals = new Map();
+  if (!S2.decals.has(key)) S2.decals.set(key, gfx.texture(liveryDecal(livery.number, livery.callsign || '', livery.band || accent, livery.ink)));
+  return S2.decals.get(key);
+}
 class ShipVisual {
-  // livery: { paint, accent, stripe:[r,g,b,width], number, callsign, band, ink }
+  // livery: { paint, accent, stripe:[r,g,b,width], number, callsign, band, ink } (V7 adds modelAccent, custom, trail, decalSlot)
   constructor(gfx, def, livery = {}) {
     const S = shared(gfx); this.gfx = gfx; this.def = def;
-    this.model = shipModel(gfx, def, livery.paint, livery.accent);
+    this.model = shipModel(gfx, def, livery.paint, livery.modelAccent || livery.accent);
     this.accent = livery.accent || def.accent;
     const m = this.model, ds = 1 / m.scale;
-    let decal = null;
-    if (livery.number != null) {
-      const key = [livery.number, livery.callsign, livery.band || this.accent, livery.ink].join('|'), S2 = shared(gfx);
-      if (!S2.decals) S2.decals = new Map();
-      if (!S2.decals.has(key)) S2.decals.set(key, gfx.texture(liveryDecal(livery.number, livery.callsign || '', livery.band || this.accent, livery.ink)));
-      decal = { tex: S2.decals.get(key), box: m.decal.box, maxX: m.decal.maxX };
-    }
-    const stripe = livery.stripe || null;
-    this.hull = { mesh: m.mesh, prog: 'pbrShip', pos: new Vec3(), quat: new Quat(), scale: 1, visible: true, cast: true, br: 2.4, ds, stripe, decal, damage: 0, rim: [0, 0, 0],
+    const decal = livery.number != null ? { tex: decalTex(gfx, livery, this.accent), box: m.decal.box, maxX: m.decal.maxX } : null;
+    const stripe = livery.stripe || null; this.trail = livery.trail || null;
+    this.hull = { mesh: m.mesh, prog: 'pbrShip', pos: new Vec3(), quat: new Quat(), scale: 1, visible: true, cast: true, br: 2.4, ds, stripe, decal, damage: 0, rim: [0, 0, 0], cust: custFor(m, livery.custom),
       eng: (() => { const a = new Float32Array(12); m.engines.slice(0, 3).forEach((e, i) => a.set([e.x, e.y, e.z, e.r], i * 4)); return a; })(),
       faction: def.id === 'lancer' || def.id === 'halberd' ? 1 : 0, seedS: ((livery.number || 7) * 0.618) % 1 };
-    this.flaps = m.flaps.map(f => ({ f, angle: 0, it: { mesh: f.gmesh, prog: 'pbrShip', pos: new Vec3(), quat: new Quat(), scale: 1, visible: true, cast: true, br: 1.6, ds } }));
+    this.flaps = m.flaps.map(f => ({ f, angle: 0, it: { mesh: f.gmesh, prog: 'pbrShip', pos: new Vec3(), quat: new Quat(), scale: 1, visible: true, cast: true, br: 1.6, ds, cust: custFor(m, livery.custom, f.pivot) } }));
     const ac = this.accent;
     this.flames = m.engines.map(e => ({ e, it: { mesh: S.cone, prog: 'unlit', blend: 'add', mode: 2, pos: new Vec3(), quat: new Quat(), sx: 1, sy: 1, sz: 1, visible: false, color: [0.55 + ac[0] * 0.6, 0.55 + ac[1] * 0.6, 0.6 + ac[2] * 0.5, 1], intensity: 2, opacity: 1, layer: 4, br: 6 } }));
     this.shield = { mesh: S.bubble, prog: 'unlit', blend: 'add', mode: 4, pos: new Vec3(), quat: new Quat(), scale: 2.65, visible: false, color: [0.35, 0.75, 1, 1], intensity: 1.05, opacity: 1, layer: 5, br: 3 };
     this.items = [this.hull, ...this.flaps.map(f => f.it), ...this.flames.map(f => f.it), this.shield];
     this.exh = 0; this.vap = 0; this.smk = 0; this.flick = 1; this.boostK = 0; this.navPhase = Math.random() * 3;
     this.enginesW = m.engines.map(() => new Vec3());
+  }
+  // V7: apply a new paint job to this ship without rebuilding anything (garage preview, Apply)
+  setLivery(livery) {
+    const ac = this.accent = livery.accent || this.def.accent;
+    this.hull.cust = custFor(this.model, livery.custom); for (const f of this.flaps) f.it.cust = custFor(this.model, livery.custom, f.f.pivot);
+    this.hull.stripe = livery.stripe || null; this.trail = livery.trail || null;
+    for (const f of this.flames) f.it.color = [0.55 + ac[0] * 0.6, 0.55 + ac[1] * 0.6, 0.6 + ac[2] * 0.5, 1];
+    if (this.hull.decal && livery.number != null) this.hull.decal.tex = decalTex(this.gfx, livery, ac);
   }
   setVisible(v) { this.hull.visible = v; for (const f of this.flaps) f.it.visible = v; if (!v) { for (const f of this.flames) f.it.visible = false; this.shield.visible = false; } this.visible = v; }
 
@@ -3412,8 +3628,11 @@ class ShipVisual {
     // vapour trails while sliding or pulling hard
     const pull = Math.abs(c.pitch || 0) + Math.abs(c.yaw || 0);
     if ((st.drifting || pull > 1.2) && sp > 60 && near < 300 * detail) {
+      let tr = 0.9, tg = 0.93, tb = 1; const T = this.trail; // V7 contrail colour (special effects); prism cycles the hue
+      if (T === 'prism') { const h = (t * 0.35) % 1; tr = 0.5 + 0.5 * Math.cos(6.283 * h); tg = 0.5 + 0.5 * Math.cos(6.283 * (h - 0.333)); tb = 0.5 + 0.5 * Math.cos(6.283 * (h - 0.667)); }
+      else if (T) { tr = T[0]; tg = T[1]; tb = T[2]; }
       for (const tp of m.tips) { tmp.set(tp.x, tp.y, tp.z).applyQuat(st.quat).add(st.pos);
-        fx.spawn(tmp.x, tmp.y, tmp.z, st.vel.x * 0.05, st.vel.y * 0.05, st.vel.z * 0.05, 0.55, 0.11, 0.22, 0.9, 0.93, 1, st.drifting ? 0.32 : 0.18, false, 0, 0.0); }
+        fx.spawn(tmp.x, tmp.y, tmp.z, st.vel.x * 0.05, st.vel.y * 0.05, st.vel.z * 0.05, 0.55, 0.11, 0.22, tr, tg, tb, st.drifting ? 0.32 : 0.18, false, 0, 0.0); }
     }
     // shield bubble
     this.shield.visible = st.shield > 0; if (st.shield > 0) { this.shield.pos.copy(st.pos); this.shield.quat.copy(st.quat); this.shield.opacity = (st.shield < 0.6 ? (Math.floor(t * 18) % 2 ? 0.35 : 1) : 1) * (0.85 + 0.15 * Math.sin(t * 9)); }
@@ -3446,7 +3665,7 @@ const RACE_NUMBERS = { 'VEX ARDEN': 11, 'MARA QUELL': 23, 'DAX ORIN': 4, 'NYLA V
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 function liveryFor(r) {
   const d = r.ship.def;
-  if (r.isPlayer) return { paint: d.color, accent: d.accent, stripe: [...mix(d.accent, [1, 1, 1], 0.25), 0.11], number: 1, callsign: '', band: mix(d.accent, [0, 0, 0], 0.15) };
+  if (r.isPlayer) return r.livery || { paint: d.color, accent: d.accent, stripe: [...mix(d.accent, [1, 1, 1], 0.25), 0.11], number: 1, callsign: '', band: mix(d.accent, [0, 0, 0], 0.15) }; // V7: the player's paint job (progress/customize.js)
   const paint = r.paint || d.color;
   return { paint, accent: d.accent, stripe: [0.93, 0.93, 0.95, 0.09], number: RACE_NUMBERS[r.name] ?? (10 + r.id), callsign: r.name, band: mix(paint, [0, 0, 0], 0.45), ink: [1, 1, 1] };
 }
@@ -3841,10 +4060,1114 @@ function mergeSave(save, text) {
 
 return { Input, loadSave, storeSave, mergeSave };
 })();
+const __m__src_progress_economy_js = (() => {
+// GALACTIC RUSH V7 — the one place for progression numbers: currencies, race and championship rewards, Style Token
+// sources, milestones and spacecraft upgrades. Game code and UI read these; nothing else hard-codes a reward or a cost.
+// Calibration (see README "Economy"): relaxed-handling laps measure 37-63 s (about 45 s on average) and every race
+// adds ~25 s of countdown, finish and menus, so a 3-lap race is ~2.8 minutes from start to start.
+
+const CURRENCIES = {
+  CR: { id: 'CR', name: 'Credits', short: 'CR', desc: 'Earned by racing. Spent on upgrades and on some cosmetics.' },
+  ST: { id: 'ST', name: 'Style Tokens', short: 'ST', desc: 'Earned through wins, course records, championships and milestones. Spent on cosmetics only.' },
+};
+const DIFF_ORDER = ['rookie', 'pro', 'ace'];
+const MODES = ['quick', 'champ', 'trial'];
+const MAX_BALANCE = 999999999;
+const MAX_REWARD = 100000; // a single reward line above this is treated as invalid data
+
+// Lap multipliers for the lap counts the game offers (1, 2, 3, 5). They keep credits per minute nearly flat across
+// lap counts (1 lap ~1.2 min, 3 laps ~2.8 min, 5 laps ~4.4 min with overheads): longer races pay more in total,
+// and short races are not a faster way to farm. Other counts interpolate (and extrapolate at +0.25 per lap).
+const LAP_MULT = { 1: 0.45, 2: 0.75, 3: 1.0, 5: 1.5 };
+function lapMult(laps) {
+  const n = Math.round(+laps); if (!(n >= 1)) return 0;
+  if (LAP_MULT[n] != null) return LAP_MULT[n];
+  const keys = Object.keys(LAP_MULT).map(Number).sort((a, b) => a - b), hi = keys[keys.length - 1];
+  if (n > hi) return LAP_MULT[hi] + (n - hi) * 0.25;
+  for (let k = 1; k < keys.length; k++) if (n < keys[k]) { const a = keys[k - 1], b = keys[k]; return LAP_MULT[a] + (LAP_MULT[b] - LAP_MULT[a]) * (n - a) / (b - a); }
+  return 1;
+}
+
+// Single races (Quick race): Base x Difficulty x Laps x Placement, rounded. Every finisher is paid, on every replay.
+const SINGLE_RACE = {
+  base: 150,
+  difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6 },
+  placement: [1.25, 1.15, 1.08, 1.0, 0.95, 0.9], // P1..P6: a modest bonus at the front, a fair wage at the back
+};
+// Time trial: no rivals, so no difficulty or placement factor; a practice wage per run.
+const TIME_TRIAL = { base: 60 };
+
+// Championships: four rounds. Each round pays its own (slightly smaller) race reward; finishing all four rounds pays a
+// completion bonus once per run, plus a final-standing bonus. Both bonuses scale with difficulty and lap count.
+const CHAMPIONSHIP_REWARDS = {
+  race: { base: 140, difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6 }, placement: [1.25, 1.15, 1.08, 1.0, 0.95, 0.9] },
+  completion: { rookie: 500, pro: 800, ace: 1200 }, // x lap multiplier
+  standing: [0.4, 0.25, 0.1, 0, 0, 0], // final standing P1..P6, as a fraction of the completion bonus
+  tokens: { completion: { rookie: 2, pro: 3, ace: 5 }, title: { rookie: 1, pro: 2, ace: 3 } },
+};
+
+// Style Token sources that hook into systems the game already has (race results, course records, championships).
+// Add a source here and it is paid by the same transaction as the race it belongs to.
+const TOKEN_SOURCES = [
+  { id: 'raceWin', name: 'Race win', ST: 1, when: c => c.mode !== 'trial' && c.place === 1 },
+  { id: 'courseRecord', name: 'New course record', ST: 1, when: c => !!c.record },
+];
+
+// One-time career milestones (lifetime achievements, not replayable content).
+const MILESTONES = [
+  { id: 'races-1', stat: 'races', at: 1, ST: 2, name: 'First race completed' },
+  { id: 'races-10', stat: 'races', at: 10, ST: 3, name: '10 races completed' },
+  { id: 'races-25', stat: 'races', at: 25, ST: 4, name: '25 races completed' },
+  { id: 'races-50', stat: 'races', at: 50, ST: 6, name: '50 races completed' },
+  { id: 'races-100', stat: 'races', at: 100, ST: 10, name: '100 races completed' },
+  { id: 'wins-1', stat: 'wins', at: 1, ST: 2, name: 'First win' },
+  { id: 'wins-10', stat: 'wins', at: 10, ST: 4, name: '10 wins' },
+  { id: 'wins-25', stat: 'wins', at: 25, ST: 6, name: '25 wins' },
+  { id: 'podiums-10', stat: 'podiums', at: 10, ST: 3, name: '10 podium finishes' },
+];
+
+// Spacecraft upgrades. Every category changes real flight-model parameters (src/sim/flight.js, race.js).
+// Effects are a share of each ship's own base value, so ships keep their character: a fully upgraded ship still trails
+// the class leader of that stat (e.g. a maxed Corsair stays below a stock Lancer's top speed).
+const UPGRADES = {
+  maxLevel: 5,
+  costs: [500, 900, 1500, 2400, 3600], // CR to go from level k to k+1
+  curve: [0, 0.25, 0.48, 0.68, 0.85, 1], // share of the full effect at each level (later levels give a little less)
+  categories: [
+    { id: 'engine', name: 'Engine', stat: 'SPEED', desc: 'Raises top speed.', effects: [['maxSpeed', 'mul', 0.05]] },
+    { id: 'accel', name: 'Acceleration', stat: 'ACCEL', desc: 'More thrust: reaches top speed sooner and exits corners faster.', effects: [['accel', 'mul', 0.15]] },
+    { id: 'handling', name: 'Handling', stat: 'HANDLING', desc: 'Faster pitch, yaw and roll, and more lateral grip.', effects: [['yawRate', 'mul', 0.08], ['pitchRate', 'mul', 0.08], ['rollRate', 'mul', 0.08], ['grip', 'mul', 0.08]] },
+    { id: 'boost', name: 'Boost', stat: 'BOOST', desc: 'Bigger boost tank, faster recharge and a slightly stronger boost.', effects: [['boostCap', 'mul', 0.15], ['boostRegen', 'mul', 0.2], ['boostMult', 'add', 0.04]] },
+    { id: 'stability', name: 'Stability', stat: 'ARMOUR', desc: 'Heavier armour: more hull, less damage and less knock-back in collisions.', effects: [['hull', 'mul', 0.15], ['mass', 'mul', 0.1]] },
+  ],
+};
+const UPGRADE_IDS = UPGRADES.categories.map(c => c.id);
+
+return { CURRENCIES, DIFF_ORDER, MODES, MAX_BALANCE, MAX_REWARD, LAP_MULT, lapMult, SINGLE_RACE, TIME_TRIAL, CHAMPIONSHIP_REWARDS, TOKEN_SOURCES, MILESTONES, UPGRADES, UPGRADE_IDS };
+})();
+const __m__src_progress_catalog_js = (() => {
+// GALACTIC RUSH V7 — cosmetic catalog: every item's definition in one place (id, name, category, slot, description,
+// rarity, classification, unlock method, cost, currency, render parameters). Unlock and equipped status live in the
+// player profile; this file never changes at runtime. Cosmetics carry no gameplay values of any kind.
+const { SHIPS } = __m__src_config_js;
+const RARITIES = [
+  { id: 'common', name: 'Common', color: '#a7b4c4' },
+  { id: 'uncommon', name: 'Uncommon', color: '#73f7ae' },
+  { id: 'rare', name: 'Rare', color: '#6fb8ff' },
+  { id: 'epic', name: 'Epic', color: '#c88cff' },
+  { id: 'legendary', name: 'Legendary', color: '#ffc66e' },
+];
+// earnable: bought with Credits or Style Tokens (or owned from the start); special: earned only by playing (championships,
+// milestones, achievements); event: reserved for future events (none in this version); premium: a locked placeholder for a
+// possible future premium catalog. Premium items cannot be bought, unlocked or equipped in this version.
+const CLASSES = {
+  earnable: { name: 'Earnable' },
+  special: { name: 'Special' },
+  event: { name: 'Event' },
+  premium: { name: 'Premium', label: 'Premium Cosmetic — Coming Soon' },
+};
+const PREMIUM_LABEL = 'Premium Cosmetic — Coming Soon';
+const CATEGORIES = [
+  { id: 'colors', name: 'Colors' }, { id: 'patterns', name: 'Patterns' }, { id: 'finishes', name: 'Finishes' },
+  { id: 'effects', name: 'Special Effects' }, { id: 'premium', name: 'Premium Cosmetics — Coming Soon' },
+];
+// slots a ship's paint job has; 'paint' is an optional special paint that replaces the primary colour
+const SLOTS = ['paint', 'pattern', 'finish', 'exhaust', 'trail'];
+const SLOT_DEFAULT = { paint: null, pattern: 'pattern.factory', finish: 'finish.glossy', exhaust: 'exhaust.standard', trail: 'trail.standard' };
+
+// shader ids (M_CUSTOM in render/gfx.js)
+const PATTERN_IDS = { factory: 0, solid: 1, stripes: 2, double: 3, chevron: 4, split: 5, geometric: 6, hex: 7, camo: 8, hazard: 9 };
+const FINISH_IDS = { glossy: 0, matte: 1, metallic: 2, brushed: 3, worn: 4 };
+const PAINT_TYPES = { flip: 1, pearl: 2, neon: 3 };
+
+const I = (id, name, category, slot, rarity, cls, unlock, desc, render = {}) => {
+  const price = unlock.type === 'credits' || unlock.type === 'tokens' ? unlock.price : null;
+  return { id, name, category, slot, rarity, class: cls, unlock, price, currency: unlock.type === 'credits' ? 'CR' : unlock.type === 'tokens' ? 'ST' : null, desc, render };
+};
+const own = { type: 'default' }, cr = price => ({ type: 'credits', price }), st = price => ({ type: 'tokens', price });
+const champ = (diff, title = false) => ({ type: 'championship', diff, title }), mile = (stat, at) => ({ type: 'milestone', stat, at });
+const prem = { type: 'premium' };
+
+const ITEMS = [
+  // Colors: special paints that replace the primary colour (plain colours are free in the paint shop)
+  I('paint.glacier', 'Glacier Pearl', 'colors', 'paint', 'uncommon', 'earnable', cr(900), 'Ice-white paint with a cold blue pearl that blooms at grazing angles.', { type: 'pearl', c0: '#dfe9ef', c1: '#6fa7e8' }),
+  I('paint.aurora', 'Aurora Flip', 'colors', 'paint', 'rare', 'earnable', cr(1400), 'Colour-shift paint: deep teal face-on, violet as the panels turn away.', { type: 'flip', c0: '#0f8f8a', c1: '#6a3fd1' }),
+  I('paint.solar', 'Solar Flip', 'colors', 'paint', 'rare', 'earnable', cr(1400), 'Colour-shift paint that runs from molten gold to crimson across every curve.', { type: 'flip', c0: '#e0a526', c1: '#b3122f' }),
+  I('paint.nebula', 'Nebula Pearl', 'colors', 'paint', 'epic', 'earnable', st(6), 'Rose-white base with a violet pearl, like dust lit by a young star.', { type: 'pearl', c0: '#eadbe3', c1: '#8c5ad8' }),
+  I('paint.neon-ion', 'Neon Ion', 'colors', 'paint', 'epic', 'earnable', st(8), 'Self-lit cyan paint. Glows softly on night courses without hiding the hull detail.', { type: 'neon', c0: '#27d2f2', c1: '#27d2f2' }),
+  I('paint.neon-ember', 'Neon Ember', 'colors', 'paint', 'epic', 'special', { type: 'achievement', stat: 'trackWins', at: 4 }, 'Self-lit ember-orange paint. Win a race on every course to earn it.', { type: 'neon', c0: '#ff7a2a', c1: '#ff7a2a' }),
+  I('paint.champion', 'Starlane Champion', 'colors', 'paint', 'legendary', 'special', champ('ace', true), 'Gold-to-bronze flip paint for the Ace Championship title holder.', { type: 'flip', c0: '#f3c74a', c1: '#8a4b16' }),
+  // Patterns (drawn on the hull in the ship's own coordinates by the hull shader)
+  I('pattern.factory', 'Factory Livery', 'patterns', 'pattern', 'common', 'earnable', own, 'The team livery the ship leaves the factory with: a fine centre line in the accent colour.', { id: PATTERN_IDS.factory }),
+  I('pattern.solid', 'Solid', 'patterns', 'pattern', 'common', 'earnable', own, 'One clean colour over the whole primary paint.', { id: PATTERN_IDS.solid }),
+  I('pattern.stripes', 'Racing Stripes', 'patterns', 'pattern', 'common', 'earnable', own, 'A broad centre stripe in the secondary colour with accent pinstripes.', { id: PATTERN_IDS.stripes }),
+  I('pattern.double', 'Double Stripes', 'patterns', 'pattern', 'uncommon', 'earnable', cr(600), 'Twin stripes in the secondary colour either side of the spine.', { id: PATTERN_IDS.double }),
+  I('pattern.chevron', 'Chevron', 'patterns', 'pattern', 'uncommon', 'earnable', cr(900), 'Forward-pointing chevrons in the secondary colour, edged in the accent.', { id: PATTERN_IDS.chevron }),
+  I('pattern.split', 'Split Color', 'patterns', 'pattern', 'uncommon', 'earnable', cr(900), 'Port side in the primary colour, starboard in the secondary, split by an accent line.', { id: PATTERN_IDS.split }),
+  I('pattern.geometric', 'Geometric', 'patterns', 'pattern', 'rare', 'earnable', cr(1800), 'Large faceted triangles in three tones of the primary and secondary colours.', { id: PATTERN_IDS.geometric }),
+  I('pattern.hex', 'Hexagonal', 'patterns', 'pattern', 'rare', 'earnable', st(4), 'A honeycomb of secondary-colour cell walls over the primary paint.', { id: PATTERN_IDS.hex }),
+  I('pattern.camo', 'Digital Camouflage', 'patterns', 'pattern', 'epic', 'earnable', st(7), 'Pixel camouflage in the primary and secondary colours at two block sizes.', { id: PATTERN_IDS.camo }),
+  I('pattern.hazard', 'Industrial Hazard', 'patterns', 'pattern', 'epic', 'special', champ('rookie'), 'Diagonal hazard bands across the tail and nose. Complete the Rookie Championship to earn it.', { id: PATTERN_IDS.hazard }),
+  // Finishes (material parameters of the painted panels)
+  I('finish.glossy', 'Glossy', 'finishes', 'finish', 'common', 'earnable', own, 'Clear-coated race paint with honest wear on the edges. The factory finish.', { id: FINISH_IDS.glossy }),
+  I('finish.matte', 'Matte', 'finishes', 'finish', 'common', 'earnable', cr(400), 'Flat, non-reflective paint with no clear coat.', { id: FINISH_IDS.matte }),
+  I('finish.metallic', 'Metallic', 'finishes', 'finish', 'uncommon', 'earnable', cr(1200), 'Metal-flake paint under a clear coat: the colour tints the reflections.', { id: FINISH_IDS.metallic }),
+  I('finish.brushed', 'Brushed Metal', 'finishes', 'finish', 'rare', 'earnable', st(5), 'Bare anodised metal with fine brushing along the hull.', { id: FINISH_IDS.brushed }),
+  I('finish.worn', 'Worn Paint', 'finishes', 'finish', 'rare', 'special', mile('races', 25), 'Chipped, sun-faded paint over bare metal, earned the long way: complete 25 races.', { id: FINISH_IDS.worn }),
+  // Special effects: engine exhaust and wingtip contrail colours (visible in races)
+  I('exhaust.standard', 'Standard Exhaust', 'effects', 'exhaust', 'common', 'earnable', own, 'Engine glow and exhaust follow the accent colour.', { color: null }),
+  I('exhaust.plasma', 'Blue Plasma', 'effects', 'exhaust', 'uncommon', 'earnable', cr(700), 'A hot blue-white plasma exhaust.', { color: '#4d9dff' }),
+  I('exhaust.solar', 'Solar Flare', 'effects', 'exhaust', 'rare', 'earnable', st(3), 'Amber exhaust with a white-hot core.', { color: '#ff9a2e' }),
+  I('exhaust.violet', 'Violet Ion', 'effects', 'exhaust', 'epic', 'special', champ('pro'), 'Violet ion exhaust. Complete the Pro Championship to earn it.', { color: '#b45cff' }),
+  I('exhaust.gold', 'Champion Gold', 'effects', 'exhaust', 'legendary', 'special', champ('ace'), 'Gold exhaust for pilots who complete the Ace Championship.', { color: '#ffcf5a' }),
+  I('trail.standard', 'Standard Contrails', 'effects', 'trail', 'common', 'earnable', own, 'White wingtip vapour.', { color: '#e6eeff' }),
+  I('trail.neon', 'Neon Contrails', 'effects', 'trail', 'uncommon', 'earnable', cr(500), 'Wingtip vapour tinted cyan.', { color: '#5fe3ff' }),
+  I('trail.ember', 'Ember Contrails', 'effects', 'trail', 'rare', 'earnable', st(4), 'Wingtip vapour in glowing ember orange.', { color: '#ff8a3d' }),
+  I('trail.prism', 'Prism Contrails', 'effects', 'trail', 'legendary', 'special', { type: 'achievement', stat: 'byDiff.ace.wins', at: 5 }, 'Contrails that cycle through the spectrum. Win 5 races on Ace to earn them.', { color: 'prism' }),
+  // Premium placeholders: locked, not purchasable, never unlocked, no gameplay values
+  I('premium.neon-skin', 'Premium Neon Skin', 'premium', 'skin', 'legendary', 'premium', prem, 'Placeholder for a possible future premium catalog.'),
+  I('premium.carbon-skin', 'Premium Carbon Skin', 'premium', 'skin', 'epic', 'premium', prem, 'Placeholder for a possible future premium catalog.'),
+  I('premium.plasma-pattern', 'Premium Plasma Pattern', 'premium', 'pattern', 'epic', 'premium', prem, 'Placeholder for a possible future premium catalog.'),
+  I('premium.champ-finish', 'Premium Championship Finish', 'premium', 'finish', 'legendary', 'premium', prem, 'Placeholder for a possible future premium catalog.'),
+];
+const ITEM = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+const DEFAULT_ITEMS = ITEMS.filter(i => i.unlock.type === 'default').map(i => i.id);
+const isPremium = it => !!it && it.class === 'premium';
+const isPurchasable = it => !!it && it.class === 'earnable' && (it.unlock.type === 'credits' || it.unlock.type === 'tokens') && it.price > 0 && (it.currency === 'CR' || it.currency === 'ST');
+
+// Free colours: a palette of named swatches; any colour can also be picked by hue or typed as hex.
+const SWATCHES = [
+  ['Signal Orange', '#e8892b'], ['Racing Red', '#d7263d'], ['Crimson', '#8e1b2c'], ['Solar Yellow', '#f2c230'], ['Lime', '#8cd13f'], ['Emerald', '#1f9e6a'],
+  ['Teal', '#1fb5ac'], ['Ion Cyan', '#39c6f0'], ['Cobalt', '#2d5bd6'], ['Violet', '#7a4bd8'], ['Magenta', '#d23c9a'], ['Pearl White', '#e9ecef'],
+  ['Silver', '#9aa3ad'], ['Gunmetal', '#42454a'], ['Graphite', '#2a2e35'], ['Midnight', '#141a26'], ['Bronze', '#9c6b3c'], ['Olive Drab', '#545945'],
+];
+
+const toHex = c => '#' + c.slice(0, 3).map(v => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+// each ship's secondary surfaces (engine housings, canopy frames, ventral plates, booms; Wisp's ceramic ring, Corsair's
+// olive hull) are tinted relative to this factory colour, so the default secondary reproduces the stock ship exactly
+const SECONDARY_REF = { kestrel: [0.26, 0.27, 0.29], wisp: [0.82, 0.8, 0.76], lancer: [0.26, 0.27, 0.29], halberd: [0.26, 0.27, 0.29], corsair: [0.33, 0.35, 0.27] };
+function defaultCustom(shipId) {
+  const s = SHIPS.find(x => x.id === shipId) || SHIPS[0];
+  return { primary: toHex(s.color), secondary: toHex(SECONDARY_REF[s.id] || SECONDARY_REF.kestrel), accent: toHex(s.accent), ...SLOT_DEFAULT };
+}
+
+return { RARITIES, CLASSES, PREMIUM_LABEL, CATEGORIES, SLOTS, SLOT_DEFAULT, PATTERN_IDS, FINISH_IDS, PAINT_TYPES, ITEMS, ITEM, DEFAULT_ITEMS, isPremium, isPurchasable, SWATCHES, toHex, SECONDARY_REF, defaultCustom };
+})();
+const __m__src_progress_upgrades_js = (() => {
+// GALACTIC RUSH V7 — the upgrade pipeline: base stats (config.js, never modified) + saved levels -> effective stats,
+// recomputed from scratch every time, so nothing accumulates however often a race is started or restarted.
+const { UPGRADES, UPGRADE_IDS } = __m__src_progress_economy_js;
+const CATEGORY = Object.fromEntries(UPGRADES.categories.map(c => [c.id, c]));
+const upgradeCost = level => (Number.isInteger(level) && level >= 0 && level < UPGRADES.maxLevel ? UPGRADES.costs[level] : null);
+const levelShare = level => UPGRADES.curve[Math.max(0, Math.min(UPGRADES.maxLevel, level | 0))];
+const remainingCost = level => UPGRADES.costs.slice(level).reduce((a, b) => a + b, 0);
+
+// A new definition object; the base is only read. Unknown or out-of-range levels count as 0.
+function effectiveDef(base, levels = {}) {
+  const def = { ...base };
+  for (const c of UPGRADES.categories) {
+    const lv = Number.isInteger(levels[c.id]) && levels[c.id] >= 0 && levels[c.id] <= UPGRADES.maxLevel ? levels[c.id] : 0, k = levelShare(lv);
+    if (!k) continue;
+    for (const [key, op, v] of c.effects) def[key] = op === 'mul' ? base[key] * (1 + v * k) : base[key] + v * k;
+  }
+  def.upgrades = Object.fromEntries(UPGRADE_IDS.map(id => [id, Number.isInteger(levels[id]) ? levels[id] : 0]));
+  return def;
+}
+
+// What the UI shows for a category: current and next value of its headline stat, in the units the hangar uses
+const KMH = v => Math.round(v * 3.6);
+const HEADLINE = {
+  engine: { label: 'Top speed', unit: 'km/h', get: d => KMH(d.maxSpeed) },
+  accel: { label: 'Thrust', unit: 'm/s²', get: d => +d.accel.toFixed(1) },
+  handling: { label: 'Turn rate', unit: 'rad/s', get: d => +d.yawRate.toFixed(2) },
+  boost: { label: 'Boost tank', unit: '', get: d => Math.round(d.boostCap) },
+  stability: { label: 'Hull', unit: '', get: d => Math.round(d.hull) },
+};
+// full stat table rows: [label, getter, unit]
+const STAT_ROWS = [
+  ['Top speed', d => KMH(d.maxSpeed), 'km/h'], ['Thrust', d => +d.accel.toFixed(1), 'm/s²'], ['Yaw rate', d => +d.yawRate.toFixed(2), 'rad/s'], ['Pitch rate', d => +d.pitchRate.toFixed(2), 'rad/s'],
+  ['Grip', d => +d.grip.toFixed(2), ''], ['Boost tank', d => Math.round(d.boostCap), ''], ['Boost recharge', d => +d.boostRegen.toFixed(1), '/s'], ['Boost power', d => '×' + d.boostMult.toFixed(2), ''],
+  ['Hull', d => Math.round(d.hull), ''], ['Mass', d => d.mass.toFixed(2), 't×'],
+];
+function preview(base, levels, cat) {
+  const lv = levels[cat] | 0, cur = effectiveDef(base, levels), nxt = lv < UPGRADES.maxLevel ? effectiveDef(base, { ...levels, [cat]: lv + 1 }) : null, h = HEADLINE[cat];
+  return { level: lv, max: UPGRADES.maxLevel, cost: upgradeCost(lv), now: h.get(cur), next: nxt ? h.get(nxt) : null, base: h.get(base), full: h.get(effectiveDef(base, { ...levels, [cat]: UPGRADES.maxLevel })), label: h.label, unit: h.unit };
+}
+
+return { CATEGORY, upgradeCost, levelShare, remainingCost, effectiveDef, HEADLINE, STAT_ROWS, preview };
+})();
+const __m__src_progress_customize_js = (() => {
+// GALACTIC RUSH V7 — paint jobs: colour helpers and the translation of a saved customisation into what the renderer needs
+// (shader uniforms for the hull, exhaust and contrail colours, the livery stripe and race-number band).
+const { SHIPS } = __m__src_config_js;
+const { ITEM, PATTERN_IDS, PAINT_TYPES, SLOT_DEFAULT, defaultCustom } = __m__src_progress_catalog_js;
+const hexToRgb = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+const rgbToHex = c => '#' + c.map(v => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+// accepts '#rrggbb', 'rrggbb', '#rgb' or 'rgb'; returns '#rrggbb' (lower case) or null
+function normHex(s) {
+  const t = String(s || '').trim().toLowerCase().replace(/^#/, '');
+  if (/^[0-9a-f]{6}$/.test(t)) return '#' + t;
+  if (/^[0-9a-f]{3}$/.test(t)) return '#' + t.split('').map(c => c + c).join('');
+  return null;
+}
+function rgbToHsl([r, g, b]) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let h = 0, s = 0;
+  if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; }
+  return [h, s, l];
+}
+function hslToRgb([h, s, l]) {
+  const f = n => { const k = (n + h / 30) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+  return [f(0), f(8), f(4)];
+}
+// hue slider: keep the colour's saturation and lightness (greys get a usable saturation so the slider does something)
+function withHue(hex, hue) { const [, s, l] = rgbToHsl(hexToRgb(hex) || [0.5, 0.5, 0.5]); return rgbToHex(hslToRgb([((+hue % 360) + 360) % 360, s < 0.08 ? 0.6 : s, l < 0.06 ? 0.45 : l > 0.94 ? 0.6 : l])); }
+function withLight(hex, light) { const [h, s] = rgbToHsl(hexToRgb(hex) || [0.5, 0.5, 0.5]); return rgbToHex(hslToRgb([h, s, Math.min(0.97, Math.max(0.03, +light))])); }
+const hueOf = hex => Math.round(rgbToHsl(hexToRgb(hex) || [0, 0, 0])[0]);
+const lightOf = hex => +rgbToHsl(hexToRgb(hex) || [0, 0, 0])[2].toFixed(3);
+
+const isDefaultCustom = (shipId, c) => { const d = defaultCustom(shipId); return Object.keys(d).every(k => d[k] === c[k]); };
+const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+
+// Render parameters for a ship's paint job. `custom` is validated data (profile or a garage draft).
+// Factory settings give exactly the V6 player livery with custom = null, so a stock ship renders as it always did.
+// The hull mesh always keeps the factory colours (paint, modelAccent); custom colours are shader uniforms, so changing
+// a colour never builds a new mesh.
+function resolveLivery(shipId, custom) {
+  const def = SHIPS.find(s => s.id === shipId) || SHIPS[0], c = { ...defaultCustom(def.id), ...(custom || {}) };
+  if (isDefaultCustom(def.id, c)) return { paint: def.color, modelAccent: def.accent, accent: def.accent, stripe: [...mix(def.accent, [1, 1, 1], 0.25), 0.11], number: 1, callsign: '', band: mix(def.accent, [0, 0, 0], 0.15), custom: null, trail: null, factory: true, key: 'factory:' + def.id };
+  const prim = hexToRgb(c.primary) || def.color, acc = hexToRgb(c.accent) || def.accent, secRef = hexToRgb(defaultCustom(def.id).secondary), sec = hexToRgb(c.secondary) || secRef;
+  const paint = c.paint && ITEM[c.paint] && ITEM[c.paint].slot === 'paint' ? ITEM[c.paint].render : null;
+  const pattern = (ITEM[c.pattern] || ITEM[SLOT_DEFAULT.pattern]).render.id, finish = (ITEM[c.finish] || ITEM[SLOT_DEFAULT.finish]).render.id;
+  const exItem = ITEM[c.exhaust], trItem = ITEM[c.trail];
+  const exhaust = exItem && exItem.render.color ? hexToRgb(exItem.render.color) : null;
+  const trail = trItem && trItem.render.color === 'prism' ? 'prism' : trItem && trItem.render.color && trItem.id !== SLOT_DEFAULT.trail ? hexToRgb(trItem.render.color) : null;
+  const stripe = pattern === PATTERN_IDS.factory ? [...mix(acc, [1, 1, 1], 0.25), 0.11] : null; // the factory livery's centre line follows the accent
+  const p0 = paint ? hexToRgb(paint.c0) : prim, p1 = paint ? hexToRgb(paint.c1) : prim, data = new Float32Array(24);
+  [p0, sec, acc, secRef, p1, exhaust || acc, [0, -2.3, 2.3], [0, 0, 0]].forEach((v, i) => data.set(v, i * 3)); // primary, secondary, accent, secondary reference, paint 2nd colour, engine glow, pattern frame and part offset (set per model and part)
+  return { paint: def.color, modelAccent: def.accent, accent: exhaust || acc, stripe, number: 1, callsign: '', band: mix(acc, [0, 0, 0], 0.15), decalSlot: 'player:' + def.id,
+    custom: { on: 1, pattern, finish, paint: paint ? PAINT_TYPES[paint.type] || 0 : 0, data }, trail, factory: false, key: JSON.stringify(c) };
+}
+
+return { hexToRgb, rgbToHex, normHex, rgbToHsl, hslToRgb, withHue, withLight, hueOf, lightOf, isDefaultCustom, resolveLivery };
+})();
+const __m__src_progress_profile_js = (() => {
+// GALACTIC RUSH V7 — the player profile: a versioned data model, its migrations, and validation that repairs or rejects
+// anything inconsistent. Loaded data is never trusted: every field is checked, clamped or reset before the game uses it.
+const { SHIPS, CHAMPIONSHIP, AI_ROSTER } = __m__src_config_js;
+const { TRACK_DEFS } = __m__src_sim_tracks_js;
+const { DIFF_ORDER, MODES, MAX_BALANCE, MILESTONES, UPGRADES, UPGRADE_IDS } = __m__src_progress_economy_js;
+const { ITEM, DEFAULT_ITEMS, SLOTS, SLOT_DEFAULT, defaultCustom } = __m__src_progress_catalog_js;
+const PROFILE_VERSION = 1;
+const LIMITS = { history: 30, runs: 30, seen: 400, tx: 60 };
+const SHIP_IDS = SHIPS.map(s => s.id), TRACK_IDS = TRACK_DEFS.map(d => d.id);
+const CHAMP_NAMES = [...AI_ROSTER.map(a => a.name), 'YOU'];
+const RUN_ID = /^champ-[a-z0-9]{4,12}-[a-z0-9]{4,12}$/;
+const EVENT_ID = /^[a-z]{2,12}:[a-z0-9:-]{4,80}$/;
+const HEX = /^#[0-9a-f]{6}$/;
+
+const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+const int = (v, lo, hi, d = lo) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d; };
+const zeroUp = () => Object.fromEntries(UPGRADE_IDS.map(k => [k, 0]));
+const tally = () => ({ races: 0, wins: 0, podiums: 0, credits: 0 });
+
+function createProfile(now = Date.now()) {
+  return {
+    version: PROFILE_VERSION, createdAt: now, updatedAt: now,
+    wallet: { CR: 0, ST: 0 }, earned: { CR: 0, ST: 0 }, spent: { CR: 0, ST: 0 },
+    selectedShip: SHIP_IDS[0],
+    ships: Object.fromEntries(SHIP_IDS.map(id => [id, { unlocked: true, upgrades: zeroUp(), custom: defaultCustom(id) }])),
+    inventory: { unlocked: [...DEFAULT_ITEMS], acquired: {} },
+    championships: { unlocked: ['rookie'], completed: { rookie: 0, pro: 0, ace: 0 }, titles: { rookie: 0, pro: 0, ace: 0 }, best: { rookie: null, pro: null, ace: null }, active: null, runs: [] },
+    stats: { races: 0, wins: 0, podiums: 0, byMode: Object.fromEntries(MODES.map(m => [m, tally()])), byTrack: Object.fromEntries(TRACK_IDS.map(t => [t, { ...tally(), best: null }])), byDiff: Object.fromEntries(DIFF_ORDER.map(d => [d, tally()])) },
+    history: [], milestones: [],
+    ledger: { seen: [], tx: [], seq: 0 },
+  };
+}
+
+// Championship difficulty unlocks follow from completion records: Rookie always, Pro after a completed Rookie run, Ace after Pro.
+function derivedChampUnlocks(ch) { const u = ['rookie']; if ((ch.completed.rookie || 0) > 0) u.push('pro'); if ((ch.completed.pro || 0) > 0) u.push('ace'); return u; }
+
+// numbers the unlock conditions of special items and milestones refer to
+function statValue(p, path) {
+  if (path === 'trackWins') return TRACK_IDS.filter(t => (p.stats.byTrack[t] || {}).wins > 0).length;
+  return path.split('.').reduce((o, k) => (o && o[k] != null ? o[k] : 0), p.stats);
+}
+function conditionMet(p, u) {
+  if (!u) return false;
+  if (u.type === 'default') return true;
+  if (u.type === 'championship') return ((u.title ? p.championships.titles : p.championships.completed)[u.diff] || 0) > 0;
+  if (u.type === 'milestone' || u.type === 'achievement') return statValue(p, u.stat) >= u.at;
+  return false; // credits/tokens need a purchase; event and premium cannot be met in this version
+}
+const unlockedSet = p => new Set(p.inventory.unlocked);
+
+function sanitizeCustom(raw, shipId, unlocked, issues = [], tag = '') {
+  const d = defaultCustom(shipId), c = { ...d };
+  if (!isObj(raw)) { if (raw !== undefined) issues.push(`${tag}custom: not an object, reset`); return c; }
+  for (const k of ['primary', 'secondary', 'accent']) {
+    const v = typeof raw[k] === 'string' ? raw[k].toLowerCase() : null;
+    if (v && HEX.test(v)) c[k] = v; else if (raw[k] !== undefined) issues.push(`${tag}${k}: invalid colour, reset`);
+  }
+  for (const s of SLOTS) {
+    const v = raw[s];
+    if (v === undefined) continue;
+    if (v === null && s === 'paint') { c.paint = null; continue; }
+    const it = ITEM[v];
+    if (it && it.slot === s && it.class !== 'premium' && unlocked.has(v)) c[s] = v;
+    else { issues.push(`${tag}${s}: ${it ? (it.class === 'premium' ? 'premium item cannot be equipped' : 'item not unlocked') : 'unknown item'} (${String(v).slice(0, 40)}), reset`); c[s] = SLOT_DEFAULT[s]; }
+  }
+  return c;
+}
+
+function sanitizeRun(r, issues, active) {
+  if (!isObj(r) || typeof r.runId !== 'string' || !RUN_ID.test(r.runId)) { issues.push('championship run: bad id, dropped'); return null; }
+  if (!DIFF_ORDER.includes(r.diff) || !SHIP_IDS.includes(r.ship)) { issues.push(`championship run ${r.runId}: bad difficulty or ship, dropped`); return null; }
+  const rounds = CHAMPIONSHIP.length, out = { runId: r.runId, diff: r.diff, laps: int(r.laps, 1, 9, 3), ship: r.ship, startedAt: int(r.startedAt, 0, 9e15, 0), round: int(r.round, 0, rounds, 0),
+    results: [], credits: { races: int(r.credits && r.credits.races, 0, MAX_BALANCE, 0), completion: 0, standing: 0, total: 0 }, tokens: int(r.tokens, 0, MAX_BALANCE, 0) };
+  const res = Array.isArray(r.results) ? r.results : [];
+  for (const x of res) { if (!isObj(x)) continue; const round = int(x.round, 0, rounds - 1, -1); if (round < 0 || out.results.some(e => e.round === round)) continue;
+    out.results.push({ round, track: TRACK_IDS.includes(x.track) ? x.track : CHAMPIONSHIP[round], place: int(x.place, 1, 6, 6), points: int(x.points, 0, 99, 0), credits: int(x.credits, 0, MAX_BALANCE, 0), eventId: typeof x.eventId === 'string' && EVENT_ID.test(x.eventId) ? x.eventId : null }); }
+  out.results.sort((a, b) => a.round - b.round);
+  if (active) {
+    if (out.results.length !== out.round || out.results.some((e, k) => e.round !== k)) { issues.push(`championship run ${r.runId}: results do not match its round counter, dropped`); return null; }
+    // finishing order of every round so far (the standings are recomputed from these with the game's own points table)
+    const orders = Array.isArray(r.orders) ? r.orders : [];
+    if (orders.length !== out.round || !orders.every(o => Array.isArray(o) && o.length === CHAMP_NAMES.length && CHAMP_NAMES.every(n => o.includes(n)))) { issues.push(`championship run ${r.runId}: finishing orders invalid, dropped`); return null; }
+    if (out.results.some((e, k) => orders[k].indexOf('YOU') + 1 !== e.place)) { issues.push(`championship run ${r.runId}: results disagree with finishing orders, dropped`); return null; }
+    out.orders = orders.map(o => [...o]);
+    return out;
+  }
+  // a finished run (completed or abandoned)
+  out.status = r.status === 'completed' ? 'completed' : 'abandoned'; out.endedAt = int(r.endedAt, 0, 9e15, 0); out.standing = r.standing == null ? null : int(r.standing, 1, 6, 6);
+  for (const k of ['completion', 'standing']) out.credits[k] = int(r.credits && r.credits[k], 0, MAX_BALANCE, 0);
+  out.credits.total = out.credits.races + out.credits.completion + out.credits.standing; out.unlocked = DIFF_ORDER.includes(r.unlocked) ? r.unlocked : null;
+  out.points = int(r.points, 0, 999, 0);
+  return out;
+}
+
+// Returns a valid profile whatever it is given; `issues` lists everything that had to be repaired.
+function sanitize(raw, now = Date.now()) {
+  const issues = [], p = createProfile(now);
+  if (!isObj(raw)) { issues.push('profile: not an object, started fresh'); return { profile: p, issues }; }
+  p.createdAt = int(raw.createdAt, 0, 9e15, now); p.updatedAt = int(raw.updatedAt, 0, 9e15, now);
+  for (const k of ['wallet', 'earned', 'spent']) for (const c of ['CR', 'ST']) {
+    const v = raw[k] && raw[k][c]; if (v === undefined) continue;
+    const n = Number(v); if (!Number.isFinite(n) || n < 0 || n > MAX_BALANCE || Math.round(n) !== n) issues.push(`${k}.${c}: invalid amount (${String(v).slice(0, 20)}), ${n < 0 ? 'set to 0' : 'clamped'}`);
+    p[k][c] = int(v, 0, MAX_BALANCE, 0);
+  }
+  // inventory first: equipped items are checked against it
+  const inv = isObj(raw.inventory) ? raw.inventory : {}, un = new Set(DEFAULT_ITEMS);
+  for (const id of Array.isArray(inv.unlocked) ? inv.unlocked : []) {
+    const it = ITEM[id];
+    if (!it) { issues.push(`inventory: unknown item ${String(id).slice(0, 40)}, dropped`); continue; }
+    if (it.class === 'premium' || it.class === 'event') { issues.push(`inventory: ${id} cannot be unlocked in this version, dropped`); continue; }
+    if (it.class === 'special') continue; // re-derived from progress below
+    un.add(id);
+  }
+  if (isObj(inv.acquired)) for (const [id, a] of Object.entries(inv.acquired)) if (un.has(id) && isObj(a)) p.inventory.acquired[id] = { at: int(a.at, 0, 9e15, 0), via: ['CR', 'ST', 'default', 'earned'].includes(a.via) ? a.via : 'earned' };
+  // stats (needed to re-derive special items)
+  const st = isObj(raw.stats) ? raw.stats : {};
+  for (const k of ['races', 'wins', 'podiums']) p.stats[k] = int(st[k], 0, 1e9, 0);
+  const fixTally = (o, src, best) => { if (!isObj(src)) return; for (const k of ['races', 'wins', 'podiums', 'credits']) o[k] = int(src[k], 0, k === 'credits' ? MAX_BALANCE : 1e9, 0);
+    if (o.podiums > o.races) o.podiums = o.races; if (o.wins > o.podiums) o.wins = o.podiums; if (best) o.best = src.best == null ? null : int(src.best, 1, 6, null); };
+  for (const m of MODES) fixTally(p.stats.byMode[m], st.byMode && st.byMode[m]);
+  for (const t of TRACK_IDS) fixTally(p.stats.byTrack[t], st.byTrack && st.byTrack[t], true);
+  for (const d of DIFF_ORDER) fixTally(p.stats.byDiff[d], st.byDiff && st.byDiff[d]);
+  if (p.stats.podiums > p.stats.races) { issues.push('stats: more podiums than races, clamped'); p.stats.podiums = p.stats.races; }
+  if (p.stats.wins > p.stats.podiums) { issues.push('stats: more wins than podiums, clamped'); p.stats.wins = p.stats.podiums; }
+  // championships: unlocks must agree with completion records
+  const ch = isObj(raw.championships) ? raw.championships : {};
+  for (const d of DIFF_ORDER) { p.championships.completed[d] = int(ch.completed && ch.completed[d], 0, 1e6, 0); p.championships.titles[d] = Math.min(p.championships.completed[d], int(ch.titles && ch.titles[d], 0, 1e6, 0));
+    p.championships.best[d] = ch.best && ch.best[d] != null ? int(ch.best[d], 1, 6, null) : null; }
+  p.championships.unlocked = derivedChampUnlocks(p.championships);
+  if (Array.isArray(ch.unlocked) && ch.unlocked.some(d => !p.championships.unlocked.includes(d))) issues.push(`championships: unlock list (${ch.unlocked.join(',')}) does not match completion records, corrected`);
+  if (ch.active != null) { const a = sanitizeRun(ch.active, issues, true); if (a && !p.championships.unlocked.includes(a.diff)) issues.push(`championship run ${a.runId}: ${a.diff} is not unlocked, dropped`); else p.championships.active = a; }
+  if (Array.isArray(ch.runs)) p.championships.runs = ch.runs.map(r => sanitizeRun(r, issues, false)).filter(Boolean).slice(-LIMITS.runs);
+  // special items follow from progress
+  for (const it of Object.values(ITEM)) if (it.class === 'special' && conditionMet(p, it.unlock)) un.add(it.id);
+  p.inventory.unlocked = [...un];
+  // ships: upgrades and paint jobs
+  const ships = isObj(raw.ships) ? raw.ships : {};
+  for (const id of Object.keys(ships)) if (!SHIP_IDS.includes(id)) issues.push(`ships: unknown ship ${String(id).slice(0, 30)}, dropped`);
+  for (const id of SHIP_IDS) {
+    const s = ships[id]; if (s === undefined) continue; if (!isObj(s)) { issues.push(`ships.${id}: not an object, reset`); continue; }
+    for (const u of UPGRADE_IDS) { const v = s.upgrades && s.upgrades[u]; if (v === undefined) continue; const n = Number(v);
+      if (!Number.isInteger(n) || n < 0 || n > UPGRADES.maxLevel) issues.push(`ships.${id}.${u}: invalid level ${String(v).slice(0, 10)}, clamped`); p.ships[id].upgrades[u] = int(v, 0, UPGRADES.maxLevel, 0); }
+    p.ships[id].custom = sanitizeCustom(s.custom, id, un, issues, `ships.${id}.`);
+  }
+  p.selectedShip = SHIP_IDS.includes(raw.selectedShip) ? raw.selectedShip : SHIP_IDS[0];
+  // history, milestones, ledger
+  if (Array.isArray(raw.history)) p.history = raw.history.filter(isObj).slice(-LIMITS.history).map(h => ({ id: typeof h.id === 'string' ? h.id.slice(0, 90) : '', at: int(h.at, 0, 9e15, 0), mode: MODES.includes(h.mode) ? h.mode : 'quick',
+    track: TRACK_IDS.includes(h.track) ? h.track : TRACK_IDS[0], diff: DIFF_ORDER.includes(h.diff) ? h.diff : null, laps: int(h.laps, 1, 9, 3), ship: SHIP_IDS.includes(h.ship) ? h.ship : SHIP_IDS[0],
+    place: int(h.place, 1, 6, 6), field: int(h.field, 1, 6, 6), time: Number.isFinite(+h.time) ? +(+h.time).toFixed(2) : 0, credits: int(h.credits, 0, MAX_BALANCE, 0), tokens: int(h.tokens, 0, MAX_BALANCE, 0) }));
+  if (Array.isArray(raw.milestones)) p.milestones = [...new Set(raw.milestones.filter(m => MILESTONES.some(x => x.id === m)))];
+  const lg = isObj(raw.ledger) ? raw.ledger : {};
+  if (Array.isArray(lg.seen)) p.ledger.seen = [...new Set(lg.seen.filter(e => typeof e === 'string' && EVENT_ID.test(e)))].slice(-LIMITS.seen);
+  if (Array.isArray(lg.tx)) p.ledger.tx = lg.tx.filter(isObj).slice(-LIMITS.tx).map(t => ({ id: String(t.id || '').slice(0, 90), at: int(t.at, 0, 9e15, 0), kind: String(t.kind || '').slice(0, 20), reason: String(t.reason || '').slice(0, 80),
+    lines: Array.isArray(t.lines) ? t.lines.filter(l => isObj(l) && (l.cur === 'CR' || l.cur === 'ST')).slice(0, 8).map(l => ({ cur: l.cur, amt: int(l.amt, -MAX_BALANCE, MAX_BALANCE, 0) })) : [] }));
+  p.ledger.seq = int(lg.seq, 0, 1e12, 0);
+  return { profile: p, issues };
+}
+
+// v0 -> v1: an unversioned profile (the shape sketched in the design brief, or an early prototype) is mapped field by
+// field onto v1; anything unrecognised is left out and sanitize() repairs the rest.
+const UP_ALIASES = { engine: 'engine', acceleration: 'accel', accel: 'accel', handling: 'handling', boost: 'boost', stability: 'stability' };
+const MIGRATIONS = {
+  0: raw => {
+    const out = { version: 1, createdAt: raw.createdAt, wallet: { CR: raw.credits ?? (raw.wallet && raw.wallet.CR), ST: raw.styleTokens ?? (raw.wallet && raw.wallet.ST) }, ships: {}, selectedShip: raw.selectedShip };
+    if (isObj(raw.ships)) for (const [id, s] of Object.entries(raw.ships)) { if (!isObj(s)) continue; const up = {};
+      if (isObj(s.upgrades)) for (const [k, v] of Object.entries(s.upgrades)) if (UP_ALIASES[k]) up[UP_ALIASES[k]] = v;
+      const c = isObj(s.customization) ? s.customization : isObj(s.custom) ? s.custom : {};
+      out.ships[id] = { upgrades: up, custom: { primary: c.primaryColor ?? c.primary, secondary: c.secondaryColor ?? c.secondary, accent: c.accentColor ?? c.accent } }; }
+    if (isObj(raw.inventory)) out.inventory = { unlocked: raw.inventory.unlockedCosmetics || raw.inventory.unlocked || [] };
+    if (isObj(raw.championships)) { const c = raw.championships, completed = { rookie: 0, pro: 0, ace: 0 };
+      for (const r of Array.isArray(c.completedRuns) ? c.completedRuns : []) if (isObj(r) && DIFF_ORDER.includes(r.difficulty || r.diff)) completed[r.difficulty || r.diff]++;
+      out.championships = { completed }; }
+    if (isObj(raw.statistics)) out.stats = { races: raw.statistics.racesCompleted, wins: raw.statistics.racesWon, podiums: raw.statistics.podiums };
+    return out;
+  },
+};
+function migrate(raw) {
+  if (!isObj(raw)) return { data: raw, from: null };
+  let v = Number.isInteger(raw.version) ? raw.version : 0, data = raw; const from = v;
+  if (v > PROFILE_VERSION) return { data: null, from, future: true };
+  while (v < PROFILE_VERSION) { const m = MIGRATIONS[v]; if (!m) return { data: null, from }; data = m(data); v++; }
+  return { data, from };
+}
+
+return { PROFILE_VERSION, LIMITS, CHAMP_NAMES, RUN_ID, EVENT_ID, HEX, createProfile, derivedChampUnlocks, statValue, conditionMet, unlockedSet, sanitizeCustom, sanitize, MIGRATIONS, migrate };
+})();
+const __m__src_progress_store_js = (() => {
+// GALACTIC RUSH V7 — save management for the career profile. Same mechanism as the existing save (browser localStorage,
+// JSON, every access guarded), under its own key next to 'galactic-rush.v1' so a damaged profile can never take best
+// laps and ghosts with it, and the other way round. Versioned, migrated and validated on load; a backup copy is kept
+// from the last good load; storage failures never stop the game. Data stays in this browser: there is no cloud sync.
+const { PROFILE_VERSION, createProfile, sanitize, migrate } = __m__src_progress_profile_js;
+const KEYS = { main: 'galactic-rush.profile', backup: 'galactic-rush.profile.bak', damaged: 'galactic-rush.profile.damaged' };
+
+function browserStorage() { try { return window.localStorage; } catch (e) { return null; } }
+// an in-memory stand-in with the localStorage interface (tests, or when the browser blocks storage)
+class MemoryStorage {
+  constructor(init = {}) { this.m = new Map(Object.entries(init)); this.writes = 0; this.fail = false; }
+  getItem(k) { return this.m.has(k) ? this.m.get(k) : null; }
+  setItem(k, v) { if (this.fail) throw new Error('QuotaExceededError (simulated)'); this.writes++; this.m.set(k, String(v)); }
+  removeItem(k) { this.m.delete(k); }
+}
+
+class ProfileStore {
+  constructor(storage, now = () => Date.now()) { this.s = storage; this.now = now; this.status = 'new'; this.issues = []; this.readOnly = false; this.lastError = null; this.writes = 0; }
+  read(k) { try { return this.s ? this.s.getItem(k) : null; } catch (e) { this.lastError = String(e && e.message || e); return null; } }
+  write(k, v) { if (!this.s) { this.lastError = 'storage unavailable'; return false; } try { this.s.setItem(k, v); this.writes++; return true; } catch (e) { this.lastError = String(e && e.message || e); return false; } }
+  parse(text) {
+    if (text == null) return { missing: true };
+    let raw; try { raw = JSON.parse(text); } catch (e) { return { error: 'not valid JSON' }; }
+    const m = migrate(raw);
+    if (m.future) return { future: true, version: raw.version };
+    if (!m.data) return { error: `unsupported profile version ${raw && raw.version}` };
+    const { profile, issues } = sanitize(m.data, this.now());
+    return { profile, issues, migratedFrom: m.from !== PROFILE_VERSION ? m.from : null };
+  }
+  // -> { profile, status: new | loaded | recovered | reset | readonly, issues }
+  load() {
+    const main = this.read(KEYS.main), a = this.parse(main);
+    if (a.future) { // written by a newer version of the game: leave it untouched and do not save over it
+      this.readOnly = true; this.status = 'readonly'; this.issues = [`career data was saved by a newer version (v${a.version}); it is left untouched and this session is not saved`];
+      return { profile: createProfile(this.now()), status: this.status, issues: this.issues };
+    }
+    if (a.profile) {
+      this.status = a.migratedFrom != null ? 'migrated' : 'loaded'; this.issues = a.issues; if (a.migratedFrom != null) this.issues.unshift(`migrated career data from v${a.migratedFrom} to v${PROFILE_VERSION}`);
+      if (main) this.write(KEYS.backup, main); // last good copy, refreshed once per session
+      if (a.migratedFrom != null || a.issues.length) this.save(a.profile);
+      return { profile: a.profile, status: this.status, issues: this.issues };
+    }
+    const b = this.parse(this.read(KEYS.backup));
+    if (!a.missing) this.write(KEYS.damaged, main); // keep the unreadable text for manual recovery
+    if (b.profile) { this.status = 'recovered'; this.issues = [`career data was unreadable (${a.error}); restored the backup copy`, ...b.issues]; this.save(b.profile); return { profile: b.profile, status: this.status, issues: this.issues }; }
+    this.status = a.missing ? 'new' : 'reset'; this.issues = a.missing ? [] : [`career data was unreadable (${a.error}) and no backup was usable; started a new career`];
+    const p = createProfile(this.now()); this.save(p);
+    return { profile: p, status: this.status, issues: this.issues };
+  }
+  save(profile) {
+    if (this.readOnly) return false;
+    let text; try { text = JSON.stringify(profile); } catch (e) { this.lastError = 'could not serialise'; return false; }
+    return this.write(KEYS.main, text);
+  }
+}
+
+return { KEYS, browserStorage, MemoryStorage, ProfileStore };
+})();
+const __m__src_progress_rewards_js = (() => {
+// GALACTIC RUSH V7 — reward calculation (pure functions, no state): single races, time trials, championship rounds and
+// completion. Results carry their own breakdown so the results screens can show exactly how a number was made.
+const { SINGLE_RACE, TIME_TRIAL, CHAMPIONSHIP_REWARDS: CR_, DIFF_ORDER, lapMult, TOKEN_SOURCES, MILESTONES } = __m__src_progress_economy_js;
+const pick = (arr, place) => arr[Math.min(arr.length - 1, Math.max(0, place - 1))];
+const DLAB = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace' };
+
+// Base x Difficulty x Laps x Placement, rounded to whole credits
+function singleRaceReward({ diff, laps, place }) {
+  const d = SINGLE_RACE.difficulty[diff], l = lapMult(laps), p = pick(SINGLE_RACE.placement, place);
+  if (!d || !l || !p) return null;
+  return { credits: Math.round(SINGLE_RACE.base * d * l * p), parts: [['Base', SINGLE_RACE.base], [DLAB[diff], d], [`${laps} lap${laps > 1 ? 's' : ''}`, l], [`P${place}`, p]] };
+}
+function trialReward({ laps }) {
+  const l = lapMult(laps); if (!l) return null;
+  return { credits: Math.round(TIME_TRIAL.base * l), parts: [['Time trial base', TIME_TRIAL.base], [`${laps} lap${laps > 1 ? 's' : ''}`, l]] };
+}
+function champRaceReward({ diff, laps, place }) {
+  const R = CR_.race, d = R.difficulty[diff], l = lapMult(laps), p = pick(R.placement, place);
+  if (!d || !l || !p) return null;
+  return { credits: Math.round(R.base * d * l * p), parts: [['Round base', R.base], [DLAB[diff], d], [`${laps} lap${laps > 1 ? 's' : ''}`, l], [`P${place}`, p]] };
+}
+// completion bonus (once per run) and final-standing bonus, both x lap multiplier; Style Tokens for completion and the title
+function champCompletionReward({ diff, laps, standing }) {
+  const base = CR_.completion[diff], l = lapMult(laps); if (!base || !l) return null;
+  const completion = Math.round(base * l), share = pick(CR_.standing, standing) || 0, standingBonus = Math.round(completion * share);
+  const tokens = (CR_.tokens.completion[diff] || 0) + (standing === 1 ? CR_.tokens.title[diff] || 0 : 0);
+  return { completion, standing: standingBonus, tokens, share, parts: [[`${DLAB[diff]} completion`, CR_.completion[diff]], [`${laps} lap${laps > 1 ? 's' : ''}`, l]] };
+}
+const nextDifficulty = diff => DIFF_ORDER[DIFF_ORDER.indexOf(diff) + 1] || null;
+
+// Style Token sources for one completed race (wins, records); milestones are checked against the updated stats
+function tokenLines(ctx) { return TOKEN_SOURCES.filter(s => s.when(ctx)).map(s => ({ id: s.id, name: s.name, ST: s.ST })); }
+function milestonesReached(stats, claimed) { return MILESTONES.filter(m => !claimed.includes(m.id) && (stats[m.stat] || 0) >= m.at); }
+
+// Economy table for documentation and tests: credits for an average finish (P3) per race type
+function economyTable() {
+  const rows = [];
+  for (const diff of DIFF_ORDER) for (const laps of [1, 3, 5]) {
+    const s = singleRaceReward({ diff, laps, place: 3 }).credits, c = champRaceReward({ diff, laps, place: 3 }).credits, b = champCompletionReward({ diff, laps, standing: 3 });
+    rows.push({ diff, laps, single: s, champRound: c, champTotalP3: c * 4 + b.completion + b.standing, fourSingles: s * 4 });
+  }
+  return rows;
+}
+
+return { singleRaceReward, trialReward, champRaceReward, champCompletionReward, nextDifficulty, tokenLines, milestonesReached, economyTable };
+})();
+const __m__src_progress_index_js = (() => {
+// GALACTIC RUSH V7 — the progression service the game talks to. It owns the player profile and is the only code that
+// changes it. Every change is a transaction: validated, applied to a copy, checked, then committed and saved in one
+// step, or rejected with nothing changed. Committed state is frozen, so UI code can read it but never write to it.
+const { SHIPS, CHAMPIONSHIP } = __m__src_config_js;
+const { TRACK_DEFS } = __m__src_sim_tracks_js;
+const { Championship } = __m__src_sim_championship_js;
+const { CURRENCIES, DIFF_ORDER, MODES, MAX_BALANCE, MAX_REWARD, UPGRADES, UPGRADE_IDS } = __m__src_progress_economy_js;
+const { ITEM, ITEMS, RARITIES, SLOTS, SLOT_DEFAULT, PREMIUM_LABEL, isPurchasable, isPremium, defaultCustom } = __m__src_progress_catalog_js;
+const { createProfile, sanitizeCustom, derivedChampUnlocks, conditionMet, LIMITS, RUN_ID, EVENT_ID, CHAMP_NAMES } = __m__src_progress_profile_js;
+const { ProfileStore, browserStorage, MemoryStorage } = __m__src_progress_store_js;
+const { singleRaceReward, trialReward, champRaceReward, champCompletionReward, nextDifficulty, tokenLines, milestonesReached } = __m__src_progress_rewards_js;
+const { effectiveDef, preview, CATEGORY } = __m__src_progress_upgrades_js;
+const { resolveLivery } = __m__src_progress_customize_js;
+const clone = o => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
+const freeze = o => { if (o && typeof o === 'object' && !Object.isFrozen(o)) { Object.freeze(o); for (const k of Object.keys(o)) freeze(o[k]); } return o; };
+const SHIP_IDS = SHIPS.map(s => s.id), TRACK_IDS = TRACK_DEFS.map(d => d.id);
+const rand36 = n => Array.from({ length: n }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+const RACE_ID = /^[a-z0-9]{4,12}-[a-z0-9]{4,12}-[a-z0-9]{1,8}$/;
+class TxError extends Error { constructor(code, message) { super(message); this.code = code; } }
+const fail = (code, message) => { throw new TxError(code, message); };
+const fmtCR = n => `${Math.round(n).toLocaleString('en-US')} CR`;
+const fmtST = n => `${Math.round(n)} ST`;
+const fmtCur = (cur, n) => (cur === 'ST' ? fmtST(n) : fmtCR(n));
+
+// standings from finishing orders, with the game's own championship scoring (sim/championship.js)
+function standingsOf(orders) { const c = new Championship(CHAMP_NAMES); for (const o of orders) c.addResult(o); return c; }
+
+class Progression {
+  constructor(storage = browserStorage() || new MemoryStorage(), { now = () => Date.now() } = {}) {
+    this.now = now; this.store = new ProfileStore(storage, now); this.subs = new Set(); this.counter = 0; this.saveT = null;
+    const r = this.store.load(); this.loadStatus = r.status; this.loadIssues = r.issues;
+    this.p = freeze(r.profile);
+    if (this.p.championships.active && this.p.championships.active.round >= CHAMPIONSHIP.length) this.completeRun(this.p.championships.active.runId); // finish a run interrupted between its last round and its bonus
+  }
+  get profile() { return this.p; }
+  wallet() { return { CR: this.p.wallet.CR, ST: this.p.wallet.ST }; }
+  onChange(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
+  emit(kind) { for (const f of this.subs) try { f(kind, this.p); } catch (e) { console.error(e); } }
+  get saveOk() { return !this.store.lastError && !this.store.readOnly; }
+
+  // ---------- transaction core ----------
+  // mutate(draft, T) applies the change to a copy; T.credit / T.debit are the only way a balance moves.
+  transact(kind, reason, mutate, { events = [] } = {}) {
+    for (const e of events) {
+      if (typeof e !== 'string' || !EVENT_ID.test(e)) return { ok: false, code: 'bad-event', message: 'Invalid event identifier.' };
+      if (this.p.ledger.seen.includes(e)) return { ok: false, code: 'duplicate', duplicate: true, message: 'Already processed: this reward was paid once.' };
+    }
+    const d = clone(this.p), lines = [];
+    const amount = (cur, amt) => { if (!CURRENCIES[cur]) fail('bad-currency', `Unknown currency ${cur}.`); if (!Number.isInteger(amt) || amt <= 0 || amt > MAX_REWARD * 10) fail('bad-amount', `Invalid amount ${amt}.`); };
+    const T = {
+      credit: (cur, amt, why) => { amount(cur, amt); if (amt > MAX_REWARD) fail('bad-amount', 'Reward out of range.'); if (d.wallet[cur] + amt > MAX_BALANCE) fail('limit', 'Balance limit reached.');
+        d.wallet[cur] += amt; d.earned[cur] += amt; lines.push({ cur, amt, why }); },
+      debit: (cur, amt, why) => { amount(cur, amt); if (d.wallet[cur] < amt) fail('funds', `Not enough ${CURRENCIES[cur].name}: ${fmtCur(cur, amt)} needed, ${fmtCur(cur, d.wallet[cur])} available.`);
+        d.wallet[cur] -= amt; d.spent[cur] += amt; lines.push({ cur, amt: -amt, why }); },
+    };
+    let out;
+    try { out = mutate(d, T) || {}; }
+    catch (e) { if (!(e instanceof TxError)) console.error('progression: transaction failed', e); return { ok: false, code: e.code || 'error', message: e instanceof TxError ? e.message : 'Unexpected error; nothing was changed.' }; }
+    for (const c of Object.keys(CURRENCIES)) if (!Number.isInteger(d.wallet[c]) || d.wallet[c] < 0 || d.wallet[c] > MAX_BALANCE) return { ok: false, code: 'invariant', message: 'Balance check failed; nothing was changed.' };
+    for (const e of events) d.ledger.seen.push(e);
+    if (d.ledger.seen.length > LIMITS.seen) d.ledger.seen.splice(0, d.ledger.seen.length - LIMITS.seen);
+    d.ledger.seq++; const txId = `${kind}-${d.ledger.seq}`;
+    if (lines.length) { d.ledger.tx.push({ id: txId, at: this.now(), kind, reason: String(reason).slice(0, 80), lines: lines.map(l => ({ cur: l.cur, amt: l.amt })) }); if (d.ledger.tx.length > LIMITS.tx) d.ledger.tx.splice(0, d.ledger.tx.length - LIMITS.tx); }
+    d.updatedAt = this.now();
+    this.p = freeze(d); clearTimeout(this.saveT); this.saveT = null;
+    const saved = this.store.save(this.p);
+    this.emit(kind);
+    return { ok: true, saved, txId, lines, balance: this.wallet(), ...out };
+  }
+  // low-stakes preference changes (selected ship): same validation, saved shortly after
+  light(mutate) {
+    const d = clone(this.p); mutate(d); d.updatedAt = this.now(); this.p = freeze(d); this.emit('light');
+    clearTimeout(this.saveT); this.saveT = setTimeout(() => { this.saveT = null; this.store.save(this.p); }, 400);
+  }
+  flush() { if (this.saveT) { clearTimeout(this.saveT); this.saveT = null; this.store.save(this.p); } }
+
+  // ---------- ships and upgrades ----------
+  shipOk(id) { return SHIP_IDS.includes(id) && this.p.ships[id] && this.p.ships[id].unlocked; }
+  selectShip(id) { if (!this.shipOk(id) || this.p.selectedShip === id) return false; this.light(d => { d.selectedShip = id; }); return true; }
+  upgrades(shipId) { return this.shipOk(shipId) ? { ...this.p.ships[shipId].upgrades } : null; }
+  // base stats + saved levels -> a fresh effective definition (base stats in config.js are never touched)
+  effectiveDef(shipId) { const base = SHIPS.find(s => s.id === shipId); if (!base) return null; return effectiveDef(base, this.p.ships[shipId] ? this.p.ships[shipId].upgrades : {}); }
+  upgradeRows(shipId) {
+    const base = SHIPS.find(s => s.id === shipId), lv = this.upgrades(shipId);
+    return UPGRADES.categories.map(c => {
+      if (!base || !lv) return { cat: c, ok: false, reason: 'Ship data unavailable.' };
+      const pv = preview(base, lv, c.id), cr = this.p.wallet.CR;
+      const reason = pv.level >= UPGRADES.maxLevel ? 'Maximum level reached.' : cr < pv.cost ? `Need ${fmtCR(pv.cost - cr)} more.` : null;
+      return { cat: c, ...pv, ok: !reason, reason, after: pv.cost != null ? cr - pv.cost : null };
+    });
+  }
+  buyUpgrade(shipId, cat, expectLevel) {
+    if (!this.shipOk(shipId)) return { ok: false, code: 'bad-ship', message: 'Unknown spacecraft.' };
+    if (!CATEGORY[cat]) return { ok: false, code: 'bad-upgrade', message: 'Unknown upgrade.' };
+    return this.transact('upgrade', `${shipId} ${cat}`, (d, T) => {
+      const up = d.ships[shipId].upgrades, lv = up[cat];
+      if (!Number.isInteger(lv) || lv < 0 || lv > UPGRADES.maxLevel) fail('bad-data', 'Upgrade data is invalid.');
+      if (expectLevel !== undefined && expectLevel !== lv) fail('stale', 'That upgrade was already applied.'); // a second click on the same button
+      if (lv >= UPGRADES.maxLevel) fail('max', `${CATEGORY[cat].name} is already at level ${UPGRADES.maxLevel}.`);
+      const cost = UPGRADES.costs[lv]; T.debit('CR', cost, `${CATEGORY[cat].name} ${lv + 1}`); up[cat] = lv + 1;
+      return { shipId, cat, level: lv + 1, cost };
+    });
+  }
+
+  // ---------- cosmetics: catalog, shop, inventory, paint jobs ----------
+  isUnlocked(id) { return this.p.inventory.unlocked.includes(id); }
+  itemState(it, shipId) {
+    const unlocked = this.isUnlocked(it.id), equipped = !!shipId && it.slot !== 'skin' && this.p.ships[shipId] && this.p.ships[shipId].custom[it.slot] === it.id;
+    let status, reason = null;
+    if (isPremium(it)) { status = 'premium'; reason = PREMIUM_LABEL; }
+    else if (unlocked) status = equipped ? 'equipped' : 'owned';
+    else if (isPurchasable(it)) { status = 'buy'; const have = this.p.wallet[it.currency]; if (have < it.price) reason = `Need ${fmtCur(it.currency, it.price - have)} more.`; }
+    else { status = 'locked'; reason = unlockText(it.unlock); }
+    return { ...it, unlocked, equipped, status, reason, canBuy: status === 'buy' && !reason, canEquip: unlocked && !isPremium(it) };
+  }
+  catalog(shipId, { category = 'all', rarity = 'all', status = 'all' } = {}) {
+    return ITEMS.filter(it => (category === 'all' || it.category === category) && (rarity === 'all' || it.rarity === rarity)).map(it => this.itemState(it, shipId))
+      .filter(s => status === 'all' || (status === 'unlocked' ? s.unlocked : status === 'locked' ? !s.unlocked : status === 'equipped' ? s.equipped : true));
+  }
+  buyItem(id) {
+    const it = ITEM[id];
+    if (!it) return { ok: false, code: 'unknown', message: 'Unknown item.' };
+    if (isPremium(it)) return { ok: false, code: 'premium', message: `${PREMIUM_LABEL}. Premium items cannot be bought or unlocked in this version.` };
+    if (!isPurchasable(it)) return { ok: false, code: 'not-for-sale', message: `${it.name} is not sold in the shop: ${unlockText(it.unlock)}` };
+    return this.transact('purchase', it.name, (d, T) => {
+      if (d.inventory.unlocked.includes(id)) fail('owned', `${it.name} is already unlocked.`);
+      T.debit(it.currency, it.price, it.name); d.inventory.unlocked.push(id); d.inventory.acquired[id] = { at: this.now(), via: it.currency };
+      return { item: id, price: it.price, currency: it.currency };
+    });
+  }
+  custom(shipId) { return this.shipOk(shipId) ? { ...this.p.ships[shipId].custom } : null; }
+  // validate a paint job strictly: nothing is silently changed; anything locked or malformed rejects the whole change
+  checkCustom(shipId, c) { const issues = []; const clean = sanitizeCustom(c, shipId, new Set(this.p.inventory.unlocked), issues); return { clean, issues }; }
+  setCustom(shipId, c) {
+    if (!this.shipOk(shipId)) return { ok: false, code: 'bad-ship', message: 'Unknown spacecraft.' };
+    const { clean, issues } = this.checkCustom(shipId, c);
+    if (issues.length) return { ok: false, code: 'invalid', message: issues[0], issues };
+    return this.transact('paint', shipId, d => { d.ships[shipId].custom = clean; return { custom: clean }; });
+  }
+  equip(shipId, id) {
+    const it = ITEM[id];
+    if (!it || !SLOTS.includes(it.slot)) return { ok: false, code: 'unknown', message: 'Unknown item.' };
+    if (isPremium(it)) return { ok: false, code: 'premium', message: PREMIUM_LABEL };
+    if (!this.isUnlocked(id)) return { ok: false, code: 'locked', message: `${it.name} is locked.` };
+    return this.setCustom(shipId, { ...this.custom(shipId), [it.slot]: id });
+  }
+  unequip(shipId, slot) { if (!SLOTS.includes(slot)) return { ok: false, code: 'bad-slot', message: 'Unknown slot.' }; return this.setCustom(shipId, { ...this.custom(shipId), [slot]: SLOT_DEFAULT[slot] }); }
+  resetCustom(shipId) { return this.setCustom(shipId, defaultCustom(shipId)); }
+  livery(shipId, draft) { return resolveLivery(shipId, draft || this.custom(shipId)); }
+
+  // ---------- races ----------
+  newRaceId() { return `${this.now().toString(36)}-${rand36(6)}-${(++this.counter).toString(36)}`; }
+  // ctx comes from the race simulation once the player has crossed the line: { raceId, mode, track, diff, laps, ship, place,
+  // field, time, record, runId (championship), order (finishing order by name, championship) }
+  completeRace(ctx) {
+    const c = ctx || {}, mode = c.mode;
+    if (!c.finished) return { ok: false, code: 'not-finished', message: 'Race not completed.' };
+    if (!MODES.includes(mode)) return { ok: false, code: 'bad-mode', message: 'Unknown game mode.' };
+    if (typeof c.raceId !== 'string' || !RACE_ID.test(c.raceId)) return { ok: false, code: 'bad-event', message: 'Missing race identifier.' };
+    if (!TRACK_IDS.includes(c.track) || !SHIP_IDS.includes(c.ship)) return { ok: false, code: 'bad-race', message: 'Unknown course or spacecraft.' };
+    const laps = c.laps, field = c.field, place = c.place;
+    if (!Number.isInteger(laps) || laps < 1 || laps > 9 || !Number.isInteger(field) || field < 1 || field > 6 || !Number.isInteger(place) || place < 1 || place > field) return { ok: false, code: 'bad-race', message: 'Race result out of range.' };
+    if (mode !== 'trial' && !DIFF_ORDER.includes(c.diff)) return { ok: false, code: 'bad-race', message: 'Unknown difficulty.' };
+    const diff = mode === 'trial' ? null : c.diff;
+    const r = mode === 'quick' ? singleRaceReward({ diff, laps, place }) : mode === 'trial' ? trialReward({ laps }) : champRaceReward({ diff, laps, place });
+    if (!r) return { ok: false, code: 'bad-race', message: 'No reward configuration for this race.' };
+    const eventId = `race:${c.raceId}`;
+    const res = this.transact('race', `${mode} ${c.track}`, (d, T) => {
+      let run = null;
+      if (mode === 'champ') {
+        run = d.championships.active;
+        if (!run || run.runId !== c.runId) fail('bad-run', 'No matching championship run.');
+        if (run.round >= CHAMPIONSHIP.length || CHAMPIONSHIP[run.round] !== c.track || run.diff !== diff || run.laps !== laps) fail('bad-run', 'Race does not match the championship run.');
+        if (!Array.isArray(c.order) || c.order.length !== CHAMP_NAMES.length || !CHAMP_NAMES.every(n => c.order.includes(n)) || c.order.indexOf('YOU') + 1 !== place) fail('bad-run', 'Finishing order invalid.');
+      }
+      const lines = [{ id: 'race', name: mode === 'champ' ? `Round ${run.round + 1} reward` : mode === 'trial' ? 'Time trial reward' : 'Race reward', CR: r.credits }];
+      T.credit('CR', r.credits, lines[0].name);
+      // statistics
+      const S = d.stats, win = mode !== 'trial' && place === 1, pod = mode !== 'trial' && place <= 3;
+      const bump = o => { o.races++; if (win) o.wins++; if (pod) o.podiums++; o.credits = Math.min(MAX_BALANCE, (o.credits || 0) + r.credits); };
+      S.races++; if (win) S.wins++; if (pod) S.podiums++;
+      bump(S.byMode[mode]); bump(S.byTrack[c.track]); if (diff) bump(S.byDiff[diff]);
+      if (mode !== 'trial') { const bt = S.byTrack[c.track]; bt.best = bt.best == null ? place : Math.min(bt.best, place); }
+      // Style Tokens from existing systems (wins, course records) and one-time milestones
+      let tokens = 0;
+      for (const t of tokenLines({ mode, place, record: !!c.record })) { T.credit('ST', t.ST, t.name); lines.push({ id: t.id, name: t.name, ST: t.ST }); tokens += t.ST; }
+      const ms = milestonesReached(S, d.milestones);
+      for (const m of ms) { d.milestones.push(m.id); T.credit('ST', m.ST, m.name); lines.push({ id: m.id, name: `Milestone: ${m.name}`, ST: m.ST }); tokens += m.ST; }
+      const unlocks = unlockSpecials(d, this.now());
+      d.history.push({ id: c.raceId, at: this.now(), mode, track: c.track, diff, laps, ship: c.ship, place, field, time: Number.isFinite(c.time) ? +c.time.toFixed(2) : 0, credits: r.credits, tokens });
+      if (d.history.length > LIMITS.history) d.history.splice(0, d.history.length - LIMITS.history);
+      let champ = null;
+      if (run) {
+        const pts = standingsOf([c.order]).points.YOU;
+        run.results.push({ round: run.round, track: c.track, place, points: pts, credits: r.credits, eventId }); run.orders.push([...c.order]);
+        run.round++; run.credits.races += r.credits; run.tokens += tokens;
+        champ = { runId: run.runId, round: run.round, rounds: CHAMPIONSHIP.length, runCredits: run.credits.races, done: run.round >= CHAMPIONSHIP.length };
+      }
+      return { mode, credits: r.credits, tokens, parts: r.parts, lines, unlocks, champ };
+    }, { events: [eventId] });
+    if (res.ok && res.champ && res.champ.done) res.completion = this.completeRun(res.champ.runId);
+    return res;
+  }
+
+  // ---------- championships ----------
+  champUnlocked(diff) { return this.p.championships.unlocked.includes(diff); }
+  activeRun() { return this.p.championships.active; }
+  runStandings(run) { return standingsOf((run || this.activeRun() || { orders: [] }).orders || []); }
+  startRun({ diff, laps, ship }) {
+    if (!DIFF_ORDER.includes(diff)) return { ok: false, code: 'bad-diff', message: 'Unknown difficulty.' };
+    if (!this.champUnlocked(diff)) return { ok: false, code: 'locked', message: `${label(diff)} Championship is locked: ${unlockText({ type: 'championship', diff: DIFF_ORDER[DIFF_ORDER.indexOf(diff) - 1] })}` };
+    if (!Number.isInteger(laps) || laps < 1 || laps > 9 || !this.shipOk(ship)) return { ok: false, code: 'bad-run', message: 'Invalid championship settings.' };
+    if (this.activeRun()) return { ok: false, code: 'active-run', message: 'A championship is already in progress. Continue or abandon it first.' };
+    let runId; do runId = `champ-${this.now().toString(36)}-${rand36(6)}`; while (this.p.championships.runs.some(r => r.runId === runId));
+    return this.transact('run', `start ${diff}`, d => {
+      d.championships.active = { runId, diff, laps, ship, startedAt: this.now(), round: 0, results: [], orders: [], credits: { races: 0, completion: 0, standing: 0, total: 0 }, tokens: 0 };
+      return { run: d.championships.active };
+    });
+  }
+  abandonRun(runId) {
+    return this.transact('run', 'abandon', d => {
+      const a = d.championships.active; if (!a || a.runId !== runId) fail('bad-run', 'No such championship in progress.');
+      d.championships.runs.push(summary(a, 'abandoned', null, this.now())); trimRuns(d); d.championships.active = null;
+      return { runId };
+    });
+  }
+  // completion bonus + final-standing bonus + Style Tokens + next-difficulty unlock, paid once per run id
+  completeRun(runId) {
+    return this.transact('champ', `complete ${runId}`, (d, T) => {
+      const a = d.championships.active;
+      if (!a || a.runId !== runId) fail('bad-run', 'No such championship in progress.');
+      if (a.round < CHAMPIONSHIP.length) fail('incomplete', 'The championship is not finished yet.');
+      const st = standingsOf(a.orders).standings(), standing = st.findIndex(e => e.name === 'YOU') + 1;
+      const b = champCompletionReward({ diff: a.diff, laps: a.laps, standing });
+      T.credit('CR', b.completion, 'Championship completion bonus'); if (b.standing > 0) T.credit('CR', b.standing, `Final standing P${standing}`); if (b.tokens > 0) T.credit('ST', b.tokens, 'Championship tokens');
+      const ch = d.championships, before = [...ch.unlocked];
+      ch.completed[a.diff]++; if (standing === 1) ch.titles[a.diff]++; ch.best[a.diff] = ch.best[a.diff] == null ? standing : Math.min(ch.best[a.diff], standing);
+      ch.unlocked = derivedChampUnlocks(ch);
+      const newly = ch.unlocked.find(x => !before.includes(x)) || null;
+      a.credits.completion = b.completion; a.credits.standing = b.standing; a.tokens += b.tokens;
+      const unlocks = unlockSpecials(d, this.now());
+      const s = summary(a, 'completed', standing, this.now()); s.unlocked = newly;
+      ch.runs.push(s); trimRuns(d); ch.active = null;
+      return { run: s, standing, standings: st, parts: b.parts, standingShare: b.share, bonusTokens: b.tokens, newlyUnlocked: newly, isHighest: a.diff === DIFF_ORDER[DIFF_ORDER.length - 1], next: nextDifficulty(a.diff), unlocks };
+    }, { events: [`champdone:${runId}`] });
+  }
+  runSummary(runId) { return this.p.championships.runs.find(r => r.runId === runId) || null; }
+
+  // ---------- career overview ----------
+  career() {
+    const p = this.p, ups = SHIP_IDS.reduce((a, id) => a + UPGRADE_IDS.reduce((b, k) => b + p.ships[id].upgrades[k], 0), 0), upMax = SHIP_IDS.length * UPGRADE_IDS.length * UPGRADES.maxLevel;
+    const earnable = ITEMS.filter(i => i.class !== 'premium' && i.class !== 'event'), owned = earnable.filter(i => this.isUnlocked(i.id)).length;
+    return { wallet: this.wallet(), earned: { ...p.earned }, spent: { ...p.spent }, stats: p.stats, upgrades: [ups, upMax], cosmetics: [owned, earnable.length], champs: p.championships, history: p.history, milestones: p.milestones };
+  }
+}
+
+function summary(a, status, standing, now) {
+  const cr = a.credits, completion = cr.completion || 0, stand = cr.standing || 0;
+  return { runId: a.runId, diff: a.diff, laps: a.laps, ship: a.ship, startedAt: a.startedAt, endedAt: now, status, standing, points: standingsOf(a.orders).points.YOU || 0,
+    results: a.results.map(r => ({ ...r })), credits: { races: cr.races, completion, standing: stand, total: cr.races + completion + stand }, tokens: a.tokens, unlocked: null };
+}
+function trimRuns(d) { const r = d.championships.runs; if (r.length > LIMITS.runs) r.splice(0, r.length - LIMITS.runs); }
+// special items unlock themselves when their condition is met (championships, milestones, achievements)
+function unlockSpecials(d, now) {
+  const out = [];
+  for (const it of ITEMS) if (it.class === 'special' && !d.inventory.unlocked.includes(it.id) && conditionMet(d, it.unlock)) { d.inventory.unlocked.push(it.id); d.inventory.acquired[it.id] = { at: now, via: 'earned' }; out.push(it.id); }
+  return out;
+}
+const label = d => ({ rookie: 'Rookie', pro: 'Pro', ace: 'Ace' })[d] || d;
+function unlockText(u) {
+  if (!u) return '';
+  switch (u.type) {
+    case 'default': return 'Owned from the start.';
+    case 'credits': return `Unlock in the shop for ${fmtCR(u.price)}.`;
+    case 'tokens': return `Unlock in the shop for ${fmtST(u.price)}.`;
+    case 'championship': return u.title ? `Win the ${label(u.diff)} Championship title.` : `Complete the ${label(u.diff)} Championship.`;
+    case 'milestone': return `Complete ${u.at} ${u.stat}.`;
+    case 'achievement': return u.stat === 'trackWins' ? 'Win a race on every course.' : u.stat === 'byDiff.ace.wins' ? `Win ${u.at} races on Ace.` : `Reach ${u.at} ${u.stat}.`;
+    case 'event': return 'Reward for a future event. No event is running in this version.';
+    case 'premium': return PREMIUM_LABEL;
+    default: return '';
+  }
+}
+
+return { RARITIES, ITEMS, ITEM, CATEGORY, RUN_ID, fmtCR, fmtST, fmtCur, standingsOf, Progression, unlockText };
+})();
+const __m__src_ui_garage_js = (() => {
+// GALACTIC RUSH V7 — markup for the garage (ship, upgrades, paint shop, inventory, cosmetic shop), the career screen,
+// reward panels and championship screens. Pure functions of the data they are given; garage.js owns the state.
+const { SHIPS, STAT_BARS, CHAMPIONSHIP } = __m__src_config_js;
+const { TRACK_DEFS } = __m__src_sim_tracks_js;
+const { UPGRADES, DIFF_ORDER, CHAMPIONSHIP_REWARDS, lapMult } = __m__src_progress_economy_js;
+const { RARITIES, CATEGORIES, SWATCHES, ITEM, PREMIUM_LABEL } = __m__src_progress_catalog_js;
+const { STAT_ROWS } = __m__src_progress_upgrades_js;
+const { hueOf, lightOf } = __m__src_progress_customize_js;
+const { fmtCR, fmtST, fmtCur, unlockText } = __m__src_progress_index_js;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const n0 = n => Math.round(n).toLocaleString('en-US');
+const num = v => (typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(Math.abs(v) < 10 ? 2 : 1) : typeof v === 'number' ? n0(v) : String(v)); // stat values keep their decimals
+const DIFF_LABEL = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace' };
+const RAR = Object.fromEntries(RARITIES.map(r => [r.id, r]));
+const trackName = id => (TRACK_DEFS.find(d => d.id === id) || { name: id }).name;
+const g = (arg, label, o = {}) => `<button class="${o.cls || 'btn sm'}" data-act="g" data-arg="${esc(arg)}"${o.pressed != null ? ` aria-pressed="${o.pressed}"` : ''}${o.disabled ? ' disabled' : ''}${o.title ? ` title="${esc(o.title)}"` : ''}${o.label ? ` aria-label="${esc(o.label)}"` : ''}>${label}</button>`;
+const gseg = (opts, cur, cls = '') => `<div class="seg ${cls}" role="group">${opts.map(([arg, l, v]) => `<button data-act="g" data-arg="${esc(arg)}" aria-pressed="${v === cur}">${l}</button>`).join('')}</div>`;
+
+const walletHTML = w => `<div class="wallet" aria-label="Balance: ${n0(w.CR)} credits, ${n0(w.ST)} style tokens"><span class="cr"><b>${n0(w.CR)}</b> CR</span><span class="st"><b>${n0(w.ST)}</b> ST</span></div>`;
+const price = it => it.currency ? `<span class="price ${it.currency === 'ST' ? 'st' : 'cr'}">${fmtCur(it.currency, it.price)}</span>` : '';
+const rarity = it => `<span class="rar" style="--rc:${RAR[it.rarity].color}">${RAR[it.rarity].name}</span>`;
+function badge(s) {
+  if (s.status === 'premium') return `<span class="badge prem">${PREMIUM_LABEL}</span>`;
+  if (s.status === 'equipped') return '<span class="badge eq">Equipped</span>';
+  if (s.status === 'owned') return '<span class="badge own">Owned</span>';
+  if (s.status === 'buy') return price(s);
+  return `<span class="badge lock">Locked</span>`;
+}
+
+// ---------------- garage frame ----------------
+function garageHTML(v) {
+  const s = v.ship, tabs = [['ship', 'Ship'], ['upgrades', 'Upgrades'], ['paint', 'Paint'], ['inventory', 'Inventory'], ['shop', 'Shop']];
+  const lv = Object.values(v.upgrades).reduce((a, b) => a + b, 0);
+  return `<div class="col gcol">
+    <div class="ghead">
+      <div class="row between"><h3>Garage · ship ${v.idx + 1} of ${SHIPS.length}</h3>${walletHTML(v.wallet)}</div>
+      <div class="shipnav"><button class="arrow" data-act="ship" data-arg="-1" aria-label="Previous ship">‹</button>
+        <div><h2>${esc(s.name)}</h2><div class="row" style="margin-top:8px"><span class="chip">${esc(s.cls)}</span><span class="chip amber">Upgrades ${lv}/${UPGRADES.categories.length * UPGRADES.maxLevel}</span></div></div>
+        <button class="arrow" data-act="ship" data-arg="1" aria-label="Next ship">›</button></div>
+      <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-act="g" data-arg="tab:${k}" aria-selected="${v.tab === k}">${l}${k === 'paint' && v.dirty ? ' <i class="dot" title="Unapplied changes"></i>' : ''}</button>`).join('')}</div>
+    </div>
+    <div class="gbody">${v.body}</div>
+    <div class="actbar">${v.bar || ''}
+      <div class="notice ${v.notice ? v.notice.cls || '' : ''}" role="status" aria-live="polite">${v.notice ? esc(v.notice.text) : ''}</div>
+      ${v.leaving ? `<div class="panel leavebar"><span>You have paint changes that are not applied.</span><div class="row">${g('leave:apply', 'Apply and continue', { cls: 'btn sm primary', disabled: !v.canApply })}${g('leave:discard', 'Discard changes')}${g('leave:stay', 'Keep editing')}</div>${v.canApply ? '' : '<p class="reason">The preview contains locked items, so it cannot be applied.</p>'}</div>` : ''}
+      <div class="row gfoot">${v.fly ? `<button class="btn primary" data-act="shipOk">Fly the ${esc(s.name)}</button>` : '<button class="btn primary" data-act="g" data-arg="done">Done</button>'}<button class="btn" data-act="back">Back</button></div></div>
+    <div class="foot">← → ship · Q / E or LB / RB tabs · drag the ship (or [ ]) to turn it</div>
+  </div><div class="dragzone" data-drag aria-hidden="true"></div>`;
+}
+
+// ---------------- Ship ----------------
+function tabShip(v) {
+  const s = v.ship, e = v.eff, cust = v.custom, vals = { SPEED: d => Math.round(d.maxSpeed * 3.6), ACCEL: d => +d.accel.toFixed(1), HANDLING: d => d.yawRate.toFixed(2), BOOST: d => Math.round(d.boostCap), ARMOUR: d => Math.round(d.hull) };
+  const bars = STAT_BARS.map(([l, f]) => { const b = Math.max(0.08, Math.min(1, f(s))), x = Math.max(b, Math.min(1, f(e)));
+    return `<span>${l}</span><i><b style="width:${Math.round(b * 100)}%"></b>${x > b + 0.002 ? `<u style="left:${(b * 100).toFixed(1)}%;width:${((x - b) * 100).toFixed(1)}%"></u>` : ''}</i><em>${vals[l](e)}${x > b + 0.002 ? '<small>▲</small>' : ''}</em>`; }).join('');
+  const nm = id => ITEM[id] ? ITEM[id].name : '—';
+  return `<p class="lede">${esc(s.desc)}</p>
+    <div class="panel stats up">${bars}</div>
+    <p class="lede small">Cyan is the factory spec; amber shows what your upgrades add. Upgrades change the real flight model; paint never does.</p>
+    <div class="panel kv"><div><span>Paint</span><b>${cust.paint ? esc(nm(cust.paint)) : '<i class="swatch" style="background:' + cust.primary + '"></i>' + cust.primary}</b></div><div><span>Pattern</span><b>${esc(nm(cust.pattern))}</b></div>
+      <div><span>Finish</span><b>${esc(nm(cust.finish))}</b></div><div><span>Exhaust · contrails</span><b>${esc(nm(cust.exhaust))} · ${esc(nm(cust.trail))}</b></div></div>
+    <div class="row">${g('tab:upgrades', 'Upgrade this ship')}${g('tab:paint', 'Paint this ship')}</div>`;
+}
+
+// ---------------- Upgrades ----------------
+function tabUpgrades(v) {
+  const rows = v.rows.map(r => {
+    const c = r.cat, key = `up:${c.id}:${r.level}`, armed = v.armed === key, maxed = r.level >= r.max;
+    const pips = Array.from({ length: r.max }, (_, k) => `<i class="${k < r.level ? 'on' : k === r.level ? 'next' : ''}"></i>`).join('');
+    const eff = maxed ? `${r.label} ${num(r.now)} ${r.unit} · maximum` : `${r.label} ${num(r.now)} → <b>${num(r.next)}</b> ${r.unit}`;
+    const btn = maxed ? '<span class="badge own">MAX</span>' : g(key, armed ? `Confirm · ${fmtCR(r.cost)}` : `Upgrade · ${fmtCR(r.cost)}`, { cls: `btn sm buy${armed ? ' armed' : ''}`, disabled: !r.ok, title: r.reason || `Leaves ${fmtCR(r.after)}` });
+    return `<div class="upg"><div class="uh"><b>${esc(c.name)}</b><span class="pips" aria-label="Level ${r.level} of ${r.max}">${pips}</span><em>Lv ${r.level}/${r.max}</em></div>
+      <div class="ud">${esc(c.desc)}</div><div class="ue"><span>${eff}</span>${btn}</div>
+      <div class="ur">${maxed ? 'Fully upgraded.' : r.ok ? `${armed ? 'Press again to confirm. ' : ''}Leaves ${fmtCR(r.after)} · ${r.max - r.level} level${r.max - r.level > 1 ? 's' : ''} left` : `<span class="reason">${esc(r.reason)}</span>`}</div></div>`;
+  }).join('');
+  const table = `<table class="res stattab"><tr><th>STAT</th><th>FACTORY</th><th>NOW</th></tr>${STAT_ROWS.map(([l, f, u]) => { const a = f(v.ship), b = f(v.eff);
+    return `<tr><td>${l}</td><td class="n">${a}${u ? ' ' + u : ''}</td><td class="n${String(a) !== String(b) ? ' upv' : ''}">${b}${u ? ' ' + u : ''}</td></tr>`; }).join('')}</table>`;
+  return `<div class="row between"><p class="lede small">Costs ${UPGRADES.costs.map(c => n0(c)).join(' / ')} CR per level. Each ship keeps its own upgrades.</p></div>
+    <div class="upgs">${rows}</div><details class="panel"><summary>Factory and current stats</summary><div class="tablewrap">${table}</div></details>`;
+}
+
+// ---------------- Paint ----------------
+function colourSlot(v) {
+  const slot = v.slot, hex = v.draft[slot], hue = hueOf(hex), light = lightOf(hex);
+  const paints = v.paints.map(s => g(`paint:${s.id}`, `${esc(s.name)}${s.unlocked ? '' : ' 🔒'}`, { cls: 'chipbtn', pressed: v.draft.paint === s.id, title: s.unlocked ? s.desc : `${s.reason || 'Locked'} — preview only` })).join('');
+  return `<div class="slots">${['primary', 'secondary', 'accent'].map(k => `<button class="slot" data-act="g" data-arg="slot:${k}" aria-pressed="${slot === k}"><i class="swatch" style="background:${v.draft[k]}"></i>${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div>
+    <p class="lede small">${{ primary: 'Main hull paint. Patterns are drawn on it.', secondary: 'Engine housings, canopy frames, ventral plates and booms (and the Wisp ring and Corsair hull); also the second colour of every pattern.', accent: 'Fins, wing strakes and control surfaces, the race-number band, engine glow, and pattern pinstripes.' }[slot]}</p>
+    ${slot === 'primary' ? `<div class="paints"><span class="lab">Special paint</span>${g('paint:none', 'None', { cls: 'chipbtn', pressed: !v.draft.paint })}${paints}</div>` : ''}
+    <div class="swatches" role="group" aria-label="Colour palette">${SWATCHES.map(([n, h]) => `<button class="sw" data-act="g" data-arg="sw:${h}" style="--c:${h}" title="${n}" aria-label="${n}" aria-pressed="${h === hex}"></button>`).join('')}</div>
+    <label class="setting"><span>Hue</span><input type="range" class="hue" data-gin="hue" min="0" max="359" step="1" value="${hue}" aria-label="Hue"></label>
+    <label class="setting"><span>Shade</span><input type="range" class="shade" data-gin="light" min="0.04" max="0.96" step="0.01" value="${light}" style="--c:${hex}" aria-label="Shade"></label>
+    <div class="setting"><span>Hex <i class="swatch" id="curSw" style="background:${hex}"></i></span><span class="row"><input type="text" class="hex" data-gin="hex" maxlength="7" value="${hex}" spellcheck="false" aria-label="Hex colour">${g('hex', 'Set')}</span></div>
+    ${slot === 'primary' && v.draft.paint ? '<p class="reason">A special paint is fitted: it replaces the primary colour. Choose “None” to paint a plain colour.</p>' : ''}`;
+}
+const itemCard = (s, arg, sel) => `<button class="icard${s.unlocked ? '' : ' locked'}" data-act="g" data-arg="${arg}" aria-pressed="${sel}" title="${esc(s.unlocked ? s.desc : (s.reason || '') + ' — preview only')}">
+  <span class="nm">${esc(s.name)}</span>${rarity(s)}<span class="st">${s.unlocked ? (sel ? 'Fitted' : 'Owned') : s.status === 'buy' ? price(s) : '🔒 Locked'}</span></button>`;
+function tabPaint(v) {
+  const sec = v.section, secs = [['colors', 'Colours'], ['pattern', 'Pattern'], ['finish', 'Finish'], ['effects', 'Effects']];
+  let body = '';
+  if (sec === 'colors') body = colourSlot(v);
+  else if (sec === 'pattern') body = `<div class="icards">${v.items.pattern.map(s => itemCard(s, `pick:${s.id}`, v.draft.pattern === s.id)).join('')}</div>`;
+  else if (sec === 'finish') body = `<div class="icards">${v.items.finish.map(s => itemCard(s, `pick:${s.id}`, v.draft.finish === s.id)).join('')}</div>`;
+  else body = `<h3>Exhaust</h3><div class="icards">${v.items.exhaust.map(s => itemCard(s, `pick:${s.id}`, v.draft.exhaust === s.id)).join('')}</div>
+    <h3 style="margin-top:12px">Contrails</h3><div class="icards">${v.items.trail.map(s => itemCard(s, `pick:${s.id}`, v.draft.trail === s.id)).join('')}</div>`;
+  const locked = v.lockedInDraft;
+  return `${gseg(secs.map(([k, l]) => [`psec:${k}`, l, k]), sec, 'wide')}
+    <div class="pbody">${body}</div>
+    <div class="viewbar"><span class="lab">View</span>${gseg([['view:front', 'Front', 'front'], ['view:side', 'Side', 'side'], ['view:rear', 'Rear', 'rear'], ['view:top', 'Top', 'top'], ['view:34', '3/4', '34'], ['view:auto', 'Spin', 'auto']], v.view, 'sm')}
+      <label class="zoom"><span class="lab">Zoom</span><input type="range" data-gin="zoom" min="0.55" max="1.3" step="0.01" value="${v.zoom}" aria-label="Zoom"></label>
+      ${g('cmp', v.compare ? 'Showing saved · back to preview' : 'Compare with saved', { cls: 'btn sm', pressed: v.compare, disabled: !v.dirty })}</div>
+    <div class="panel pstate">${v.dirty ? `<b>Preview</b> — ${v.changes} change${v.changes > 1 ? 's' : ''} not applied yet.` : '<b>Saved</b> — this is the paint job you race with.'}
+      ${locked.length ? `<p class="reason">Locked items in the preview: ${locked.map(s => `${esc(s.name)} (${esc(s.reason || 'locked')})`).join('; ')}. Unlock them in the Shop to apply.</p>` : ''}</div>`;
+}
+// Apply / Revert / Factory colours sit in the garage's action bar, so they stay in view while the paint options scroll
+function paintActions(v) {
+  return `<div class="row">${g('apply', v.dirty ? `Apply paint job · ${v.changes} change${v.changes > 1 ? 's' : ''}` : 'Apply paint job', { cls: 'btn sm primary', disabled: !v.dirty || v.locked > 0, title: v.locked ? 'Unlock the locked items in the preview first' : '' })}${g('revert', 'Revert', { disabled: !v.dirty })}${g('factory', 'Factory colours')}</div>`;
+}
+
+// ---------------- Inventory ----------------
+function tabInventory(v) {
+  const f = v.filters, cats = [['all', 'All'], ...CATEGORIES.map(c => [c.id, c.id === 'premium' ? 'Premium' : c.name.replace('Special ', '')])];
+  const rows = v.list.map(s => {
+    const acts = [];
+    if (s.status === 'premium') acts.push('<span class="reason">Not available in this version.</span>');
+    else { if (s.unlocked) acts.push(s.equipped ? (s.id === v.defaults[s.slot] ? '' : g(`unequip:${s.slot}`, 'Unequip')) : g(`equip:${s.id}`, 'Equip'));
+      if (!s.equipped) acts.push(g(`try:${s.id}`, 'Preview'));
+      if (s.status === 'buy') acts.push(g(`goshop:${s.id}`, 'Shop'));
+      if (s.status === 'locked') acts.push(`<span class="reason">${esc(s.reason)}</span>`); }
+    return `<div class="irow${s.unlocked ? '' : ' locked'}"><div class="ii"><b>${esc(s.name)}</b> ${rarity(s)}<span class="cat">${esc((CATEGORIES.find(c => c.id === s.category) || {}).name || '')}</span><p>${esc(s.desc)}</p></div><div class="ia">${badge(s)}<div class="row">${acts.join('')}</div></div></div>`;
+  }).join('') || '<p class="lede">Nothing matches these filters.</p>';
+  return `<div class="filters">${gseg(cats.map(([k, l]) => [`f:cat:${k}`, l, k]), f.category, 'sm')}
+    ${gseg([['f:rar:all', 'Any rarity', 'all'], ...RARITIES.map(r => [`f:rar:${r.id}`, r.name, r.id])], f.rarity, 'sm')}
+    ${gseg([['f:st:all', 'All', 'all'], ['f:st:unlocked', 'Unlocked', 'unlocked'], ['f:st:locked', 'Locked', 'locked'], ['f:st:equipped', 'Equipped', 'equipped']], f.status, 'sm')}</div>
+    <p class="lede small">${v.owned} of ${v.total} cosmetics unlocked. Equip applies to the ${esc(v.ship.name)} and is saved at once. Cosmetics never change performance.</p>
+    <div class="ilist">${rows}</div>`;
+}
+
+// ---------------- Shop ----------------
+function tabShop(v) {
+  const cards = v.list.map(s => `<button class="icard${s.unlocked ? '' : ' locked'}${s.status === 'premium' ? ' prem' : ''}" data-act="g" data-arg="sel:${s.id}" aria-pressed="${v.sel === s.id}">
+    <span class="nm">${esc(s.name)}</span>${rarity(s)}<span class="st">${s.status === 'premium' ? 'Coming soon' : s.unlocked ? 'Owned' : s.status === 'buy' ? price(s) : '🔒 Earned in play'}</span></button>`).join('');
+  let detail = '<p class="lede small">Select an item to see what it costs and what you will have left.</p>';
+  const s = v.selItem;
+  if (s) {
+    let act = '';
+    if (s.status === 'premium') act = `<p class="prem-note"><b>${PREMIUM_LABEL}</b><br>This is a placeholder for a possible future premium catalog. It cannot be bought, unlocked or equipped in this version, and nothing here involves real money.</p>`;
+    else if (s.unlocked) act = `<div class="row"><span class="badge own">Owned</span>${s.equipped ? '<span class="badge eq">Equipped</span>' : g(`equip:${s.id}`, `Equip on ${esc(v.ship.name)}`, { cls: 'btn sm primary' })}</div>`;
+    else if (s.status === 'buy') { const have = v.wallet[s.currency], key = `buy:${s.id}`, armed = v.armed === key;
+      act = `<div class="buyline"><span>Cost ${price(s)}</span><span>You have <b class="${s.currency === 'ST' ? 'st' : 'cr'}">${fmtCur(s.currency, have)}</b></span>${s.canBuy ? `<span>After: <b>${fmtCur(s.currency, have - s.price)}</b></span>` : ''}</div>
+        <div class="row">${g(key, armed ? `Confirm: spend ${fmtCur(s.currency, s.price)}` : `Unlock for ${fmtCur(s.currency, s.price)}`, { cls: `btn sm buy${armed ? ' armed' : ''}`, disabled: !s.canBuy })}${armed ? g('cancel', 'Cancel') : ''}${g(`try:${s.id}`, 'Preview on ship')}</div>
+        ${s.canBuy ? (armed ? '<p class="lede small">Press confirm to spend the in-game currency shown.</p>' : '') : `<p class="reason">${esc(s.reason)}</p>`}`; }
+    else act = `<p class="reason">Earned by playing: ${esc(s.reason)}</p><div class="row">${g(`try:${s.id}`, 'Preview on ship')}</div>`;
+    detail = `<div class="dh"><b>${esc(s.name)}</b>${rarity(s)}<span class="cat">${esc(s.class === 'premium' ? 'Premium' : s.class === 'special' ? 'Special' : 'Earnable')}</span></div><p>${esc(s.desc)}</p>${act}`;
+  }
+  return `${gseg(v.cats.map(c => [`scat:${c.id}`, c.id === 'premium' ? 'Premium — Coming Soon' : c.name, c.id]), v.cat, 'sm wrap')}
+    <div class="panel detail">${detail}</div><div class="icards">${cards}</div>
+    <p class="lede small">Credits and Style Tokens are earned in races and cannot be bought. The shop has no real-money purchases.</p>`;
+}
+
+// ---------------- results: reward panel ----------------
+function rewardHTML(r, wallet) {
+  if (!r) return '';
+  if (!r.ok) return `<div class="panel rewards"><h3>Reward</h3><p class="reason">${esc(r.duplicate ? 'This race was already paid.' : r.message || 'No reward.')}</p></div>`;
+  const cr = r.lines.filter(l => l.CR), st = r.lines.filter(l => l.ST);
+  return `<div class="panel rewards"><div class="rw-top"><span>${esc(cr[0] ? cr[0].name : 'Reward')}</span><b class="cr">+${fmtCR(r.credits)}</b></div>
+    <div class="rw-parts">${r.parts.map(([l, x], k) => `${k ? '<i>×</i>' : ''}<span>${esc(l)} <b>${typeof x === 'number' && x < 10 ? x.toFixed(2) : n0(x)}</b></span>`).join('')}</div>
+    ${st.map(l => `<div class="rw-line"><span>${esc(l.name)}</span><b class="st">+${fmtST(l.ST)}</b></div>`).join('')}
+    ${(r.unlocks || []).map(id => `<div class="rw-line"><span>Unlocked: ${esc(ITEM[id].name)}</span><b class="good">NEW</b></div>`).join('')}
+    <div class="rw-bal"><span>Balance</span>${walletHTML(wallet)}</div>${r.saved === false ? '<p class="reason">This browser would not let the game save: your career lasts until the page is closed.</p>' : ''}</div>`;
+}
+
+// ---------------- championship ----------------
+function ladderHTML(champs, cur, laps) {
+  return `<div class="ladder">${DIFF_ORDER.map((d, k) => { const open = champs.unlocked.includes(d), done = champs.completed[d] || 0, prev = DIFF_ORDER[k - 1];
+    const bonus = Math.round(CHAMPIONSHIP_REWARDS.completion[d] * lapMult(laps));
+    return `<button class="rung" data-act="diff" data-arg="${d}" aria-pressed="${cur === d}"${open ? '' : ' disabled'}><b>${DIFF_LABEL[d]}</b>
+      <span>${open ? (done ? `Completed ×${done}${champs.titles[d] ? ` · titles ×${champs.titles[d]}` : ''}` : 'Unlocked') : `🔒 Complete ${DIFF_LABEL[prev]} first`}</span>
+      <em>Completion bonus ${fmtCR(bonus)} · +${CHAMPIONSHIP_REWARDS.tokens.completion[d]} ST</em></button>`; }).join('')}</div>`;
+}
+function runTable(results, total) {
+  return `<table class="res"><tr><th>RND</th><th>COURSE</th><th>POS</th><th>PTS</th><th>CREDITS</th></tr>${results.map(r => `<tr><td class="p">${r.round + 1}</td><td>${esc(trackName(r.track))}</td><td class="n">P${r.place}</td><td class="n">${r.points}</td><td class="n">${fmtCR(r.credits)}</td></tr>`).join('')}
+    ${total != null ? `<tr class="sum"><td></td><td>Race rewards</td><td></td><td></td><td class="n"><b>${fmtCR(total)}</b></td></tr>` : ''}</table>`;
+}
+function champHubHTML(v) {
+  const st = v.standings, done = v.final, run = v.run;
+  const table = `<div class="tablewrap panel"><table class="res"><tr><th>POS</th><th>PILOT</th><th>WINS</th><th>POINTS</th></tr>
+    ${st.map((e, k) => `<tr class="${e.name === 'YOU' ? 'me' : ''}"><td class="p">${k + 1}</td><td>${esc(e.name)}</td><td class="n">${e.wins}</td><td class="n"><b>${e.points}</b></td></tr>`).join('')}</table></div>`;
+  if (!done) return `<div class="col center" style="width:min(900px,100%)"><div class="row between"><h3>${DIFF_LABEL[run.diff]} Championship · after round ${run.round} of ${CHAMPIONSHIP.length} · ${run.laps} lap${run.laps > 1 ? 's' : ''}</h3>${walletHTML(v.wallet)}</div>
+    <h2>Standings</h2><div class="split2">${table}<div class="panel"><h3>This run so far</h3>${runTable(run.results, run.credits.races)}<p class="lede small">Finish all ${CHAMPIONSHIP.length} rounds for the completion bonus of ${fmtCR(v.bonus)} plus a final-standing bonus.</p></div></div>
+    <div class="actbar"><div class="row">${v.next ? `<button class="btn primary" data-act="nextRound">Round ${run.round + 1}: ${esc(trackName(v.next))}</button>` : ''}<button class="btn" data-act="menu">Save and exit</button>
+      ${v.armedAbandon ? '<button class="btn danger" data-act="champAbandon" data-arg="confirm">Confirm: abandon this run</button>' : '<button class="btn" data-act="champAbandon">Abandon run</button>'}</div></div>
+    <p class="lede small">Your progress in this championship is saved after every round; you can leave and continue it later from the main menu.</p></div>`;
+  const c = v.completion, s = c.run, credits = s.credits;
+  const head = c.standing === 1 ? 'You are champion' : `${esc(st[0].name)} takes the title`;
+  return `<div class="col center" style="width:min(980px,100%)"><div class="row between"><h3>${DIFF_LABEL[s.diff]} Championship · complete · ${s.laps} lap${s.laps > 1 ? 's' : ''} per round</h3>${walletHTML(v.wallet)}</div>
+    <h2>${head}</h2>
+    ${c.newlyUnlocked ? `<div class="unlockbar"><b>${DIFF_LABEL[c.newlyUnlocked]} Championship unlocked</b><span>${c.newlyUnlocked === 'ace' ? 'Ace is the highest difficulty.' : 'The next step on the ladder is open.'}</span></div>` : c.isHighest ? '<div class="unlockbar ace"><b>Ace completed</b><span>Ace is the highest championship difficulty. Replay any championship to earn its rewards again.</span></div>' : ''}
+    <div class="split2">${table}
+      <div class="panel"><h3>This run</h3><div class="kv"><div><span>Completion</span><b class="good">Completed</b></div><div><span>Final standing</span><b>P${c.standing} of ${st.length} · ${s.points} pts</b></div></div>
+        ${runTable(s.results, credits.races)}
+        <div class="rw-line"><span>Completion bonus (${DIFF_LABEL[s.diff]}, ${s.laps} lap${s.laps > 1 ? 's' : ''})</span><b class="cr">+${fmtCR(credits.completion)}</b></div>
+        <div class="rw-line"><span>Final-standing bonus (P${c.standing}${c.standingShare ? `, ${Math.round(c.standingShare * 100)}%` : ''})</span><b class="cr">+${fmtCR(credits.standing)}</b></div>
+        ${c.bonusTokens ? `<div class="rw-line"><span>Championship Style Tokens</span><b class="st">+${fmtST(c.bonusTokens)}</b></div>` : ''}
+        ${(c.unlocks || []).map(id => `<div class="rw-line"><span>Unlocked: ${esc(ITEM[id].name)}</span><b class="good">NEW</b></div>`).join('')}
+        <div class="rw-top"><span>Total from this championship</span><b class="cr">${fmtCR(credits.total)}</b></div>
+        <div class="rw-bal"><span>Balance now</span>${walletHTML(v.wallet)}</div></div></div>
+    <div class="panel career-line"><h3>Career (all runs)</h3><span>Rookie ×${v.champs.completed.rookie} · Pro ×${v.champs.completed.pro} · Ace ×${v.champs.completed.ace} completed</span><span>Titles: ${v.champs.titles.rookie + v.champs.titles.pro + v.champs.titles.ace}</span><span>Lifetime credits earned ${fmtCR(v.earned.CR)}</span></div>
+    <div class="actbar"><div class="row"><button class="btn primary" data-act="menu">Main menu</button><button class="btn" data-act="garage">Garage</button></div></div></div>`;
+}
+
+// ---------------- career ----------------
+function careerHTML(c) {
+  const S = c.stats, pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  const modeRows = [['quick', 'Quick race'], ['champ', 'Championship races'], ['trial', 'Time trial']].map(([k, l]) => { const m = S.byMode[k]; return `<tr><td>${l}</td><td class="n">${m.races}</td><td class="n">${k === 'trial' ? '—' : m.wins}</td><td class="n">${k === 'trial' ? '—' : m.podiums}</td><td class="n">${fmtCR(m.credits)}</td></tr>`; }).join('');
+  const trackRows = TRACK_DEFS.map(d => { const t = S.byTrack[d.id]; return `<tr><td>${esc(d.name)}</td><td class="n">${t.races}</td><td class="n">${t.wins}</td><td class="n">${t.podiums}</td><td class="n">${t.best ? 'P' + t.best : '—'}</td><td class="n">${fmtCR(t.credits)}</td></tr>`; }).join('');
+  const ch = c.champs, hist = c.history.slice(-8).reverse().map(h => `<tr><td>${esc(trackName(h.track))}</td><td>${h.mode === 'trial' ? 'Trial' : h.mode === 'champ' ? 'Champ' : 'Quick'}${h.diff ? ' · ' + DIFF_LABEL[h.diff] : ''}</td><td class="n">${h.laps}</td><td class="n">${h.mode === 'trial' ? '—' : 'P' + h.place}</td><td class="n">+${n0(h.credits)}${h.tokens ? ` · +${h.tokens} ST` : ''}</td></tr>`).join('') || '<tr><td colspan="5">No races yet.</td></tr>';
+  const runs = ch.runs.slice(-6).reverse().map(r => `<tr><td>${DIFF_LABEL[r.diff]}</td><td>${r.status === 'completed' ? 'Completed' : 'Abandoned'}</td><td class="n">${r.standing ? 'P' + r.standing : '—'}</td><td class="n">${fmtCR(r.credits.total)}</td></tr>`).join('') || '<tr><td colspan="4">No championships finished yet.</td></tr>';
+  return `<div class="col center" style="width:min(1000px,100%)"><div class="row between"><h3>Career</h3>${walletHTML(c.wallet)}</div><h2>Pilot record</h2>
+    <div class="kpis"><div class="panel"><span>Races</span><b>${S.races}</b></div><div class="panel"><span>Wins</span><b>${S.wins}</b></div><div class="panel"><span>Podiums</span><b>${S.podiums}</b></div>
+      <div class="panel"><span>Credits earned</span><b class="cr">${n0(c.earned.CR)}</b></div><div class="panel"><span>Style Tokens earned</span><b class="st">${n0(c.earned.ST)}</b></div>
+      <div class="panel"><span>Upgrades</span><b>${c.upgrades[0]}/${c.upgrades[1]}</b><small>${pct(c.upgrades[0], c.upgrades[1])}%</small></div><div class="panel"><span>Cosmetics</span><b>${c.cosmetics[0]}/${c.cosmetics[1]}</b><small>${pct(c.cosmetics[0], c.cosmetics[1])}%</small></div></div>
+    <div class="panel"><h3>Championships</h3>${ladderHTML(ch, null, 3).replace(/data-act="diff"/g, 'data-act="noop"')}</div>
+    <div class="split2"><div class="panel tablewrap"><h3>By mode</h3><table class="res"><tr><th>MODE</th><th>RACES</th><th>WINS</th><th>PODIUMS</th><th>CREDITS</th></tr>${modeRows}</table></div>
+      <div class="panel tablewrap"><h3>By course</h3><table class="res"><tr><th>COURSE</th><th>RACES</th><th>WINS</th><th>POD.</th><th>BEST</th><th>CREDITS</th></tr>${trackRows}</table></div></div>
+    <div class="split2"><div class="panel tablewrap"><h3>Recent races</h3><table class="res"><tr><th>COURSE</th><th>MODE</th><th>LAPS</th><th>POS</th><th>EARNED</th></tr>${hist}</table></div>
+      <div class="panel tablewrap"><h3>Championship runs</h3><table class="res"><tr><th>LEVEL</th><th>RESULT</th><th>STANDING</th><th>CREDITS</th></tr>${runs}</table></div></div>
+    <p class="lede small">Career data is saved in this browser only (no cloud sync). Currencies are earned by playing; there are no real-money purchases.</p>
+    <div class="actbar"><div class="row"><button class="btn primary" data-act="back" data-arg="title">Done</button></div></div></div>`;
+}
+
+return { esc, DIFF_LABEL, walletHTML, garageHTML, tabShip, tabUpgrades, tabPaint, paintActions, tabInventory, tabShop, rewardHTML, ladderHTML, runTable, champHubHTML, careerHTML };
+})();
 const __m__src_ui_js = (() => {
 // Menus, banners and messages (DOM). The in-race HUD lives in hud.js.
 const { SHIPS, STAT_BARS, DIFFICULTY, CHAMPIONSHIP } = __m__src_config_js;
 const { TRACK_DEFS } = __m__src_sim_tracks_js;
+const { walletHTML, rewardHTML, ladderHTML, DIFF_LABEL } = __m__src_ui_garage_js;
 const $ = s => document.querySelector(s);
 const fmt = t => (!isFinite(t) || t <= 0) ? '--:--.--' : `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -3861,14 +5184,22 @@ class UI {
   constructor(game) {
     this.g = game; this.root = $('#ui'); this.msgEl = $('#msg'); this.countEl = $('#count'); this.bannerEl = $('#banner'); this.tab = 'graphics';
     this.root.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b) { game.audio.ui('click'); game.action(b.dataset.act, b.dataset.arg, b); } });
-    this.root.addEventListener('input', e => { const el = e.target; if (el.dataset.set) game.action('set', `${el.dataset.set}:${el.value}`); });
+    this.root.addEventListener('input', e => { const el = e.target; if (el.dataset.set) game.action('set', `${el.dataset.set}:${el.value}`); else if (el.dataset.gin) game.garage.input(el); });
+    this.root.addEventListener('change', e => { const el = e.target; if (el.dataset.gin === 'hex') game.action('g', 'hex'); }); // V7: Enter or leaving the hex field applies it
     this.root.addEventListener('focusin', e => { if (e.target.closest('[data-act]')) game.audio.ui('move'); const c = e.target.closest('.card[data-arg]'); if (c && c.dataset.act === 'track') game.action('hoverTrack', c.dataset.arg); });
     this.root.addEventListener('mouseover', e => { const c = e.target.closest('.card[data-arg]'); if (c && c.dataset.act === 'track') game.action('hoverTrack', c.dataset.arg); });
-    addEventListener('resize', () => this.fitLogo());
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.fitLogo());
+    addEventListener('resize', () => { this.fitLogo(); this.fitBar(); });
+    this.root.addEventListener('toggle', () => this.fitBar(), true); // <details> opening or closing changes the height
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.fitLogo(); this.fitBar(); });
   }
-  show(html, cls = 'scrim', focus = true) {
-    this.root.innerHTML = `<section class="screen ${cls}">${html}</section>`; this.fitLogo();
+  // V7: a screen taller than the window keeps its action row (.actbar) pinned to the bottom edge
+  fitBar() { const sc = this.root.querySelector('.screen'); if (sc && sc.querySelector('.actbar')) sc.classList.toggle('scrolls', sc.scrollHeight > sc.clientHeight + 2); }
+  show(html, cls = 'scrim', focus = true, keep = false) {
+    // V7: keep = re-render of the same screen (garage): no slide-in, same scroll position, focus stays on the same control
+    let fk = null, top = 0; const a = document.activeElement, sc = this.root.querySelector('.screen');
+    if (keep && sc) { top = sc.scrollTop; if (a && this.root.contains(a)) fk = a.dataset.gin ? `[data-gin="${a.dataset.gin}"]` : a.dataset.act ? `[data-act="${a.dataset.act}"]${a.dataset.arg != null ? `[data-arg="${CSS.escape(a.dataset.arg)}"]` : ''}` : null; }
+    this.root.innerHTML = `<section class="screen ${cls}${keep ? ' still' : ''}">${html}</section>`; this.fitLogo(); this.fitBar();
+    if (keep) { const s2 = this.root.querySelector('.screen'); s2.scrollTop = top; const f = fk && this.root.querySelector(fk); if (f) f.focus({ preventScroll: true }); else if (focus) { const t = this.root.querySelector('.tabs [aria-selected="true"]'); if (t) t.focus({ preventScroll: true }); } return; }
     if (focus) { const f = this.root.querySelector('.btn.primary, .card[aria-pressed="true"], .btn'); if (f) f.focus({ preventScroll: true }); }
   }
   hide() { this.root.innerHTML = ''; }
@@ -3888,15 +5219,19 @@ class UI {
   activate() { const a = document.activeElement; if (a && a.matches && a.matches('button')) a.click(); }
 
   title(touch) {
+    const P = this.g.progress, run = P && P.activeRun();
     this.show(`<div class="col">
-      <div class="kicker">Starlane Grand Prix · Season 5</div>
+      <div class="row between"><div class="kicker">Starlane Grand Prix · Season 5</div>${P ? walletHTML(P.wallet()) : ''}</div>
       <h1 class="logo"><span class="a">Galactic</span><span class="b">Rush</span></h1>
       <p class="lede">Thread an orbital foundry trench, a drifting asteroid belt, a neon megacity and the ring plane of a gas giant at six hundred kilometres an hour.</p>
       ${touch ? '<p class="touchnote">Needs a keyboard or a gamepad to fly.</p>' : ''}
       <div class="menu">
-        <button class="btn primary" data-act="mode" data-arg="quick">Quick race<small>One course, five rivals</small></button>
-        <button class="btn" data-act="mode" data-arg="champ">Championship<small>Four rounds, points decide the title</small></button>
+        ${run ? `<button class="btn primary" data-act="champContinue">Continue championship<small>${DIFF_LABEL[run.diff]} · round ${run.round + 1} of ${CHAMPIONSHIP.length}</small></button>` : ''}
+        <button class="btn${run ? '' : ' primary'}" data-act="mode" data-arg="quick">Quick race<small>One course, five rivals · earn credits every race</small></button>
+        <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : 'Four rounds · Rookie → Pro → Ace'}</small></button>
         <button class="btn" data-act="mode" data-arg="trial">Time trial<small>Race your ghost for the course record</small></button>
+        <button class="btn" data-act="garage">Garage<small>Upgrades, paint shop, inventory and cosmetic shop</small></button>
+        <button class="btn" data-act="career">Career<small>Your record, championships and earnings</small></button>
         <button class="btn" data-act="settings" data-arg="title">Settings</button>
         <button class="btn" data-act="controls" data-arg="title">Controls</button>
       </div>
@@ -3929,8 +5264,9 @@ class UI {
           <span class="chip">${champ ? 'Round ' + (k + 1) : d.short}</span><span class="t">${d.name}</span><span class="d">${d.tagline}</span>
           <span class="m"><span>LENGTH <b>${(this.g.trackLen(d.id) / 1000).toFixed(1)} KM</b></span><span>BEST <b>${b ? fmt(b.lap) : '--'}</b></span></span></button>`; }).join('')}</div>
       <div class="row" style="gap:22px"><div class="row"><h3>Laps</h3>${seg('laps', [[1, '1'], [2, '2'], [3, '3'], [5, '5']], o.laps)}</div>
-        ${trial ? '' : `<div class="row"><h3>Rivals</h3>${seg('diff', Object.entries(DIFFICULTY).map(([k, v]) => [k, v.label]), o.diff)}</div>`}</div>
-      <div class="row"><button class="btn primary" data-act="start">${champ ? 'Start round 1' : 'Launch'}</button><button class="btn" data-act="back">Back</button></div>
+        ${trial || champ ? '' : `<div class="row"><h3>Rivals</h3>${seg('diff', Object.entries(DIFFICULTY).map(([k, v]) => [k, v.label]), o.diff)}</div>`}</div>
+      ${champ ? `<div class="panel"><h3>Championship difficulty · Rookie → Pro → Ace</h3>${ladderHTML(this.g.progress.profile.championships, o.diff, o.laps)}</div>` : ''}
+      <div class="actbar"><div class="row"><button class="btn primary" data-act="start"${champ && !this.g.progress.champUnlocked(o.diff) ? ' disabled' : ''}>${champ ? `Start ${DIFF_LABEL[o.diff] || ''} championship` : 'Launch'}</button><button class="btn" data-act="back">Back</button></div></div>
     </div>`, 'scrim', false);
     this.root.querySelectorAll('canvas[data-map]').forEach(c => { const m = maps(c.dataset.map); if (m) c.getContext('2d').drawImage(m, 0, 0); });
     const f = this.root.querySelector('.card[aria-pressed="true"]') || this.root.querySelector('.btn.primary'); if (f) f.focus({ preventScroll: true });
@@ -3953,6 +5289,7 @@ class UI {
   }
 
   results(race, extra) {
+    const P = this.g.progress;
     const pl = race.player, win = race.order[0];
     const head = race.mode === 'trial' ? 'Run complete' : pl.place === 1 ? 'Victory' : `Finished P${pl.place}`;
     const rows = race.order.map(r => {
@@ -3965,10 +5302,12 @@ class UI {
       <h2>${head}</h2>
       ${extra.record ? `<div><span class="chip" style="color:var(--good);border-color:var(--good)">New course record ${fmt(extra.record)}</span></div>` : ''}
       ${laps}
+      ${extra.reward ? rewardHTML(extra.reward, P.wallet()) : ''}
+      ${extra.reward && extra.reward.ok && extra.reward.champ ? `<p class="lede small">Championship run so far: ${extra.reward.champ.round} of ${extra.reward.champ.rounds} rounds, ${extra.reward.champ.runCredits.toLocaleString('en-US')} CR from races.</p>` : ''}
       <div class="tablewrap panel"><table class="res"><tr><th>POS</th><th>PILOT</th><th>SHIP</th><th>TIME</th><th>BEST LAP</th>${extra.points ? '<th>PTS</th>' : ''}</tr>${rows}</table></div>
-      <div class="row">${extra.champ ? '<button class="btn primary" data-act="champHub">Championship standings</button>'
+      <div class="actbar"><div class="row">${extra.champ ? `<button class="btn primary" data-act="champHub">${extra.reward && extra.reward.completion && extra.reward.completion.ok ? 'Championship results' : 'Championship standings'}</button>`
         : '<button class="btn primary" data-act="restart">Race again</button><button class="btn" data-act="mode" data-arg="' + race.mode + '">Change course</button>'}
-        <button class="btn" data-act="menu">Main menu</button></div>
+        <button class="btn" data-act="menu">Main menu</button></div></div>
     </div>`, 'scrim');
   }
 
@@ -3992,7 +5331,8 @@ class UI {
     else if (this.tab === 'audio') body = opt('sound', 'Sound', [['on', 'On'], ['off', 'Off']]) + range('master', 0, 1, 0.05, 'Master volume') + range('music', 0, 1, 0.05, 'Music volume') + range('sfx', 0, 1, 0.05, 'Effects volume');
     else if (this.tab === 'controls') body = range('sens', 0.6, 1.4, 0.05, 'Steering sensitivity') + range('padSens', 0.6, 1.6, 0.05, 'Gamepad sensitivity') + opt('invert', 'Pitch', [['false', 'Normal'], ['true', 'Inverted']])
       + opt('handling', 'Handling', [['relaxed', 'Relaxed'], ['classic', 'Classic (V1)']]) + opt('assist', 'Steering assist', [['0', 'Off'], ['0.3', 'Low'], ['0.6', 'High']]) + opt('rumble', 'Gamepad rumble', [['on', 'On'], ['off', 'Off']]);
-    else body = `<p class="lede" style="margin:6px 0 10px">Best laps and ghosts are stored in this browser. Copy them out, or paste a save from Galactic Rush V1 or another browser. Pasting keeps whichever lap is faster.</p>
+    else body = `<p class="lede" style="margin:6px 0 10px">Best laps and ghosts are stored in this browser. Copy them out, or paste a save from Galactic Rush V1 or another browser. Pasting keeps whichever lap is faster.
+      Your career (credits, Style Tokens, upgrades, cosmetics and championships) is also saved in this browser, separately, and is not part of this copy: there is no cloud sync.</p>
       <textarea class="save" id="saveText" placeholder="Paste a save here"></textarea>
       <div class="row" style="margin-top:10px"><button class="btn" data-act="saveExport">Copy my save</button><button class="btn" data-act="saveImport">Import pasted save</button></div><p class="lede" id="saveMsg" style="margin-top:6px"></p>`;
     this.show(`<div class="col center" style="width:min(680px,100%)"><h3>Settings</h3><h2>Tune the cockpit</h2>
@@ -4280,6 +5620,158 @@ class RaceFX {
 }
 
 return { RaceFX };
+})();
+const __m__src_garage_js = (() => {
+// GALACTIC RUSH V7 — the garage: ship choice, upgrades, paint shop with a live 3D preview, inventory and the cosmetic
+// shop, all on the existing hangar scene. This file holds UI state only; every purchase, upgrade and saved paint job
+// goes through the progression service (src/progress), which validates and saves it.
+const { SHIPS } = __m__src_config_js;
+const { ITEM, CATEGORIES, SLOT_DEFAULT, defaultCustom } = __m__src_progress_catalog_js;
+const { normHex, withHue, withLight, hueOf, lightOf } = __m__src_progress_customize_js;
+const { CATEGORY } = __m__src_progress_upgrades_js;
+const { fmtCR, fmtCur } = __m__src_progress_index_js;
+const { garageHTML, tabShip, tabUpgrades, tabPaint, paintActions, tabInventory, tabShop } = __m__src_ui_garage_js;
+const TABS = ['ship', 'upgrades', 'paint', 'inventory', 'shop'];
+const SECTION_OF = { paint: 'colors', pattern: 'pattern', finish: 'finish', exhaust: 'effects', trail: 'effects' };
+const KEYS = ['primary', 'secondary', 'accent', 'paint', 'pattern', 'finish', 'exhaust', 'trail'];
+// preview angles relative to the camera's bearing: [turntable offset, tilt toward the camera]
+const VIEWS = { front: [0, 0.12], side: [-Math.PI / 2, 0.06], rear: [Math.PI, 0.1], top: [-0.75, 1.0], '34': [-0.8, 0.12] };
+
+class Garage {
+  constructor(game) {
+    this.g = game; this.tab = 'ship'; this.section = 'colors'; this.slot = 'primary'; this.filters = { category: 'all', rarity: 'all', status: 'all' };
+    this.shopCat = 'colors'; this.sel = null; this.armed = null; this.notice = null; this.draft = null; this.compare = false; this.view = 'auto'; this.zoom = 1; this.leaving = null; this.fly = false;
+  }
+  get P() { return this.g.progress; }
+  get shipId() { return SHIPS[this.g.opts.ship].id; }
+  get saved() { return this.P.custom(this.shipId); }
+  get dirty() { const s = this.saved; return !!this.draft && KEYS.some(k => this.draft[k] !== s[k]); }
+  changes() { const s = this.saved; return KEYS.filter(k => this.draft[k] !== s[k]).length; }
+  lockedInDraft() { return ['paint', 'pattern', 'finish', 'exhaust', 'trail'].map(k => this.draft[k]).filter(id => id && !this.P.isUnlocked(id)).map(id => this.P.itemState(ITEM[id], this.shipId)); }
+  // what the hangar shows: the draft while editing (or the saved paint when comparing)
+  liveryFor(shipId) { return this.P.livery(shipId, shipId === this.shipId && this.draft && !this.compare ? this.draft : null); }
+
+  open(fly, tab) {
+    const g = this.g; this.fly = fly; this.tab = tab || (fly ? 'ship' : this.tab); // racing: start on the ship; the Garage menu returns to the last tab
+    this.draft = this.saved; this.compare = false; this.leaving = null; this.armed = null; this.notice = null;
+    g.state = 'ship'; g.input.capture = false; g.hud.show(false); g.scene = { kind: 'hangar', mode: 'showcase' }; g.fx.clear(); g.audio.setEnv('hangar');
+    g.hangar.resetView(); this.view = 'auto'; this.zoom = 1; g.setShowcase();
+    // keyboard and pad: choosing a ship for a race starts on "Fly the …" so Enter flies at once, as in V6; the Garage menu starts on its tabs
+    this.render(false, fly ? '.gfoot .btn.primary' : '.tabs [aria-selected="true"]'); g.audio.music('menu');
+  }
+  close() { this.g.hangar.resetView(); this.view = 'auto'; this.zoom = 1; this.compare = false; this.leaving = null; this.armed = null; this.notice = null; this.P.flush(); }
+  // leaving with unapplied paint asks first (inline, no modal)
+  leave(next) { if (this.dirty) { this.leaving = next; this.render(); return; } this.close(); next(); }
+  switchShip(dir) {
+    this.leave(() => { const g = this.g; g.opts.ship = (g.opts.ship + dir + SHIPS.length) % SHIPS.length; this.P.selectShip(this.shipId); this.draft = this.saved; this.armed = null; g.setShowcase(); this.notice = null; this.render(); });
+  }
+  preview() { const sv = this.g.showSV; if (sv) sv.setLivery(this.liveryFor(this.shipId)); }
+  say(text, cls = '') { this.notice = { text, cls }; }
+  arm(key) { this.armed = key; clearTimeout(this.armT); this.armT = setTimeout(() => { if (this.armed === key && this.g.state === 'ship') { this.armed = null; this.render(); } }, 6000); }
+  result(r, okText) { if (r.ok) { this.say(okText + (r.saved === false ? ' (Could not save in this browser: progress lasts until you close the page.)' : ''), 'good'); this.g.audio.play('checkpoint'); } else this.say(r.message || 'Not possible.', 'warn'); }
+  setTab(t) { if (TABS.includes(t)) { this.tab = t; this.armed = null; } }
+  tabStep(d) { this.setTab(TABS[(TABS.indexOf(this.tab) + d + TABS.length) % TABS.length]); this.render(); const f = document.querySelector('#ui .tabs [aria-selected="true"]'); if (f) f.focus({ preventScroll: true }); }
+  setColour(hex) { const h = normHex(hex); if (!h) { this.say('That is not a colour. Use six hex digits, e.g. #e8892b.', 'warn'); return false; } this.draft = { ...this.draft, [this.slot]: h, ...(this.slot === 'primary' ? { paint: null } : {}) }; this.preview(); return true; }
+  setView(v) {
+    const H = this.g.hangar; this.view = v;
+    if (v === 'auto') { H.setView({ auto: true, tYaw: null, tTilt: 0 }); return; }
+    const c = H.camera(0), az = Math.atan2(c.pos.x, c.pos.z), [o, tilt] = VIEWS[v];
+    H.setView({ auto: false, tYaw: az + o, tTilt: tilt });
+  }
+  rotate(dyaw, dtilt = 0) { const H = this.g.hangar, V = H.view; this.view = 'free'; H.setView({ auto: false, tYaw: (V.tYaw ?? H.spin) + dyaw, tTilt: Math.max(-0.5, Math.min(1.25, V.tTilt + dtilt)) }); }
+  zoomBy(f) { const H = this.g.hangar; this.zoom = Math.max(0.55, Math.min(1.3, H.view.tZoom * f)); H.setView({ tZoom: this.zoom }); const z = document.querySelector('#ui [data-gin="zoom"]'); if (z) z.value = this.zoom; }
+  applyDraft() {
+    const r = this.P.setCustom(this.shipId, this.draft);
+    if (r.ok) { this.draft = this.saved; this.compare = false; this.preview(); this.result(r, 'Paint job saved.'); return true; }
+    this.result(r); return false;
+  }
+
+  act(arg) {
+    const [verb, ...rest] = String(arg).split(':'), val = rest.join(':'), id = this.shipId;
+    switch (verb) {
+      case 'tab': this.setTab(val); break;
+      case 'done': this.leave(() => { this.g.state = 'title'; this.g.startAttract(); this.g.ui.title(this.g.touch); }); return;
+      case 'leave': { const next = this.leaving; if (val === 'stay') this.leaving = null;
+        else if (val === 'apply') { if (this.applyDraft() && next) { this.leaving = null; this.close(); next(); return; } }
+        else if (val === 'discard') { this.draft = this.saved; this.preview(); this.leaving = null; if (next) { this.close(); next(); return; } } break; }
+      // upgrades: first press arms, second press buys (the expected level stops a double press from buying twice)
+      case 'up': { if (this.armed !== arg) { this.arm(arg); break; } this.armed = null; const [cat, lv] = rest, r = this.P.buyUpgrade(id, cat, +lv);
+        this.result(r, r.ok ? `${CATEGORY[cat].name} upgraded to level ${r.level} for ${fmtCR(r.cost)}. Balance ${fmtCR(r.balance.CR)}.` : ''); break; }
+      // paint shop (draft only until Apply)
+      case 'psec': this.section = val; break;
+      case 'slot': this.slot = val; break;
+      case 'sw': this.setColour(val); break;
+      case 'hex': { const el = document.querySelector('#ui input.hex'); if (el) this.setColour(el.value); break; }
+      case 'paint': this.draft = { ...this.draft, paint: val === 'none' ? null : val }; this.preview(); break;
+      case 'pick': { const it = ITEM[val]; if (it && it.class !== 'premium') { this.draft = { ...this.draft, [it.slot]: val }; this.preview(); } break; }
+      case 'view': this.setView(val); break;
+      case 'cmp': this.compare = !this.compare && this.dirty; this.preview(); break;
+      case 'apply': this.applyDraft(); break;
+      case 'revert': this.draft = this.saved; this.compare = false; this.preview(); this.say('Preview reverted to your saved paint job.'); break;
+      case 'factory': { const d = defaultCustom(id); this.draft = { ...this.draft, primary: d.primary, secondary: d.secondary, accent: d.accent, paint: null }; this.preview(); this.say('Factory colours in the preview. Apply to keep them.'); break; }
+      // inventory
+      case 'f': { const [k, v] = rest; this.filters[{ cat: 'category', rar: 'rarity', st: 'status' }[k]] = v; break; }
+      case 'equip': { const it = ITEM[val], r = this.P.equip(id, val); if (r.ok) this.draft = { ...this.draft, [it.slot]: val }; this.result(r, `${it ? it.name : 'Item'} equipped on the ${SHIPS[this.g.opts.ship].name}.`); this.preview(); break; }
+      case 'unequip': { const r = this.P.unequip(id, val); if (r.ok) this.draft = { ...this.draft, [val]: SLOT_DEFAULT[val] }; this.result(r, 'Unequipped; the default is back on.'); this.preview(); break; }
+      case 'try': { const it = ITEM[val]; if (!it || it.class === 'premium') { this.say('Premium cosmetics cannot be previewed or used in this version.', 'warn'); break; }
+        this.draft = { ...this.draft, [it.slot]: val }; this.preview(); this.tab = 'paint'; this.section = SECTION_OF[it.slot]; this.say(`Previewing ${it.name}.${this.P.isUnlocked(val) ? ' Apply to keep it.' : ' It is locked: unlock it to apply.'}`); break; }
+      case 'goshop': { const it = ITEM[val]; if (it) { this.tab = 'shop'; this.shopCat = it.category; this.sel = val; } break; }
+      // shop: select, then unlock in two presses
+      case 'scat': this.shopCat = val; this.sel = null; this.armed = null; break;
+      case 'sel': this.sel = val; this.armed = null; break;
+      case 'cancel': this.armed = null; break;
+      case 'buy': { if (this.armed !== arg) { this.arm(arg); break; } this.armed = null; const it = ITEM[val], r = this.P.buyItem(val);
+        this.result(r, r.ok ? `${it.name} unlocked for ${fmtCur(r.currency, r.price)}. Balance ${fmtCur(r.currency, r.balance[r.currency])}.` : ''); break; }
+    }
+    this.render();
+  }
+  // live controls: sliders and the hex field update the preview without rebuilding the screen
+  input(el) {
+    const k = el.dataset.gin;
+    if (k === 'zoom') { this.zoom = +el.value; this.g.hangar.setView({ tZoom: this.zoom }); return; }
+    let hex = null;
+    if (k === 'hue') hex = withHue(this.draft[this.slot], el.value);
+    else if (k === 'light') hex = withLight(this.draft[this.slot], el.value);
+    else if (k === 'hex') { hex = normHex(el.value); if (!hex || el.value.replace('#', '').length < 6) return; }
+    if (!hex) return;
+    this.draft = { ...this.draft, [this.slot]: hex, ...(this.slot === 'primary' ? { paint: null } : {}) }; this.preview();
+    const R = document.getElementById('ui'), set = (sel, f) => { const e = R.querySelector(sel); if (e) f(e); };
+    set('#curSw', e => { e.style.background = hex; }); set(`.slot[data-arg="slot:${this.slot}"] .swatch`, e => { e.style.background = hex; });
+    if (k !== 'hex') set('input.hex', e => { e.value = hex; }); if (k !== 'hue') set('input.hue', e => { e.value = hueOf(hex); }); if (k !== 'light') set('input.shade', e => { e.value = lightOf(hex); });
+    set('input.shade', e => e.style.setProperty('--c', hex));
+    R.querySelectorAll('.sw[aria-pressed="true"]').forEach(e => e.setAttribute('aria-pressed', 'false'));
+  }
+
+  render(keep = true, focusSel = null) {
+    const P = this.P, id = this.shipId, ship = SHIPS[this.g.opts.ship], eff = P.effectiveDef(id), wallet = P.wallet();
+    if (!this.draft) this.draft = this.saved;
+    let body = '', bar = '';
+    if (this.tab === 'ship') body = tabShip({ ship, eff, custom: this.saved });
+    else if (this.tab === 'upgrades') body = tabUpgrades({ ship, eff, rows: P.upgradeRows(id), armed: this.armed });
+    else if (this.tab === 'paint') { const bySlot = s => P.catalog(id).filter(x => x.slot === s && x.class !== 'premium');
+      body = tabPaint({ section: this.section, slot: this.slot, draft: this.draft, paints: bySlot('paint'), items: { pattern: bySlot('pattern'), finish: bySlot('finish'), exhaust: bySlot('exhaust'), trail: bySlot('trail') },
+        view: this.view, zoom: this.zoom, compare: this.compare, dirty: this.dirty, changes: this.dirty ? this.changes() : 0, lockedInDraft: this.lockedInDraft() });
+      bar = paintActions({ dirty: this.dirty, changes: this.dirty ? this.changes() : 0, locked: this.lockedInDraft().length }); }
+    else if (this.tab === 'inventory') { const all = P.catalog(id), earn = all.filter(s => s.class !== 'premium' && s.class !== 'event');
+      body = tabInventory({ filters: this.filters, list: P.catalog(id, this.filters), owned: earn.filter(s => s.unlocked).length, total: earn.length, ship, defaults: SLOT_DEFAULT }); }
+    else { const list = P.catalog(id, { category: this.shopCat }); if (this.sel && !list.some(s => s.id === this.sel)) this.sel = null;
+      body = tabShop({ cats: CATEGORIES, cat: this.shopCat, list, sel: this.sel, selItem: this.sel ? P.itemState(ITEM[this.sel], id) : null, wallet, armed: this.armed, ship }); }
+    const dirty = this.dirty;
+    this.g.ui.show(garageHTML({ ship, idx: this.g.opts.ship, tab: this.tab, wallet, upgrades: P.upgrades(id), body, bar, notice: this.notice, dirty, leaving: !!this.leaving, canApply: dirty && this.lockedInDraft().length === 0, fly: this.fly }), 'scrim garage', !keep && !focusSel, keep);
+    if (focusSel) { const f = document.querySelector('#ui ' + focusSel); if (f) f.focus({ preventScroll: true }); }
+    this.bindDrag();
+  }
+  // drag the ship to turn it, wheel to zoom (the drag zone covers the scene to the right of the menu)
+  bindDrag() {
+    const z = document.querySelector('#ui .dragzone'); if (!z) return; let last = null;
+    z.addEventListener('pointerdown', e => { last = [e.clientX, e.clientY]; z.setPointerCapture(e.pointerId); z.classList.add('drag'); });
+    z.addEventListener('pointermove', e => { if (!last) return; const dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY]; this.rotate(dx * 0.012, dy * 0.006); });
+    const up = () => { last = null; z.classList.remove('drag'); }; z.addEventListener('pointerup', up); z.addEventListener('pointercancel', up);
+    z.addEventListener('wheel', e => { e.preventDefault(); this.zoomBy(e.deltaY > 0 ? 1.06 : 1 / 1.06); }, { passive: false });
+  }
+}
+
+return { Garage };
 })();
 const __m__src_render_props_js = (() => {
 // Background life and hazard props (original designs): capital carrier, hauler, patrol craft, traffic pod,
@@ -5770,7 +7262,8 @@ registerCourse('gasgiant', buildRing);
 return {  };
 })();
 const __m__src_main_js = (() => {
-// GALACTIC RUSH V2 — game controller: loading, settings and presets, scenes, flow, camera, bench.
+// GALACTIC RUSH — game controller: loading, settings and presets, scenes, flow, camera, bench.
+// V7 adds the career: race rewards, championship runs, upgrades and paint jobs (src/progress, src/garage.js).
 const { Vec3, Quat, clamp, wrapDelta, makeRng } = __m__src_math_js;
 const { SHIPS, AI_ROSTER, DIFFICULTY, CHAMPIONSHIP, SIM_DT, shipById } = __m__src_config_js;
 const { getTrack, TRACK_DEFS } = __m__src_sim_tracks_js;
@@ -5792,6 +7285,10 @@ const { Input, loadSave, storeSave, mergeSave } = __m__src_input_js;
 const { UI, fmt } = __m__src_ui_js;
 const { HUD } = __m__src_hud_js;
 const { RaceFX } = __m__src_racefx_js;
+const { Progression, standingsOf } = __m__src_progress_index_js;
+const { CHAMPIONSHIP_REWARDS, DIFF_ORDER, lapMult } = __m__src_progress_economy_js;
+const { Garage } = __m__src_garage_js;
+const { champHubHTML, careerHTML } = __m__src_ui_garage_js;
 const $ = s => document.querySelector(s);
 const DEFAULTS = { handling: 'relaxed', sound: 'on', master: 0.8, music: 0.55, sfx: 0.9, sens: 1, padSens: 1, invert: 'false', assist: '0.3', cam: 'chase', preset: '',
   shadows: 'on', ao: 'on', volumetrics: 'on', motionBlur: 'on', grain: 'on', ca: 'on', flare: 'on', resScale: 1, dynRes: 'on', fov: 72, shake: 1, hudScale: 1,
@@ -5813,11 +7310,13 @@ class Game {
     this.canvas = $('#gl');
     this.gfx = new GFX(this.canvas);
     this.save = loadSave(); this.settings = { ...DEFAULTS, ...this.save.settings };
+    this.progress = new Progression(); if (this.progress.loadIssues.length) console.warn('Galactic Rush career data:', this.progress.loadIssues.join('; '));
     if (!this.settings.preset) { this.settings.preset = (this.save.settings.quality && PRESETS[this.save.settings.quality]) ? this.save.settings.quality : this.autoPreset(); Object.assign(this.settings, PRESET_TOGGLES[this.settings.preset]); this.firstRun = true; }
     if (params.get('quality') && PRESETS[params.get('quality')]) { this.settings.preset = params.get('quality'); Object.assign(this.settings, PRESET_TOGGLES[this.settings.preset]); this.settings.dynRes = 'off'; }
     this.audio = new Audio(); this.input = new Input(); this.ui = new UI(this); this.ui.recKey = id => this.recKey(id); this.hud = new HUD(); this.fx = new Effects(this.gfx); this.rig = new CameraRig();
+    this.garage = new Garage(this); this.benchMode = params.has('bench');
     this.racefx = new RaceFX(this);
-    this.opts = { mode: params.get('mode') || 'quick', track: params.get('track') || 'foundry', laps: +(params.get('laps') || 3), diff: params.get('diff') || 'pro', ship: +(params.get('ship') || 0) };
+    this.opts = { mode: params.get('mode') || 'quick', track: params.get('track') || 'foundry', laps: +(params.get('laps') || 3), diff: params.get('diff') || 'pro', ship: params.has('ship') ? +params.get('ship') : Math.max(0, SHIPS.findIndex(s => s.id === this.progress.profile.selectedShip)) };
     this.timeScale = +(params.get('ts') || 1); this.autotest = params.has('autotest'); this.camMode = this.settings.cam;
     this.state = 'loading'; this.acc = 0; this.t = 0; this.fps = 60; this.frames = 0; this.fpsT = 0; this.res = 1; this.ftAcc = 0; this.ftN = 0; this.slowmo = 0;
     this.courses = new Map(); this.maps = new Map();
@@ -5832,8 +7331,8 @@ class Game {
       ['Lighting the hangar', () => { this.hangar = buildHangar(this.gfx); this.gfx.buildEnv(this.hangar.env); }],
       ['Building ships', () => { for (const s of SHIPS) shipModel(this.gfx, s); for (const a of AI_ROSTER) shipModel(this.gfx, shipById(a.ship), a.paint); this.cockpit = this.makeCockpit(); }],
       ['Warming up shaders', () => this.warmup()]];
-    for (let k = 0; k < steps.length; k++) { this.progress(k / steps.length, steps[k][0]); await nextFrame(); await nextFrame(); steps[k][1](); }
-    this.progress(1, 'Ready'); $('#loading').classList.add('done'); this.ready = true;
+    for (let k = 0; k < steps.length; k++) { this.loadProgress(k / steps.length, steps[k][0]); await nextFrame(); await nextFrame(); steps[k][1](); }
+    this.loadProgress(1, 'Ready'); $('#loading').classList.add('done'); this.ready = true;
     this.ff = secs => { const n = Math.round(secs / SIM_DT), sc = this.scene; if (this.state === 'intro') this.endIntro(); for (let k = 0; k < n; k++) { sc.race.step(SIM_DT, null); if (k % 60 === 0) this.racefx.events(sc.race, true); } this.racefx.events(sc.race, true); this.rig.snap = true; return sc.race.time; };
     if (params.has('bench')) this.runBench();
     else if (params.has('skipmenu')) { this.opts.mode = params.get('mode') || 'quick'; this.startRace(); }
@@ -5842,7 +7341,7 @@ class Game {
     this.last = performance.now();
     requestAnimationFrame(t => this.frame(t));
   }
-  progress(f, text) { $('#ldBar').style.width = Math.round(f * 100) + '%'; $('#ldPct').textContent = Math.round(f * 100) + '%'; $('#ldStep').textContent = text; }
+  loadProgress(f, text) { $('#ldBar').style.width = Math.round(f * 100) + '%'; $('#ldPct').textContent = Math.round(f * 100) + '%'; $('#ldStep').textContent = text; }
   autoPreset() {
     const gl = this.gfx.gl; let ren = '';
     try { const d = gl.getExtension('WEBGL_debug_renderer_info'); ren = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (e) { /* hidden */ }
@@ -5891,7 +7390,8 @@ class Game {
     const ai = mode === 'trial' ? [] : AI_ROSTER.map(a => ({ name: a.name, shipId: a.ship, paint: a.paint, skill: clamp(diff.skill[0] + (diff.skill[1] - diff.skill[0]) * a.bias + rng.range(-0.03, 0.03), 0.3, 1) }));
     ai.sort((a, b) => a.skill - b.skill);
     if (mode === 'attract') return ai.concat([{ name: 'RIO KADE', shipId: SHIPS[this.opts.ship].id, skill: 0.9, paint: [0.85, 0.85, 0.88] }]);
-    return [...ai, { name: 'YOU', shipId: SHIPS[this.opts.ship].id, isPlayer: true }];
+    const id = SHIPS[this.opts.ship].id; // V7: upgrades (effective stats rebuilt from base stats) and the saved paint job
+    return [...ai, { name: 'YOU', shipId: id, isPlayer: true, def: this.progress.effectiveDef(id), livery: this.progress.livery(id) }];
   }
   courseScene(id, race, attract) {
     const course = this.courses.get(id), view = new RaceView(this.gfx, race);
@@ -5912,18 +7412,35 @@ class Game {
     this.courseScene(id, race, true); this.rig.shot = null;
     this.hud.show(false); this.audio.music('menu');
   }
-  toShipSelect() {
-    this.state = 'ship'; this.input.capture = false; this.hud.show(false);
-    this.scene = { kind: 'hangar', mode: 'showcase' }; this.fx.clear(); this.audio.setEnv('hangar');
-    this.setShowcase(); this.ui.shipSelect(this.opts.ship); this.audio.music('menu');
-  }
+  toShipSelect() { this.garage.open(true); } // V7: the hangar is now the garage
   setShowcase() {
-    const d = SHIPS[this.opts.ship], sv = new ShipVisual(this.gfx, d, liveryFor({ isPlayer: true, ship: { def: d } }));
+    const d = SHIPS[this.opts.ship], sv = this.showSV = new ShipVisual(this.gfx, d, this.garage.liveryFor(d.id));
     this.hangar.setShow([sv], 'showcase');
+  }
+  // V7 championship runs live in the career profile; the in-race standings table is rebuilt from the saved finishing orders
+  champFromRun(run) { return { round: run.round, c: standingsOf(run.orders), runId: run.runId, diff: run.diff, laps: run.laps, ship: run.ship }; }
+  topDiff() { const u = this.progress.profile.championships.unlocked; return DIFF_ORDER.filter(d => u.includes(d)).pop() || 'rookie'; }
+  showChampHub(armed = false) {
+    const P = this.progress, c = this.champDone;
+    this.state = 'champ'; this.input.capture = false; this.hud.show(false);
+    if (c && c.ok) { this.ui.show(champHubHTML({ final: true, completion: c, standings: c.standings, wallet: P.wallet(), champs: P.profile.championships, earned: P.profile.earned }), 'full'); return; }
+    const run = P.activeRun(); if (!run) { this.toMenu(); return; }
+    this.ui.show(champHubHTML({ final: false, run, standings: standingsOf(run.orders).standings(), wallet: P.wallet(), next: CHAMPIONSHIP[run.round], bonus: Math.round(CHAMPIONSHIP_REWARDS.completion[run.diff] * lapMult(run.laps)), armedAbandon: armed }), 'full');
+  }
+  resumeChamp() {
+    const run = this.progress.activeRun(); if (!run) return false;
+    this.opts.mode = 'champ'; this.champ = this.champFromRun(run); this.champDone = null; this.opts.diff = run.diff; this.opts.laps = run.laps; this.opts.ship = Math.max(0, SHIPS.findIndex(s => s.id === run.ship));
+    this.showChampHub(); return true;
   }
   startRace() {
     const o = this.opts;
-    if (o.mode === 'champ' && !this.champ) this.champ = { round: 0, c: new Championship([...AI_ROSTER.map(a => a.name), 'YOU']) };
+    if (o.mode === 'champ' && !this.champ) { // V7: start (or pick up) a championship run; locked difficulties fall back to the highest unlocked one
+      let run = this.progress.activeRun();
+      if (!run) { if (!this.progress.champUnlocked(o.diff)) o.diff = this.topDiff(); const r = this.progress.startRun({ diff: o.diff, laps: o.laps, ship: SHIPS[o.ship].id }); if (!r.ok) { console.warn(r.message); this.toMenu(); return; } run = r.run; }
+      this.champ = this.champFromRun(run); this.champDone = null;
+    }
+    if (o.mode === 'champ') { o.diff = this.champ.diff; o.laps = this.champ.laps; o.ship = Math.max(0, SHIPS.findIndex(s => s.id === this.champ.ship)); }
+    this.raceId = this.progress.newRaceId(); // every started race is a new reward event, even on the same course and settings
     const id = o.mode === 'champ' ? CHAMPIONSHIP[this.champ.round] : o.track, track = getTrack(id);
     const race = new Race({ track, laps: o.laps, racers: this.makeRacers(o.mode), mode: o.mode, seed: (Math.random() * 1e6) | 0, handling: this.settings.handling, assist: +this.settings.assist, sens: +this.settings.sens, autopilot: this.autotest });
     this.courseScene(id, race, false);
@@ -5936,25 +7453,34 @@ class Game {
     else { this.state = 'intro'; this.introT = 0; this.hud.show(false); this.ui.preRace(track.name, o.mode === 'champ' ? `Championship · round ${this.champ.round + 1} of ${CHAMPIONSHIP.length}` : o.mode === 'trial' ? 'Time trial' : 'Quick race'); }
   }
   endIntro() { this.state = 'race'; this.ui.hide(); this.hud.show(true); this.rig.snap = this.autotest; }
-  toMenu() { this.champ = null; this.state = 'title'; this.input.capture = false; this.ui.clearMessages(); this.startAttract(); this.ui.title(this.touch); }
+  toMenu() { this.champ = null; this.champDone = null; this.state = 'title'; this.input.capture = false; this.ui.clearMessages(); this.startAttract(); this.ui.title(this.touch); }
 
   // ---------- menu actions ----------
   action(act, arg) {
     const o = this.opts;
     switch (act) {
-      case 'mode': o.mode = arg; this.champ = null; this.toShipSelect(); break;
-      case 'ship': o.ship = (o.ship + +arg + SHIPS.length) % SHIPS.length; this.setShowcase(); this.ui.shipSelect(o.ship); break;
-      case 'shipOk': this.state = 'track'; this.startAttract(o.mode === 'champ' ? CHAMPIONSHIP[0] : o.track); this.ui.trackSelect(o, this.save, id => this.maps.get(id)); this.audio.music('menu'); break;
+      case 'mode': o.mode = arg; this.champ = null; this.champDone = null;
+        if (arg === 'champ' && this.progress.activeRun()) { this.resumeChamp(); break; } // a saved run continues instead of a new one
+        if (arg === 'champ' && !this.progress.champUnlocked(o.diff)) o.diff = this.topDiff();
+        this.toShipSelect(); break;
+      case 'ship': this.garage.switchShip(+arg); break;
+      case 'shipOk': this.garage.leave(() => { this.state = 'track'; this.startAttract(o.mode === 'champ' ? CHAMPIONSHIP[0] : o.track); this.ui.trackSelect(o, this.save, id => this.maps.get(id)); this.audio.music('menu'); }); break;
+      case 'g': this.garage.act(arg); break;
+      case 'garage': this.champ = null; this.champDone = null; this.garage.open(false); break;
+      case 'career': this.state = 'career'; this.ui.show(careerHTML(this.progress.career()), 'full'); break;
+      case 'champContinue': this.resumeChamp(); break;
+      case 'champAbandon': if (arg === 'confirm') { const run = this.progress.activeRun(); if (run) this.progress.abandonRun(run.runId); this.toMenu(); } else this.showChampHub(true); break;
       case 'track': o.track = arg; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); this.previewCourse(arg, true); break;
       case 'hoverTrack': this.previewCourse(arg); break;
       case 'laps': o.laps = +arg; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
-      case 'diff': o.diff = arg; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
-      case 'start': this.startRace(); break;
+      case 'diff': if (o.mode === 'champ' && !this.progress.champUnlocked(arg)) break; o.diff = arg; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
+      case 'start': if (o.mode === 'champ' && !this.progress.champUnlocked(o.diff)) break; this.startRace(); break;
       case 'skip': if (this.state === 'intro') this.endIntro(); break;
       case 'back':
         if (arg === 'pause') { this.ui.pause(); this.state = 'paused'; }
         else if (arg === 'results') this.showResults();
-        else if (arg === 'title' || this.state === 'ship') { this.state = 'title'; if (this.scene.kind !== 'course') this.startAttract(); this.ui.title(this.touch); }
+        else if (this.state === 'ship') this.garage.leave(() => { this.state = 'title'; this.startAttract(); this.ui.title(this.touch); });
+        else if (arg === 'title') { this.state = 'title'; if (this.scene.kind !== 'course') this.startAttract(); this.ui.title(this.touch); }
         else if (this.state === 'track') this.toShipSelect();
         else { this.state = 'title'; this.ui.title(this.touch); }
         break;
@@ -5969,9 +7495,9 @@ class Game {
       case 'saveImport': { try { const n = mergeSave(this.save, $('#saveText').value); storeSave(this.save); $('#saveMsg').textContent = n ? `Imported ${n} record${n > 1 ? 's' : ''}.` : 'Nothing faster than your current records in that save.'; }
         catch (e) { $('#saveMsg').textContent = 'That text is not a Galactic Rush save. Copy the whole save and paste it again.'; } break; }
       case 'resume': this.state = 'race'; this.ui.hide(); this.input.capture = true; this.hud.show(true); break;
-      case 'restart': if (o.mode === 'champ' && this.result) { this.champ.round--; this.undoChampPoints(); } this.startRace(); break;
+      case 'restart': if (o.mode === 'champ' && this.result) break; this.startRace(); break; // V7: a finished championship round is recorded and paid; it is not re-run
       case 'menu': this.toMenu(); break;
-      case 'champHub': this.ui.champHub(this.champ); break;
+      case 'champHub': this.showChampHub(); break;
       case 'nextRound': this.startRace(); break;
     }
     if (this.scene && this.scene.race && act === 'opt' && arg.startsWith('assist')) this.scene.race.opts.assist = +this.settings.assist;
@@ -5989,6 +7515,12 @@ class Game {
     if (isFinite(me.bestLap) && (!prev || me.bestLap < prev.lap)) { this.save.best[tid] = { lap: me.bestLap, ship: SHIPS[this.opts.ship].id }; record = me.bestLap; storeSave(this.save); }
     const extra = { record };
     if (this.opts.mode === 'champ') { const aw = this.champ.c.addResult(race.order.map(r => r.name)); this.champ.round++; extra.points = Object.fromEntries(aw.map(a => [a.name, a.pts])); extra.champ = true; }
+    // V7: the race simulation confirmed the finish; pay for it once (the race id is new for every started race)
+    if (!this.benchMode && me.finished) {
+      extra.reward = this.progress.completeRace({ finished: true, raceId: this.raceId, mode: this.opts.mode, track: sc.id, diff: this.opts.diff, laps: race.laps, ship: SHIPS[this.opts.ship].id, place: me.place,
+        field: race.racers.length, time: me.finishTime, record: record != null, runId: this.champ ? this.champ.runId : null, order: race.order.map(r => r.name) });
+      if (extra.reward.completion) this.champDone = extra.reward.completion;
+    }
     this.result = { race, extra }; this.showResults();
   }
   showResults() {
@@ -6090,7 +7622,15 @@ class Game {
     if (st === 'paused' && (I.hit('KeyP') || padStart)) { this.action('resume'); return; }
     if (st === 'loading') return;
     // menus: arrows / d-pad move focus, A clicks, B goes back
-    if (st === 'ship') { if (I.hit('ArrowLeft') || I.padHit(14)) this.action('ship', '-1'); if (I.hit('ArrowRight') || I.padHit(15)) this.action('ship', '1'); }
+    if (st === 'ship') { // V7 garage: ships, tabs, turning the preview (keyboard, gamepad); arrows stay with a focused slider or text field
+      const ae = document.activeElement, field = ae && ae.tagName === 'INPUT', p = I.pad;
+      if (!field) { if (I.hit('ArrowLeft') || I.padHit(14)) this.action('ship', '-1'); if (I.hit('ArrowRight') || I.padHit(15)) this.action('ship', '1');
+        if (I.hit('KeyQ') || I.hit('PageUp')) this.garage.tabStep(-1); if (I.hit('KeyE') || I.hit('PageDown')) this.garage.tabStep(1);
+        if (I.key('BracketLeft')) this.garage.rotate(-0.035); if (I.key('BracketRight')) this.garage.rotate(0.035); }
+      else if (ae.type === 'range') { const L = I.padHit(14), R = I.padHit(15); if (L || R) { if (R) ae.stepUp(3); else ae.stepDown(3); ae.dispatchEvent(new Event('input', { bubbles: true })); } } // d-pad moves a focused slider
+      if (I.padHit(4)) this.garage.tabStep(-1); if (I.padHit(5)) this.garage.tabStep(1);
+      if (p && p.axes && (Math.abs(p.axes[2] || 0) > 0.25 || Math.abs(p.axes[3] || 0) > 0.25)) this.garage.rotate((p.axes[2] || 0) * 0.05, (p.axes[3] || 0) * 0.02);
+    }
     if (I.hit('ArrowDown') || I.padHit(13) || (st !== 'ship' && I.padHit(15))) this.ui.nav(1);
     if (I.hit('ArrowUp') || I.padHit(12) || (st !== 'ship' && I.padHit(14))) this.ui.nav(-1);
     if (padA) this.ui.activate();

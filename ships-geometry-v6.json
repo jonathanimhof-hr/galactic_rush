@@ -1,0 +1,64 @@
+{
+ "note": "V6 ship meshes (positions, normals, colours, indices, control surfaces): V7 must match exactly; only paint-region tags in the material channel may differ",
+ "ships": {
+  "kestrel": {
+   "pos": "473a095b75bd95b8",
+   "nor": "1063e5d59cf8da2f",
+   "col": "5792530d4c19fa44",
+   "idx": "6ce4961313fc88af",
+   "tris": 6568,
+   "flaps": [
+    "86a5219a37c77ad8:36c550b22561aaf3",
+    "4eeb747d3bbf31a9:36c550b22561aaf3",
+    "3c620980fc24767a:36c550b22561aaf3",
+    "d4274003338438a5:36c550b22561aaf3"
+   ]
+  },
+  "wisp": {
+   "pos": "56022b57f1f4a741",
+   "nor": "3d9ad02eaf0eb9e6",
+   "col": "3f6e860c1b57ea01",
+   "idx": "721f219e2f523c4f",
+   "tris": 6912,
+   "flaps": [
+    "9fdba327d0c31efc:36c550b22561aaf3",
+    "8d6afca64602cb31:36c550b22561aaf3"
+   ]
+  },
+  "lancer": {
+   "pos": "3f2afd6a0512f888",
+   "nor": "6bf13b2ba94fd39e",
+   "col": "7166e7cb83e13fc2",
+   "idx": "ee147ad439d86aa1",
+   "tris": 4668,
+   "flaps": [
+    "110eb187fed419c0:36c550b22561aaf3",
+    "148824d0b476e44c:36c550b22561aaf3",
+    "cd4e4efd4ab69f81:36c550b22561aaf3"
+   ]
+  },
+  "halberd": {
+   "pos": "d9afd399ed1d0acb",
+   "nor": "ac07cf5a8c09ea55",
+   "col": "7e00e7a3443493d3",
+   "idx": "db4173af89f299e4",
+   "tris": 11920,
+   "flaps": [
+    "aba70605e20c0be6:36c550b22561aaf3",
+    "1adea0af146e0808:36c550b22561aaf3",
+    "50a2fd00cd701269:36c550b22561aaf3"
+   ]
+  },
+  "corsair": {
+   "pos": "bada9c51ef73e3d0",
+   "nor": "2d5056983ccc5829",
+   "col": "169eec8b18c92d46",
+   "idx": "35a6477415dd4035",
+   "tris": 8784,
+   "flaps": [
+    "aaf104066efd85e5:36c550b22561aaf3",
+    "2addb2f8e02817b7:36c550b22561aaf3"
+   ]
+  }
+ }
+}

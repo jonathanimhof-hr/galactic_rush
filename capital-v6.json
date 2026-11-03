@@ -1,0 +1,143 @@
+{
+ "title": "GALACTIC RUSH V5 vs V6 - capital ships (Halo of Vashti fleet; same cameras; software rendering, quality high)",
+ "views": [
+  {
+   "label": "Bastion (fleet 1): front three-quarter",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(520, 160, 1750), at: T(0, 20, -40), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion (fleet 1): side",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(2300, 140, -60), at: T(0, 40, -60), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion (fleet 1): rear: clustered engines",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(-420, 230, -2350), at: T(0, 10, -620), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion (fleet 1): elevated",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(1300, 1350, 950), at: T(0, 0, -120), fov: 42 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion: hangar bays, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(470, 25, -120), at: T(272, -12, -200), fov: 46 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion: inside a hangar bay",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(330, -6, -50), at: T(250, -18, -90), fov: 50 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion: engine cluster, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(-300, -70, -1120), at: T(0, 10, -730), fov: 44 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion: command deck and spine",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(240, 330, 160), at: T(0, 200, -220), fov: 44 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Warden (fleet 2; V5: a second carrier): front three-quarter",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[1], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(520, 160, 1750), at: T(0, 20, -40), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Warden (fleet 2; V5: a second carrier): side",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[1], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(2300, 140, -60), at: T(0, 40, -60), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Warden (fleet 2; V5: a second carrier): rear: clustered engines",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[1], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(-420, 230, -2350), at: T(0, 10, -620), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Warden (fleet 2; V5: a second carrier): elevated",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[1], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(1300, 1350, 950), at: T(0, 0, -120), fov: 42 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Atlas (fleet 3; V5: a third carrier): front three-quarter",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[2], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(520, 160, 1750), at: T(0, 20, -40), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Atlas (fleet 3; V5: a third carrier): side (from just below: it rides under the ring plane)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[2], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(2300, -160, -60), at: T(0, 40, -60), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Atlas (fleet 3; V5: a third carrier): rear: engine block",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[2], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(-420, -120, -2350), at: T(0, 10, -620), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Atlas (fleet 3; V5: a third carrier): elevated (the camera stays under the ring plane the Atlas rides beneath)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[2], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(650, 330, 350), at: T(0, -20, -220), fov: 62 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Bastion LOD: full level (forced)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(2600, 1600, 2600), at: T(0, 0, -60), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 0; }"
+  },
+  {
+   "label": "Bastion LOD: lite level (forced)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(2600, 1600, 2600), at: T(0, 0, -60), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 2.5; }"
+  },
+  {
+   "label": "Bastion LOD: far level (forced; V5 had two levels)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(2600, 1600, 2600), at: T(0, 0, -60), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 100; }"
+  },
+  {
+   "label": "racing distance: Bastion from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], t = __game.scene.race.track; let b = 0, bd = 1e18; for (let i = 0; i < t.N; i++) { const d = t.pos[i].distSq(it.pos); if (d < bd) { bd = d; b = i; } } const p = t.pos[b]; return { pos: [p.x, p.y + 6, p.z], at: [it.pos.x, it.pos.y, it.pos.z], fov: 72 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "racing distance: Warden from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[1], t = __game.scene.race.track; let b = 0, bd = 1e18; for (let i = 0; i < t.N; i++) { const d = t.pos[i].distSq(it.pos); if (d < bd) { bd = d; b = i; } } const p = t.pos[b]; return { pos: [p.x, p.y + 6, p.z], at: [it.pos.x, it.pos.y, it.pos.z], fov: 72 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "racing distance: Atlas from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[2], t = __game.scene.race.track; let b = 0, bd = 1e18; for (let i = 0; i < t.N; i++) { const d = t.pos[i].distSq(it.pos); if (d < bd) { bd = d; b = i; } } const p = t.pos[b]; return { pos: [p.x, p.y + 6, p.z], at: [it.pos.x, it.pos.y, it.pos.z], fov: 72 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "gameplay: chase camera on the grid",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => null",
+   "pre": "() => { __game.gfx.lodBias = 1; __game.shotCam = null; }"
+  }
+ ]
+}

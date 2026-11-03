@@ -1,0 +1,238 @@
+{
+ "title": "GALACTIC RUSH V5 vs V6 - Neon Spire facades (same cameras; software rendering, quality high)",
+ "views": [
+  {
+   "label": "skyline from the start",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(-30, 0, 6), at: P(70, 0, 70), fov: 72 }; }",
+   "save": "city-skyline.png"
+  },
+  {
+   "label": "close pass between towers",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.62, 22, -10), at: P(N * 0.62 + 30, 10, -25), fov: 70 }; }",
+   "save": "city-close.png"
+  },
+  {
+   "label": "aerial over the city",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.1, 0, 420), at: P(N * 0.5, 0, -250), fov: 62 }; }",
+   "save": "city-aerial.png"
+  },
+  {
+   "label": "below the course, among the towers",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.62, 50, -260), at: P(N * 0.62 + 50, 60, -230), fov: 70 }; }",
+   "save": "city-below.png"
+  },
+  {
+   "label": "toward the low sun (glare check)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const p = P(N * 0.25, 0, 60), s = g.scene.course.env.sunDir; return { pos: p, at: [p[0] + s.x * 1000, p[1] + 60, p[2] + s.z * 1000], fov: 70 }; }",
+   "save": "city-sun.png"
+  },
+  {
+   "label": "away from the sun (lit facades)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const p = P(N * 0.25, 0, 60), s = g.scene.course.env.sunDir; return { pos: p, at: [p[0] - s.x * 1000, p[1] - 80, p[2] - s.z * 1000], fov: 70 }; }",
+   "save": "city-lit.png"
+  },
+  {
+   "label": "racing view mid-course",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.45, 0, 8), at: P(N * 0.45 + 40, 0, 4), fov: 72 }; }",
+   "save": "city-race.png"
+  },
+  {
+   "label": "street canyon, low",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const p = P(N * 0.8, 0, -300); return { pos: p, at: [p[0] + 300, p[1] + 120, p[2] + 200], fov: 70 }; }",
+   "save": "city-canyon.png"
+  },
+  {
+   "label": "hero curtain wall, 45 m, low sun: fins, spandrels, offices behind glass",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "frames": 8,
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }",
+   "cam": {
+    "pos": [
+     51.5,
+     80.9,
+     1043.7
+    ],
+    "at": [
+     77.3,
+     78.9,
+     1080.5
+    ],
+    "fov": 50
+   },
+   "save": "city-hero-curtain.png"
+  },
+  {
+   "label": "hero office tower, 45 m: ledge and fin shadows, rooms behind lit windows",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "frames": 8,
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }",
+   "cam": {
+    "pos": [
+     49.4,
+     -253.3,
+     779.7
+    ],
+    "at": [
+     75.2,
+     -255.3,
+     816.5
+    ],
+    "fov": 50
+   },
+   "save": "city-hero-office.png"
+  },
+  {
+   "label": "windows close, 25 m: curtain-wall fins and spandrels in the low sun",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "frames": 8,
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }",
+   "cam": {
+    "pos": [
+     63.5,
+     72.0,
+     1058.0
+    ],
+    "at": [
+     77.3,
+     80.0,
+     1080.5
+    ],
+    "fov": 46
+   },
+   "save": "city-windows.png"
+  },
+  {
+   "label": "hero residential block, 45 m: balcony slabs with parapets",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "frames": 8,
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }",
+   "cam": {
+    "pos": [
+     -719.2,
+     -398.3,
+     1132.6
+    ],
+    "at": [
+     -682.4,
+     -400.3,
+     1106.8
+    ],
+    "fov": 50
+   },
+   "save": "city-hero-balcony.png"
+  },
+  {
+   "label": "mid-distance, 120 m: monolith, cooling towers, industrial frames",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "frames": 6,
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }",
+   "cam": {
+    "pos": [
+     -1683.2,
+     -351.6,
+     809.6
+    ],
+    "at": [
+     -1614.3,
+     -361.6,
+     711.3
+    ],
+    "fov": 50
+   },
+   "save": "city-mid.png"
+  },
+  {
+   "label": "curved needle tower, 60 m: floor bands, window columns and ribs that follow the curve",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "cam": {
+    "pos": [
+     -787.8,
+     144.6,
+     -370.7
+    ],
+    "at": [
+     -821.4,
+     140.6,
+     -429.0
+    ],
+    "fov": 55
+   },
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "curved needle tower, 70 m, higher floors",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "cam": {
+    "pos": [
+     46.9,
+     75.6,
+     -239.5
+    ],
+    "at": [
+     -20.5,
+     71.6,
+     -239.5
+    ],
+    "fov": 55
+   },
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "cooling towers: ribs, cornice and base bracing (no windows)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "cam": {
+    "pos": [
+     -860.6,
+     -324.7,
+     750.5
+    ],
+    "at": [
+     -941.0,
+     -328.7,
+     750.5
+    ],
+    "fov": 55
+   },
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "domed hall drum: piers and cornice",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "cam": {
+    "pos": [
+     231.5,
+     -347.2,
+     189.5
+    ],
+    "at": [
+     96.3,
+     -351.2,
+     189.5
+    ],
+    "fov": 55
+   },
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "LOD check: every building at full detail (bias 0)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "pre": "() => { __game.shotShadow = false; __game.gfx.lodBias = 0; }",
+   "js": "() => { const g = __game, t = g.scene.race.track, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; }, N = t.N; return { pos: P(N * 0.1, 0, 420), at: P(N * 0.5, 0, -250), fov: 62 }; }"
+  },
+  {
+   "label": "LOD check: every building at lite detail (bias 100)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "pre": "() => { __game.shotShadow = false; __game.gfx.lodBias = 100; }",
+   "js": "() => { const g = __game, t = g.scene.race.track, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; }, N = t.N; return { pos: P(N * 0.1, 0, 420), at: P(N * 0.5, 0, -250), fov: 62 }; }",
+   "post": "() => { __game.gfx.lodBias = 1; }"
+  }
+ ]
+}

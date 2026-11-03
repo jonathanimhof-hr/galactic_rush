@@ -1,0 +1,132 @@
+{
+ "title": "GALACTIC RUSH V5 vs V6 - matched views (same camera, same frozen moment; software rendering, quality high)",
+ "views": [
+  {
+   "label": "Neon Spire: skyline from the start",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; return { pos: P(-30, 0, 6), at: P(70, 0, 70), fov: 72 }; }",
+   "pre": "() => { __game.shotShadow = false; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Neon Spire: close pass between towers",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; return { pos: P(N * 0.62, 22, -10), at: P(N * 0.62 + 30, 10, -25), fov: 70 }; }",
+   "pre": "() => { __game.shotShadow = false; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Neon Spire: curved needle tower facade, 60 m",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire&nointro=1",
+   "cam": {
+    "pos": [
+     -787.8,
+     144.6,
+     -370.7
+    ],
+    "at": [
+     -821.4,
+     140.6,
+     -429.0
+    ],
+    "fov": 55
+   },
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Neon Spire: cooling towers (curved, ribbed)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire&nointro=1",
+   "frames": 6,
+   "pre": "() => { __game.shotShadow = true; __game.gfx.lodBias = 1; }",
+   "cam": {
+    "pos": [
+     -1683.2,
+     -351.6,
+     809.6
+    ],
+    "at": [
+     -1614.3,
+     -361.6,
+     711.3
+    ],
+    "fov": 50
+   },
+   "save": "city-mid.png"
+  },
+  {
+   "label": "Neon Spire sky: icy moon lineae and ring, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire&nointro=1",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => v + u[i] * 0.45)); return { pos: V(d, R * 2.3), at: C, fov: 48 }; }",
+   "save": "planet-spire-day.png",
+   "pre": "() => { __game.shotShadow = false; __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Halo of Vashti: player ship close (spacecraft materials)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; const r = g.scene.race.player, s = r.ship.pos, i = r.ti, b = t.bin[i], n = t.nrm[i], f = t.tan[i], o = (k, a, c, d) => s[k] + b[k] * a + n[k] * c + f[k] * d; return { pos: ['x', 'y', 'z'].map(k => o(k, 5, 1.6, 7)), at: [s.x, s.y, s.z], fov: 50 }; }"
+  },
+  {
+   "label": "Halo of Vashti: rival group on the grid",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; const r = g.scene.race.player, s = r.ship.pos, i = r.ti, b = t.bin[i], n = t.nrm[i], f = t.tan[i], o = (k, a, c, d) => s[k] + b[k] * a + n[k] * c + f[k] * d; return { pos: ['x', 'y', 'z'].map(k => o(k, 9, 5, 34)), at: ['x', 'y', 'z'].map(k => o(k, 0, 0, 6)), fov: 55 }; }"
+  },
+  {
+   "label": "Halo of Vashti: gas giant and rings from the course",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; const p = P(N * 0.5, 0, 20), d = [-0.55, 0.12, 0.83]; return { pos: p, at: p.map((v, k) => v + d[k] * 1000), fov: 70 }; }"
+  },
+  {
+   "label": "Halo of Vashti: ring-plane dust clouds (V5 slow view)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; return { pos: P(N * 0.3, 40, 12), at: P(N * 0.3 + 60, -40, 0), fov: 70 }; }"
+  },
+  {
+   "label": "Halo of Vashti: capital ship at anchor",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; const c = [cx - 3200, 380, cz + 1800]; return { pos: [c[0] + 1700, c[1] + 350, c[2] - 1500], at: c, fov: 45 }; }"
+  },
+  {
+   "label": "Halo of Vashti: inside a hangar bay of the Bastion",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[0], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(330, -6, -50), at: T(250, -18, -90), fov: 50 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Halo of Vashti: second fleet ship (V6: Warden class)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring&nointro=1",
+   "js": "() => { const it = __game.scene.course.fleet[1], V = it.pos.constructor, T = (x, y, z) => { const v = new V(x, y, z).applyQuat(it.quat).add(it.pos); return [v.x, v.y, v.z]; }; return { pos: T(520, 160, 1750), at: T(0, 20, -40), fov: 40 }; }",
+   "pre": "() => { __game.gfx.lodBias = 1; }"
+  },
+  {
+   "label": "Cinder Belt: asteroid formation from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; return { pos: P(N * 0.3, 0, 10), at: P(N * 0.3 + 60, 0, 0), fov: 70 }; }"
+  },
+  {
+   "label": "Cinder Belt: field overview (V5 slow view)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; return { pos: P(N * 0.6, 200, 300), at: P(N * 0.7, 0, 0), fov: 70 }; }"
+  },
+  {
+   "label": "Cinder Belt: landmark (natural arch) from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, M = g.scene.course.marks; const m = M[1]; let b = 0, bd = 1e18; for (let k = 0; k < N; k++) { const d = t.pos[k].distSq(m.p); if (d < bd) { bd = d; b = k; } } const p = t.pos[b]; return { pos: [p.x, p.y + 12, p.z], at: [m.p.x, m.p.y, m.p.z], fov: 64 }; }",
+   "save": "ast-mark1.png"
+  },
+  {
+   "label": "Cinder Belt sky: rocky world clouds, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&nointro=1",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => v + u[i] * 0.45)); return { pos: V(d, R * 2.3), at: C, fov: 48 }; }",
+   "save": "planet-belt-day.png"
+  },
+  {
+   "label": "Foundry Trench: in the trench",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry&nointro=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };let cx = 0, cz = 0; for (const q of t.pos) { cx += q.x; cz += q.z; } cx /= N; cz /= N; return { pos: P(N * 0.42, 0, -3), at: P(N * 0.42 + 25, 0, -5), fov: 72 }; }"
+  },
+  {
+   "label": "Foundry Trench sky: hazy world limb",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry&nointro=1",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(u.map((v, i) => v + s[i] * 0.15)); return { pos: V(d, R * 1.9), at: V(s.map((v, i) => v * 0.2 - u[i] * 0.3), R), fov: 55 }; }",
+   "save": "planet-foundry-limb.png"
+  }
+ ]
+}

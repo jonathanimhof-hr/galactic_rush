@@ -1,0 +1,93 @@
+{
+ "title": "GALACTIC RUSH V5 - planet sheet (software rendering, quality high)",
+ "views": [
+  {
+   "label": "Cinder Belt: rocky world - from the course",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt",
+   "js": "() => { const g = __game, t = g.scene.race.track, e = g.scene.course.env, pl = e.planet, p = t.pos[0]; return { pos: [p.x, p.y + 8, p.z], at: [pl.dir.x * 1e4 + p.x, pl.dir.y * 1e4 + p.y, pl.dir.z * 1e4 + p.z], fov: 60 }; }"
+  },
+  {
+   "label": "Cinder Belt: rocky world - day side, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => v + u[i] * 0.45)); return { pos: V(d, R * 2.3), at: C, fov: 48 }; }",
+   "save": "planet-belt-day.png"
+  },
+  {
+   "label": "Cinder Belt: rocky world - terminator and limb",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(u.map((v, i) => v + s[i] * 0.15)); return { pos: V(d, R * 1.9), at: V(s.map((v, i) => v * 0.2 - u[i] * 0.3), R), fov: 55 }; }",
+   "save": "planet-belt-limb.png"
+  },
+  {
+   "label": "Cinder Belt: rocky world - night side (backlit rim)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => -v + u[i] * 0.35 + (i === 1 ? 0.15 : 0))); return { pos: V(d, R * 2.6), at: C, fov: 50 }; }"
+  },
+  {
+   "label": "Foundry Trench: atmospheric world under haze - from the course",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry",
+   "js": "() => { const g = __game, t = g.scene.race.track, e = g.scene.course.env, pl = e.planet, p = t.pos[0]; return { pos: [p.x, p.y + 8, p.z], at: [pl.dir.x * 1e4 + p.x, pl.dir.y * 1e4 + p.y, pl.dir.z * 1e4 + p.z], fov: 60 }; }"
+  },
+  {
+   "label": "Foundry Trench: atmospheric world under haze - day side, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => v + u[i] * 0.45)); return { pos: V(d, R * 2.3), at: C, fov: 48 }; }",
+   "save": "planet-foundry-day.png"
+  },
+  {
+   "label": "Foundry Trench: atmospheric world under haze - terminator and limb",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(u.map((v, i) => v + s[i] * 0.15)); return { pos: V(d, R * 1.9), at: V(s.map((v, i) => v * 0.2 - u[i] * 0.3), R), fov: 55 }; }",
+   "save": "planet-foundry-limb.png"
+  },
+  {
+   "label": "Foundry Trench: atmospheric world under haze - night side (backlit rim)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => -v + u[i] * 0.35 + (i === 1 ? 0.15 : 0))); return { pos: V(d, R * 2.6), at: C, fov: 50 }; }"
+  },
+  {
+   "label": "Neon Spire: icy ringed moon - from the course",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, e = g.scene.course.env, pl = e.planet, p = t.pos[0]; return { pos: [p.x, p.y + 8, p.z], at: [pl.dir.x * 1e4 + p.x, pl.dir.y * 1e4 + p.y, pl.dir.z * 1e4 + p.z], fov: 60 }; }"
+  },
+  {
+   "label": "Neon Spire: icy ringed moon - day side, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => v + u[i] * 0.45)); return { pos: V(d, R * 2.3), at: C, fov: 48 }; }",
+   "save": "planet-spire-day.png"
+  },
+  {
+   "label": "Neon Spire: icy ringed moon - terminator and limb",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(u.map((v, i) => v + s[i] * 0.15)); return { pos: V(d, R * 1.9), at: V(s.map((v, i) => v * 0.2 - u[i] * 0.3), R), fov: 55 }; }",
+   "save": "planet-spire-limb.png"
+  },
+  {
+   "label": "Neon Spire: icy ringed moon - night side (backlit rim)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => -v + u[i] * 0.35 + (i === 1 ? 0.15 : 0))); return { pos: V(d, R * 2.6), at: C, fov: 50 }; }"
+  },
+  {
+   "label": "Halo of Vashti: banded gas giant - from the course",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring",
+   "js": "() => { const g = __game, t = g.scene.race.track, e = g.scene.course.env, pl = e.planet, p = t.pos[0]; return { pos: [p.x, p.y + 8, p.z], at: [pl.dir.x * 1e4 + p.x, pl.dir.y * 1e4 + p.y, pl.dir.z * 1e4 + p.z], fov: 60 }; }"
+  },
+  {
+   "label": "Halo of Vashti: banded gas giant - day side, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => v + u[i] * 0.45)); return { pos: V(d, R * 2.3), at: C, fov: 48 }; }",
+   "save": "planet-ring-day.png"
+  },
+  {
+   "label": "Halo of Vashti: banded gas giant - terminator and limb",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(u.map((v, i) => v + s[i] * 0.15)); return { pos: V(d, R * 1.9), at: V(s.map((v, i) => v * 0.2 - u[i] * 0.3), R), fov: 55 }; }",
+   "save": "planet-ring-limb.png"
+  },
+  {
+   "label": "Halo of Vashti: banded gas giant - night side (backlit rim)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring",
+   "js": "() => { const g = __game, e = g.scene.course.env, pl = e.planet, l = Math.hypot(pl.dir.x, pl.dir.y, pl.dir.z), C = [pl.dir.x / l * pl.dist, pl.dir.y / l * pl.dist, pl.dir.z / l * pl.dist], R = pl.r, S = e.sunDir; const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const k = Math.hypot(...a); return a.map(v => v / k); }, s = [S.x, S.y, S.z], u = nz(cr(s, [0, 1, 0])), V = (d, k) => C.map((c, i) => c + d[i] * k); const d = nz(s.map((v, i) => -v + u[i] * 0.35 + (i === 1 ? 0.15 : 0))); return { pos: V(d, R * 2.6), at: C, fov: 50 }; }"
+  }
+ ]
+}

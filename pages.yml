@@ -1,0 +1,44 @@
+# Galactic Rush V8: builds the game and publishes it to GitHub Pages on every push to main.
+# The game is static; online multiplayer also needs the separate multiplayer server (server/), which this workflow
+# does NOT deploy. Set the repository variable GR_MP_SERVER (Settings → Secrets and variables → Actions → Variables)
+# to that server's public address, e.g. wss://galactic-rush-mp.onrender.com — it is public, not a secret.
+# Without it the site still works; the online screens explain that no server is set.
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Unit tests (game, career and multiplayer rules)
+        run: npm test
+      - name: Build the game
+        env:
+          GR_MP_SERVER: ${{ vars.GR_MP_SERVER }}
+        run: node build.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

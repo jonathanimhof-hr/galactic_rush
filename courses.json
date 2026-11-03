@@ -1,0 +1,41 @@
+{
+ "title": "GALACTIC RUSH V5 - Foundry Trench and Halo of Vashti (software rendering, quality high)",
+ "views": [
+  {
+   "label": "Foundry Trench: racing line (floodlights, sparks)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.42, 0, -3), at: P(N * 0.42 + 25, 0, -5), fov: 72 }; }",
+   "save": "trench-race.png"
+  },
+  {
+   "label": "Foundry Trench: up toward a rim floodlight",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const i = 30 + 47 * 6; return { pos: P(i - 20, 0, -8), at: P(i, 0, 25), fov: 70 }; }",
+   "save": "trench-flood.png"
+  },
+  {
+   "label": "Foundry Trench: above the rim, foundry beyond",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=foundry",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.2, 0, 60), at: P(N * 0.2 + 120, 0, 10), fov: 66 }; }",
+   "save": "trench-rim.png"
+  },
+  {
+   "label": "Halo of Vashti: along the ring plane",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.3, 40, 12), at: P(N * 0.3 + 60, -40, 0), fov: 70 }; }",
+   "save": "halo-ring.png"
+  },
+  {
+   "label": "Halo of Vashti: chunks close (ice, rock, fractured)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const p = P(N * 0.6, 60, 0); return { pos: p, at: P(N * 0.6 + 8, 160, -10), fov: 60 }; }",
+   "save": "halo-chunks.png"
+  },
+  {
+   "label": "Halo of Vashti: the fleet over the ring",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=ring",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const c = g.scene.course.fleet[0].pos, p = P(N * 0.15, 0, 30); return { pos: p, at: [c.x, c.y, c.z], fov: 55 }; }",
+   "save": "halo-fleet.png"
+  }
+ ]
+}

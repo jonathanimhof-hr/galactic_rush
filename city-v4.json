@@ -1,0 +1,29 @@
+{
+ "title": "Neon Spire V4 views (software rendering, quality high)",
+ "views": [
+  {
+   "label": "skyline from the start",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(-30, 0, 6), at: P(70, 0, 70), fov: 72 }; }",
+   "save": "v4city-skyline.png"
+  },
+  {
+   "label": "close pass between towers",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };return { pos: P(N * 0.62, 22, -10), at: P(N * 0.62 + 30, 10, -25), fov: 70 }; }",
+   "save": "v4city-close.png"
+  },
+  {
+   "label": "toward the low sun (glare check)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const p = P(N * 0.25, 0, 60), s = g.scene.course.env.sunDir; return { pos: p, at: [p[0] + s.x * 1000, p[1] + 60, p[2] + s.z * 1000], fov: 70 }; }",
+   "save": "v4city-sun.png"
+  },
+  {
+   "label": "street canyon, low",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=spire",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; };const p = P(N * 0.8, 0, -300); return { pos: p, at: [p[0] + 300, p[1] + 120, p[2] + 200], fov: 70 }; }",
+   "save": "v4city-canyon.png"
+  }
+ ]
+}

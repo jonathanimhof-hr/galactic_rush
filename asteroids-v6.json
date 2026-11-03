@@ -1,0 +1,121 @@
+{
+ "title": "GALACTIC RUSH V5 vs V6 - asteroids (Cinder Belt; same cameras; software rendering, quality high)",
+ "views": [
+  {
+   "label": "family lineup (gallery, far outside the field)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const m = X(4); return { pos: [m, 160, G.z + 1500], at: [m, 0, G.z], fov: 50 }; }",
+   "save": "ast-lineup.png"
+  },
+  {
+   "label": "ancient cratered, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(0); return { pos: [x + 104, 41, G.z + 166], at: [x, 0, G.z], fov: 42 }; }",
+   "save": "ast-0.png"
+  },
+  {
+   "label": "fractured (fresh flat faces), close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(1); return { pos: [x + 104, 41, G.z + 166], at: [x, 0, G.z], fov: 42 }; }",
+   "save": "ast-1.png"
+  },
+  {
+   "label": "icy, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(2); return { pos: [x + 104, 41, G.z + 166], at: [x, 0, G.z], fov: 42 }; }",
+   "save": "ast-2.png"
+  },
+  {
+   "label": "metallic, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(3); return { pos: [x + 104, 41, G.z + 166], at: [x, 0, G.z], fov: 42 }; }",
+   "save": "ast-3.png"
+  },
+  {
+   "label": "massive (mega rock), close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(4); return { pos: [x + 104, 41, G.z + 166], at: [x, 0, G.z], fov: 42 }; }"
+  },
+  {
+   "label": "layered formation spire, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(5); return { pos: [x + 135, 54, G.z + 216], at: [x, 0, G.z], fov: 42 }; }"
+  },
+  {
+   "label": "ice spire, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(6); return { pos: [x + 135, 54, G.z + 216], at: [x, 0, G.z], fov: 42 }; }"
+  },
+  {
+   "label": "moonlet fragment, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(7); return { pos: [x + 135, 54, G.z + 216], at: [x, 0, G.z], fov: 42 }; }"
+  },
+  {
+   "label": "natural arch, close",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(8); return { pos: [x + 135, 54, G.z + 216], at: [x, 0, G.z], fov: 42 }; }"
+  },
+  {
+   "label": "lighting: ancient rock against the sun (backlit)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step, S = g.scene.course.env.sunDir, x = X(0), c = [x, 0, G.z]; const u = [-S.z, 0, S.x], ul = Math.hypot(u[0], u[2]) || 1, k = [-S.x, -S.y * 0.3, -S.z]; return { pos: [c[0] + k[0] * 230, c[1] + k[1] * 230 + 30, c[2] + k[2] * 230], at: c, fov: 42 }; }"
+  },
+  {
+   "label": "lighting: metallic rock, sun from the side (grazing)",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step, S = g.scene.course.env.sunDir, x = X(3), c = [x, 0, G.z]; const u = [-S.z, 0, S.x], ul = Math.hypot(u[0], u[2]) || 1, k = [u[0] / ul, 0.25, u[2] / ul]; return { pos: [c[0] + k[0] * 230, c[1] + k[1] * 230 + 30, c[2] + k[2] * 230], at: c, fov: 42 }; }"
+  },
+  {
+   "label": "lighting: icy rock, sun behind the camera",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step, S = g.scene.course.env.sunDir, x = X(2), c = [x, 0, G.z]; const u = [-S.z, 0, S.x], ul = Math.hypot(u[0], u[2]) || 1, k = [S.x, S.y * 0.5 + 0.1, S.z]; return { pos: [c[0] + k[0] * 230, c[1] + k[1] * 230 + 30, c[2] + k[2] * 230], at: c, fov: 42 }; }"
+  },
+  {
+   "label": "close-up: fractured surface at a third of the distance",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(1); return { pos: [x + 40, 16, G.z + 64], at: [x, 0, G.z], fov: 42 }; }"
+  },
+  {
+   "label": "close-up: ancient surface at a third of the distance",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, G = g.scene.course.gallery, X = j => G.x0 + j * G.step; const x = X(0); return { pos: [x + 40, 16, G.z + 64], at: [x, 0, G.z], fov: 42 }; }"
+  },
+  {
+   "label": "landmark 1 (spires) from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, M = g.scene.course.marks; const m = M[0]; let b = 0, bd = 1e18; for (let k = 0; k < N; k++) { const d = t.pos[k].distSq(m.p); if (d < bd) { bd = d; b = k; } } const p = t.pos[b]; return { pos: [p.x, p.y + 12, p.z], at: [m.p.x, m.p.y, m.p.z], fov: 64 }; }",
+   "save": "ast-mark0.png"
+  },
+  {
+   "label": "landmark 2 (arch) from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, M = g.scene.course.marks; const m = M[1]; let b = 0, bd = 1e18; for (let k = 0; k < N; k++) { const d = t.pos[k].distSq(m.p); if (d < bd) { bd = d; b = k; } } const p = t.pos[b]; return { pos: [p.x, p.y + 12, p.z], at: [m.p.x, m.p.y, m.p.z], fov: 64 }; }",
+   "save": "ast-mark1.png"
+  },
+  {
+   "label": "landmark 3 (moonlet) from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, M = g.scene.course.marks; const m = M[2]; let b = 0, bd = 1e18; for (let k = 0; k < N; k++) { const d = t.pos[k].distSq(m.p); if (d < bd) { bd = d; b = k; } } const p = t.pos[b]; return { pos: [p.x, p.y + 12, p.z], at: [m.p.x, m.p.y, m.p.z], fov: 64 }; }",
+   "save": "ast-mark2.png"
+  },
+  {
+   "label": "landmark 4 (ice) from the racing line",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, N = t.N, M = g.scene.course.marks; const m = M[3]; let b = 0, bd = 1e18; for (let k = 0; k < N; k++) { const d = t.pos[k].distSq(m.p); if (d < bd) { bd = d; b = k; } } const p = t.pos[b]; return { pos: [p.x, p.y + 12, p.z], at: [m.p.x, m.p.y, m.p.z], fov: 64 }; }",
+   "save": "ast-mark3.png"
+  },
+  {
+   "label": "racing distance: chase camera on the grid",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "pre": "() => { __game.shotCam = null; }",
+   "js": "() => null",
+   "save": "ast-race.png"
+  },
+  {
+   "label": "racing distance: looking down the course",
+   "query": "skipmenu=1&autotest=1&laps=1&quality=high&track=belt&gallery=1",
+   "js": "() => { const g = __game, t = g.scene.race.track, P = (i, x, y) => { const v = t.pointAt(t.wrapIdx(Math.round(i)), x, y); return [v.x, v.y, v.z]; }, N = t.N; return { pos: P(N * 0.3, 0, 10), at: P(N * 0.3 + 60, 0, 0), fov: 70 }; }"
+  }
+ ]
+}

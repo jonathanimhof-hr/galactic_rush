@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Galactic Rush V7</title>
+<title>Galactic Rush V8</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Saira+Semi+Condensed:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -5230,6 +5230,7 @@ class UI {
         <button class="btn${run ? '' : ' primary'}" data-act="mode" data-arg="quick">Quick race<small>One course, five rivals · earn credits every race</small></button>
         <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : 'Four rounds · Rookie → Pro → Ace'}</small></button>
         <button class="btn" data-act="mode" data-arg="trial">Time trial<small>Race your ghost for the course record</small></button>
+        <button class="btn" data-act="mp" data-arg="open">Online multiplayer<small>Tournament against real pilots · qualifier and final</small></button>
         <button class="btn" data-act="garage">Garage<small>Upgrades, paint shop, inventory and cosmetic shop</small></button>
         <button class="btn" data-act="career">Career<small>Your record, championships and earnings</small></button>
         <button class="btn" data-act="settings" data-arg="title">Settings</button>
@@ -5772,6 +5773,1229 @@ class Garage {
 }
 
 return { Garage };
+})();
+const __m__src_mp_protocol_js = (() => {
+// GALACTIC RUSH V8 — online multiplayer protocol, shared by the game (src/mp) and the server (server/).
+// Every message is a JSON object { t: type, ...fields }. Ship states travel as compact arrays (packState / unpackState).
+// This file has no browser or Node dependencies so both sides validate messages with the same rules.
+
+const PROTOCOL = 1;
+const MP = Object.freeze({
+  MAX_PLAYERS: 6,          // the starting grid has six slots
+  MIN_PLAYERS: 2,
+  LAPS: 5,                 // both stages are five-lap races
+  QUALIFIERS: 2,           // the top two of the qualifier race the final
+  NAME_MIN: 2, NAME_MAX: 16,
+  CODE_LEN: 5, CODE_ALPHABET: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', // no I, L, O, 0 or 1
+  MAX_MSG_BYTES: 4096,
+  STATE_HZ: 20,            // each racer sends its ship state 20 times a second
+  SNAP_HZ: 20,             // the server relays everyone's latest state 20 times a second
+  FINISH_WINDOW_S: 45,     // after the first pilot finishes, the others have this many race seconds to finish,
+  FINISH_WINDOW_FRAC: 0.25, // or a quarter of the winner's time if that is longer
+});
+const SHIP_IDS = Object.freeze(['kestrel', 'wisp', 'lancer', 'halberd', 'corsair']);
+const HANDLINGS = Object.freeze(['relaxed', 'classic']);
+const VISIBILITY = Object.freeze(['private', 'public']);
+const FLAG = Object.freeze({ BOOST: 1, PAD: 2, DRIFT: 4, SHIELD: 8, STUN: 16, WRECK: 32, INVULN: 64, FINISHED: 128 });
+
+// client -> server
+const C = Object.freeze({
+  HELLO: 'hello', CREATE: 'create', JOIN: 'join', LEAVE: 'leave', LIST: 'list', SHIP: 'ship', PAINT: 'paint', READY: 'ready',
+  SETTINGS: 'settings', START: 'start', LOADED: 'loaded', STATE: 'st', FINISH: 'finish', PING: 'ping', SPECTATE: 'spectate',
+});
+// server -> client
+const S = Object.freeze({
+  WELCOME: 'welcome', ERROR: 'error', LOBBY: 'lobby', LOBBIES: 'lobbies', LEFT: 'left', PREPARE: 'prepare', START: 'start',
+  SNAP: 'snap', FINISHED: 'fin', STATUS: 'pstat', RESULTS: 'results', COMPLETE: 'complete', PONG: 'pong', NOTICE: 'notice',
+});
+
+// error codes the server sends, with the text the game shows
+const ERRORS = Object.freeze({
+  'bad-msg': 'The server could not read a message from this game. Reload the page.',
+  'version': 'The server runs a different version of Galactic Rush. Reload the page to update.',
+  'hello-first': 'Not signed in to the server yet.',
+  'bad-name': `Choose a pilot name of ${MP.NAME_MIN}–${MP.NAME_MAX} letters or numbers.`,
+  'bad-code': `Room codes are ${MP.CODE_LEN} letters and numbers, for example K7QX2.`,
+  'no-room': 'There is no lobby with that code. Check the code with your host.',
+  'full': `That lobby is full (${MP.MAX_PLAYERS} pilots).`,
+  'in-progress': 'That lobby is racing a tournament right now. Try again when it is over.',
+  'in-lobby': 'You are already in a lobby. Leave it first.',
+  'not-in-lobby': 'You are not in a lobby.',
+  'not-host': 'Only the host can do that.',
+  'too-few': `A tournament needs at least ${MP.MIN_PLAYERS} connected pilots.`,
+  'not-ready': 'Every pilot has to be ready before the host can start.',
+  'running': 'A tournament is already running in this lobby.',
+  'bad-ship': 'Unknown ship.',
+  'bad-paint': 'That paint job could not be used.',
+  'bad-setting': 'Unknown lobby setting.',
+  'server-full': 'The server is full right now. Try again in a few minutes.',
+  'rate': 'Too many messages; slow down.',
+  'not-racing': 'That race is not running.',
+  'session': 'Your session expired. Join the lobby again.',
+});
+
+const finite = v => typeof v === 'number' && Number.isFinite(v);
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+
+// Pilot names: letters, numbers, spaces and . _ ' -, shown in capitals like the game's own pilots.
+function normalizeName(s) {
+  if (typeof s !== 'string' || s.length > 64) return null;
+  const n = s.normalize('NFKC').replace(/\s+/g, ' ').trim().toUpperCase();
+  if (n.length < MP.NAME_MIN || n.length > MP.NAME_MAX) return null;
+  if (!/^[\p{L}\p{N}][\p{L}\p{N} ._'-]*$/u.test(n)) return null;
+  return n;
+}
+// Room codes: case and spaces/dashes are ignored when typed.
+function normalizeCode(s) {
+  if (typeof s !== 'string' || s.length > 16) return null;
+  const c = s.toUpperCase().replace(/[\s-]/g, '');
+  return c.length === MP.CODE_LEN && [...c].every(ch => MP.CODE_ALPHABET.includes(ch)) ? c : null;
+}
+const validShip = s => SHIP_IDS.includes(s);
+
+// ---------- ship state ----------
+// [t, px, py, pz, qx, qy, qz, qw, vx, vy, vz, boost 0..1, flags, lap, cp (next checkpoint), prog (m), yaw rate, hull 0..1, throttle 0..1]
+const STATE_LEN = 19;
+const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000, r4 = v => Math.round(v * 10000) / 10000;
+function packState(o) {
+  return [r3(o.t), r2(o.p[0]), r2(o.p[1]), r2(o.p[2]), r4(o.q[0]), r4(o.q[1]), r4(o.q[2]), r4(o.q[3]), r1(o.v[0]), r1(o.v[1]), r1(o.v[2]),
+    r2(clamp(o.b, 0, 1)), o.f | 0, o.lap | 0, o.cp | 0, r1(o.prog), r2(o.ay), r2(clamp(o.hull, 0, 1)), r2(clamp(o.thr, 0, 1))];
+}
+// Returns a clean state object, or null when anything is missing, not a finite number or out of range.
+function unpackState(a) {
+  if (!Array.isArray(a) || a.length !== STATE_LEN || !a.every(finite)) return null;
+  const [t, px, py, pz, qx, qy, qz, qw, vx, vy, vz, b, f, lap, cp, prog, ay, hull, thr] = a;
+  if (t < 0 || t > 7200 || Math.abs(px) > 1e5 || Math.abs(py) > 1e5 || Math.abs(pz) > 1e5) return null;
+  const qn = Math.hypot(qx, qy, qz, qw); if (qn < 0.95 || qn > 1.05) return null;
+  if (Math.hypot(vx, vy, vz) > 2000 || b < 0 || b > 1 || f < 0 || f > 255 || !Number.isInteger(f)) return null;
+  if (!Number.isInteger(lap) || lap < 0 || lap > 99 || !Number.isInteger(cp) || cp < 0 || cp > 10000) return null;
+  if (Math.abs(prog) > 1e6 || Math.abs(ay) > 50 || hull < 0 || hull > 1 || thr < 0 || thr > 1) return null;
+  return { t, p: [px, py, pz], q: [qx / qn, qy / qn, qz / qn, qw / qn], v: [vx, vy, vz], b, f, lap, cp, prog, ay, hull, thr };
+}
+
+// ---------- message shapes (both directions are checked with these) ----------
+const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+const str = (v, max = 64) => typeof v === 'string' && v.length <= max;
+// Parses one incoming text frame: returns { msg } or { error: code }.
+function parseMessage(text) {
+  if (typeof text !== 'string' || text.length > MP.MAX_MSG_BYTES) return { error: 'bad-msg' };
+  let m; try { m = JSON.parse(text); } catch (e) { return { error: 'bad-msg' }; }
+  if (!isObj(m) || !str(m.t, 16)) return { error: 'bad-msg' };
+  return { msg: m };
+}
+// Field checks for client messages; the server rejects anything that does not match.
+function checkClientMessage(m) {
+  switch (m.t) {
+    case C.HELLO: return m.v === PROTOCOL && (m.token == null || str(m.token, 200)) && (m.rid == null || str(m.rid, 40)) && str(m.name, 64);
+    case C.CREATE: return (m.visibility == null || VISIBILITY.includes(m.visibility)) && (m.handling == null || HANDLINGS.includes(m.handling)) && validShip(m.ship) && (m.paint == null || isObj(m.paint)) && (m.name == null || str(m.name, 64));
+    case C.JOIN: return str(m.code, 16) && validShip(m.ship) && (m.paint == null || isObj(m.paint)) && (m.name == null || str(m.name, 64));
+    case C.LEAVE: case C.LIST: return true;
+    case C.SHIP: return validShip(m.ship) && (m.paint == null || isObj(m.paint));
+    case C.PAINT: return isObj(m.paint);
+    case C.READY: return typeof m.ready === 'boolean';
+    case C.SETTINGS: return (m.handling == null || HANDLINGS.includes(m.handling)) && (m.visibility == null || VISIBILITY.includes(m.visibility));
+    case C.START: return m.rematch == null || typeof m.rematch === 'boolean';
+    case C.LOADED: case C.SPECTATE: return str(m.rid, 40) && (m.ok == null || typeof m.ok === 'boolean');
+    case C.STATE: return str(m.rid, 40) && Array.isArray(m.s) && m.s.length === STATE_LEN;
+    case C.FINISH: return str(m.rid, 40) && finite(m.time) && (m.laps == null || (Array.isArray(m.laps) && m.laps.length <= 20 && m.laps.every(finite)));
+    case C.PING: return finite(m.c) && (m.rtt == null || finite(m.rtt));
+    default: return false;
+  }
+}
+
+// Formatting shared by screens and server logs: 1:23.45
+function fmtTime(t) {
+  if (t == null || !Number.isFinite(t)) return '--:--.--';
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return `${m}:${s < 10 ? '0' : ''}${s.toFixed(2)}`;
+}
+
+return { PROTOCOL, MP, SHIP_IDS, HANDLINGS, VISIBILITY, FLAG, C, S, ERRORS, normalizeName, normalizeCode, validShip, STATE_LEN, packState, unpackState, parseMessage, checkClientMessage, fmtTime };
+})();
+const __m__src_mp_net_js = (() => {
+// GALACTIC RUSH V8 — the game's connection to the multiplayer server: one WebSocket carrying JSON messages, automatic
+// reconnection with back-off after a dropped connection, and a clock synchronised with the server's (start times and
+// remote ships are expressed in server time). Uses only the standard WebSocket API, so the same code runs in the
+// browser and in the Node test clients.
+const { PROTOCOL, S, C, ERRORS } = __m__src_mp_protocol_js;
+const BACKOFF = [500, 1000, 2000, 3000, 5000];
+// close codes after which reconnecting would not help
+const FINAL = { 1003: 'unsupported', 1008: 'policy', 4001: 'hello-timeout', 4002: 'replaced' };
+
+class Connection {
+  // url: ws:// or wss:// address; hello(): { name, token, rid } sent on every (re)connect
+  constructor({ url, hello, WebSocketImpl = globalThis.WebSocket, now = () => performance.now(), retryForMs = 30000 }) {
+    this.url = url; this.helloFn = hello; this.WS = WebSocketImpl; this.now = now; this.retryForMs = retryForMs;
+    this.ws = null; this.state = 'idle'; this.handlers = new Map(); this.closing = false; this.attempt = 0; this.lostAt = 0;
+    this.offset = 0; this.rtt = 0; this.samples = []; this.pingT = null; this.retryT = null; this.welcome = null; this.reason = null;
+  }
+  on(type, fn) { if (!this.handlers.has(type)) this.handlers.set(type, new Set()); this.handlers.get(type).add(fn); return () => this.handlers.get(type).delete(fn); }
+  emit(type, data) { const h = this.handlers.get(type); if (h) for (const fn of [...h]) { try { fn(data); } catch (e) { console.error('multiplayer handler failed', type, e); } } }
+  setState(st, reason) { if (this.state === st && this.reason === reason) return; this.state = st; this.reason = reason || null; this.emit('conn', { state: st, reason: this.reason, attempt: this.attempt }); }
+  get online() { return this.state === 'online'; }
+  // server time in ms, estimated from round trips
+  serverNow() { return this.now() + this.offset; }
+  toLocal(serverMs) { return serverMs - this.offset; }
+
+  connect() { this.closing = false; this.attempt = 0; this.lostAt = 0; this.open(); }
+  open() {
+    clearTimeout(this.retryT); this.setState(this.attempt ? 'reconnecting' : 'connecting');
+    let ws;
+    try { ws = new this.WS(this.url); }
+    catch (e) { this.setState('failed', 'blocked'); return; } // e.g. a page that may not open network connections
+    this.ws = ws;
+    ws.onopen = () => { if (this.ws !== ws) return; const h = this.helloFn ? this.helloFn() : {}; this.rawSend({ t: C.HELLO, v: PROTOCOL, ...h }); };
+    ws.onmessage = e => { if (this.ws === ws) this.receive(e.data); };
+    ws.onclose = e => { if (this.ws === ws) this.dropped(e.code, e.reason); };
+    ws.onerror = () => { /* followed by close */ };
+  }
+  receive(text) {
+    let m; try { m = JSON.parse(text); } catch (e) { return; }
+    if (!m || typeof m.t !== 'string') return;
+    if (m.t === S.PONG) { this.pong(m); return; }
+    if (m.t === S.WELCOME) {
+      this.welcome = m; this.attempt = 0; this.lostAt = 0; this.samples = [];
+      this.offset = m.now - this.now(); // rough until the first round trips
+      this.setState('online'); this.startPings();
+    }
+    if (m.t === S.ERROR) m.text = ERRORS[m.code] || m.code;
+    this.emit(m.t, m);
+  }
+  dropped(code, reason) {
+    this.ws = null; clearInterval(this.pingT); this.pingT = null;
+    if (this.closing) { this.setState('offline'); return; }
+    if (FINAL[code]) { this.setState('failed', FINAL[code]); return; }
+    const wasOnline = this.welcome != null;
+    if (!this.lostAt) this.lostAt = this.now();
+    if (!wasOnline && this.attempt === 0) { this.attempt = 1; } // first connection failed: still try a few times
+    else this.attempt++;
+    if (this.now() - this.lostAt > this.retryForMs) { this.setState('failed', wasOnline ? 'lost' : 'unreachable'); return; }
+    this.setState('reconnecting', 'lost');
+    this.retryT = setTimeout(() => this.open(), BACKOFF[Math.min(BACKOFF.length - 1, this.attempt - 1)]);
+  }
+  close(reason = 'leave') {
+    this.closing = true; clearTimeout(this.retryT); clearInterval(this.pingT); this.pingT = null;
+    const ws = this.ws; this.ws = null;
+    if (ws) { try { ws.close(1000, reason); } catch (e) { /* closed */ } }
+    this.setState('offline');
+  }
+  rawSend(m) { const ws = this.ws; if (!ws || ws.readyState !== 1) return false; try { ws.send(JSON.stringify(m)); return true; } catch (e) { return false; } }
+  send(type, payload = {}) { return this.state === 'online' ? this.rawSend({ t: type, ...payload }) : false; }
+
+  // ---------- clock ----------
+  startPings() {
+    clearInterval(this.pingT); let n = 0;
+    const ping = () => this.rawSend({ t: C.PING, c: this.now(), rtt: Math.round(this.rtt) });
+    ping(); this.pingT = setInterval(() => { n++; ping(); if (n === 5) { clearInterval(this.pingT); this.pingT = setInterval(ping, 2000); } }, 250);
+  }
+  pong(m) {
+    const t1 = this.now(), rtt = t1 - m.c; if (!(rtt >= 0) || rtt > 10000) return;
+    this.samples.push({ rtt, off: m.s - (m.c + rtt / 2) }); if (this.samples.length > 12) this.samples.shift();
+    const best = [...this.samples].sort((a, b) => a.rtt - b.rtt).slice(0, 3); // the quickest round trips give the best estimate
+    this.offset = best.reduce((a, s) => a + s.off, 0) / best.length;
+    this.rtt = this.rtt ? this.rtt * 0.8 + rtt * 0.2 : rtt;
+  }
+}
+
+return { Connection };
+})();
+const __m__src_mp_config_js = (() => {
+// GALACTIC RUSH V8 — where the multiplayer server is. The website sets it in config.js
+// (window.GALACTIC_RUSH_CONFIG = { multiplayerServer: 'wss://…' }) or the build writes it into a <meta> tag from the
+// GR_MP_SERVER environment variable. On a local page (localhost or a file) a developer may also pass ?mp=ws://….
+// No secrets live here: the address is public by nature.
+function toWsUrl(raw) {
+  if (typeof raw !== 'string') return '';
+  let u = raw.trim(); if (!u) return '';
+  if (/^https?:\/\//i.test(u)) u = u.replace(/^http/i, 'ws');
+  if (!/^wss?:\/\//i.test(u)) return '';
+  try { const p = new URL(u); if (p.pathname === '/' || p.pathname === '') p.pathname = '/ws'; return p.toString(); } catch (e) { return ''; }
+}
+// a page served from this computer or the local network (development, LAN play and automated tests), never a public site
+const devPage = (loc = typeof location !== 'undefined' ? location : null) => !!loc && (loc.protocol === 'file:' || /^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|[a-z0-9-]+\.local|)$/i.test(loc.hostname));
+function mpServer(loc = typeof location !== 'undefined' ? location : null, doc = typeof document !== 'undefined' ? document : null, win = typeof window !== 'undefined' ? window : {}) {
+  let url = '', source = 'none';
+  const cfg = win.GALACTIC_RUSH_CONFIG;
+  if (cfg && typeof cfg.multiplayerServer === 'string' && cfg.multiplayerServer.trim()) { url = toWsUrl(cfg.multiplayerServer); source = 'config'; }
+  if (!url && doc) { const m = doc.querySelector('meta[name="galactic-rush:mp-server"]'); if (m && m.content.trim()) { url = toWsUrl(m.content); source = 'build'; } }
+  if (devPage(loc)) { const p = new URLSearchParams(loc.search).get('mp'); if (p) { url = toWsUrl(p); source = 'dev'; } }
+  const insecure = !!(url && loc && loc.protocol === 'https:' && url.startsWith('ws://'));
+  return { url, source, insecure };
+}
+
+return { toWsUrl, devPage, mpServer };
+})();
+const __m__src_mp_identity_js = (() => {
+// GALACTIC RUSH V8 — the pilot's online identity on this device: the display name and online ship (kept in this
+// browser) and the server's session token (kept for this tab only, so a reload can rejoin the same lobby). The server
+// assigns the pilot id and signs the token; the game never invents either. Storage may be unavailable: everything
+// still works, it is just not remembered.
+const { normalizeName, validShip } = __m__src_mp_protocol_js;
+const PREFS_KEY = 'galactic-rush.mp', SESSION_KEY = 'galactic-rush.mp.session';
+function prefs() { try { const v = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
+function savePrefs(patch) { try { localStorage.setItem(PREFS_KEY, JSON.stringify({ ...prefs(), ...patch })); } catch (e) { /* storage unavailable */ } }
+const loadName = () => normalizeName(prefs().name) || '';
+const saveName = name => savePrefs({ name });
+const loadShip = () => (validShip(prefs().ship) ? prefs().ship : null);
+const saveShip = ship => savePrefs({ ship });
+function suggestName() { return 'PILOT ' + (100 + Math.floor(Math.random() * 900)); }
+function loadSession(url) {
+  try { const v = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); return v && v.url === url && typeof v.token === 'string' && v.token.length < 200 ? v : null; } catch (e) { return null; }
+}
+function saveSession(url, token) { try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ url, token })); } catch (e) { /* storage unavailable */ } }
+function clearSession() { try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* storage unavailable */ } }
+
+return { loadName, saveName, loadShip, saveShip, suggestName, loadSession, saveSession, clearSession };
+})();
+const __m__src_mp_sync_js = (() => {
+// GALACTIC RUSH V8 — what a racer sends and how a remote racer is shown. The local ship is simulated by the game's
+// own Race exactly as in single-player; 20 times a second its state (pose, speed, boost, lap, checkpoint, progress
+// and a few visual flags) is packed and sent. Remote racers are ordinary Race racers whose ships are not simulated
+// locally but posed from the server's states. Nothing graphical is transmitted.
+const { packState, FLAG } = __m__src_mp_protocol_js;
+function localState(race, r) {
+  const s = r.ship, f = (s.boosting ? FLAG.BOOST : 0) | (s.padTimer > 0 ? FLAG.PAD : 0) | (s.drifting ? FLAG.DRIFT : 0) | (s.shield > 0 ? FLAG.SHIELD : 0)
+    | (s.stun > 0 ? FLAG.STUN : 0) | (r.wrecked ? FLAG.WRECK : 0) | (s.invuln > 0 ? FLAG.INVULN : 0) | (r.finished ? FLAG.FINISHED : 0);
+  return packState({ t: race.time, p: [s.pos.x, s.pos.y, s.pos.z], q: [s.quat.x, s.quat.y, s.quat.z, s.quat.w], v: [s.vel.x, s.vel.y, s.vel.z],
+    b: s.boost / s.def.boostCap, f, lap: r.lap, cp: r.cpNext, prog: r.prog, ay: s.ang.y, hull: s.hull / s.def.hull, thr: s.throttle });
+}
+
+// pose: interpolated { p, q, v }; st: the latest state (flags, lap, progress)
+function applyRemote(r, pose, st) {
+  const s = r.ship;
+  s.pos.set(pose.p[0], pose.p[1], pose.p[2]); s.prevPos.copy(s.pos);
+  s.quat.set(pose.q[0], pose.q[1], pose.q[2], pose.q[3]); s.prevQuat.copy(s.quat);
+  s.vel.set(pose.v[0], pose.v[1], pose.v[2]);
+  if (!st) return;
+  const f = st.f;
+  s.boosting = !!(f & FLAG.BOOST); s.padTimer = f & FLAG.PAD ? 0.3 : 0; s.drifting = !!(f & FLAG.DRIFT);
+  s.shield = f & FLAG.SHIELD ? 1 : 0; s.stun = f & FLAG.STUN ? 0.3 : 0; s.invuln = f & FLAG.INVULN ? 0.5 : 0;
+  s.boost = st.b * s.def.boostCap; s.hull = st.hull * s.def.hull; s.throttle = st.thr; s.ang.y = st.ay;
+  r.wrecked = !!(f & FLAG.WRECK); r.lap = st.lap; r.cpNext = st.cp; r.prog = st.prog;
+}
+
+return { localState, applyRemote };
+})();
+const __m__src_mp_interp_js = (() => {
+// GALACTIC RUSH V8 — smooth remote ships. Each remote racer keeps a short buffer of the states the server relayed,
+// stamped with the server's receive time. Every frame the ship is drawn a little in the past (the render delay, which
+// adapts to the connection), between the two states around that moment: position by a cubic Hermite curve through
+// both states' positions and velocities, rotation by slerp. If the next state is late, the ship carries on along its
+// velocity for at most 250 ms and then holds, so it never jumps backwards or teleports. Everyone draws a ship at the
+// same server time minus a similar delay, so all players see it in the same place.
+const EXTRAP_MS = 250, STALE_MS = 1500;
+
+class SnapBuffer {
+  constructor(max = 40) { this.a = []; this.max = max; this.lagAvg = 60; this.lagDev = 20; }
+  get last() { return this.a.length ? this.a[this.a.length - 1] : null; }
+  // ts: server time of the state (ms); st: unpacked state; arrival: server time when it reached this game
+  push(ts, st, arrival) {
+    const a = this.a; if (a.length && ts <= a[a.length - 1].ts) return false;
+    a.push({ ts, st }); if (a.length > this.max) a.shift();
+    if (arrival != null) { const lag = arrival - ts; this.lagAvg += (lag - this.lagAvg) * 0.1; this.lagDev += (Math.abs(lag - this.lagAvg) - this.lagDev) * 0.1; }
+    return true;
+  }
+  // how far in the past to draw: one sender interval plus the usual lag and its jitter
+  delay() { return Math.min(400, Math.max(90, 50 + this.lagAvg + 2.5 * this.lagDev)); }
+  clear() { this.a.length = 0; }
+  // pose at server time t (ms) into out { p, q, v, state, extrapolated, stale }
+  sample(t, out) {
+    const a = this.a; if (!a.length) return null;
+    const first = a[0], last = a[a.length - 1];
+    if (t >= last.ts) {
+      const dt = Math.min(t - last.ts, EXTRAP_MS) / 1000, s = last.st;
+      for (let k = 0; k < 3; k++) { out.p[k] = s.p[k] + s.v[k] * dt; out.v[k] = s.v[k]; }
+      for (let k = 0; k < 4; k++) out.q[k] = s.q[k];
+      out.state = s; out.extrapolated = t > last.ts; out.stale = t - last.ts > STALE_MS; return out;
+    }
+    if (t <= first.ts) { copyPose(first.st, out); out.state = first.st; out.extrapolated = false; out.stale = false; return out; }
+    let i = a.length - 1; while (i > 1 && a[i - 1].ts > t) i--;
+    const A = a[i - 1], B = a[i], span = B.ts - A.ts, u = (t - A.ts) / span, d = span / 1000;
+    hermite(A.st, B.st, u, d, out); slerp(A.st.q, B.st.q, u, out.q);
+    out.state = u < 0.5 ? A.st : B.st; out.extrapolated = false; out.stale = false; return out;
+  }
+}
+const newPose = () => ({ p: [0, 0, 0], q: [0, 0, 0, 1], v: [0, 0, 0], state: null, extrapolated: false, stale: false });
+function copyPose(s, out) { for (let k = 0; k < 3; k++) { out.p[k] = s.p[k]; out.v[k] = s.v[k]; } for (let k = 0; k < 4; k++) out.q[k] = s.q[k]; }
+function hermite(A, B, u, d, out) {
+  const u2 = u * u, u3 = u2 * u, h00 = 2 * u3 - 3 * u2 + 1, h10 = u3 - 2 * u2 + u, h01 = -2 * u3 + 3 * u2, h11 = u3 - u2;
+  for (let k = 0; k < 3; k++) { out.p[k] = h00 * A.p[k] + h10 * d * A.v[k] + h01 * B.p[k] + h11 * d * B.v[k]; out.v[k] = A.v[k] + (B.v[k] - A.v[k]) * u; }
+}
+function slerp(a, b, t, out) {
+  let bx = b[0], by = b[1], bz = b[2], bw = b[3], c = a[0] * bx + a[1] * by + a[2] * bz + a[3] * bw;
+  if (c < 0) { c = -c; bx = -bx; by = -by; bz = -bz; bw = -bw; }
+  let k0, k1;
+  if (c > 0.9995) { k0 = 1 - t; k1 = t; }
+  else { const th = Math.acos(c), s = Math.sin(th); k0 = Math.sin((1 - t) * th) / s; k1 = Math.sin(t * th) / s; }
+  out[0] = a[0] * k0 + bx * k1; out[1] = a[1] * k0 + by * k1; out[2] = a[2] * k0 + bz * k1; out[3] = a[3] * k0 + bw * k1;
+  const n = Math.hypot(out[0], out[1], out[2], out[3]) || 1; for (let k = 0; k < 4; k++) out[k] /= n;
+  return out;
+}
+
+return { SnapBuffer, newPose, slerp };
+})();
+const __m__src_mp_paint_js = (() => {
+// GALACTIC RUSH V8 — paint jobs in online races. A pilot's saved paint job (V7 garage) is sent with their ship and
+// checked on both sides with the career's own validator: known colours and items for the right slots only, never a
+// premium item. Paint is cosmetic; it never changes a ship's handling.
+const { ITEMS } = __m__src_progress_catalog_js;
+const { sanitizeCustom } = __m__src_progress_profile_js;
+const { validShip } = __m__src_mp_protocol_js;
+const USABLE = new Set(ITEMS.filter(i => i.class !== 'premium' && i.class !== 'event').map(i => i.id));
+
+// Returns the cleaned paint job for that ship (factory values where something was invalid) and the list of problems.
+function cleanPaint(raw, shipId) {
+  const issues = [];
+  if (!validShip(shipId)) return { paint: null, issues: ['unknown ship'] };
+  const paint = sanitizeCustom(raw == null ? undefined : raw, shipId, USABLE, issues);
+  return { paint, issues };
+}
+
+return { cleanPaint };
+})();
+const __m__src_mp_netrace_js = (() => {
+// GALACTIC RUSH V8 — one online race in the game. It uses the game's own Race, RaceView, HUD, camera and effects:
+// the local pilot's ship is simulated exactly as in single-player, and the other pilots are ordinary racers whose
+// ships are posed from the server's states instead of being simulated here. The Race and the view are wrapped at
+// run time, not changed: during each simulation step the remote racers are taken out of the list the step simulates
+// and put back for bumps with the local ship and for the standings. The start is the server's: the countdown follows
+// the server clock, so every game says GO at the same moment. The local end of race is ignored; the server ends it.
+const { Vec3 } = __m__src_math_js;
+const { Race } = __m__src_sim_race_js;
+const { getTrack } = __m__src_sim_tracks_js;
+const { resolveLivery } = __m__src_progress_customize_js;
+const { C, unpackState, MP } = __m__src_mp_protocol_js;
+const { localState, applyRemote } = __m__src_mp_sync_js;
+const { SnapBuffer, newPose } = __m__src_mp_interp_js;
+const { cleanPaint } = __m__src_mp_paint_js;
+const { devPage } = __m__src_mp_config_js;
+const now = () => performance.now(), loc = {};
+const COUNT_FROM = 3.7; // the game's 3-2-1 runs in the last seconds before the server's start time
+
+// a pilot's paint job as the game draws it (V7 customisation), with their grid number and name on the band
+function mpLivery({ ship, paint, name }, number) {
+  const { decalSlot, ...lv } = resolveLivery(ship, cleanPaint(paint, ship).paint); // decalSlot is the garage's own decal: not shared with online pilots
+  return { ...lv, number, callsign: name };
+}
+
+class NetRace {
+  // m: the server's prepare message for this race
+  constructor(mp, m) {
+    this.mp = mp; this.g = mp.g; this.conn = mp.conn; this.m = m; this.rid = m.rid; this.stage = m.stage;
+    this.startLocal = 0; this.synced = false; this.frameT = -1; this.lastSend = 0;
+    this.official = null; this.adjusted = false; this.provisional = null; this.finishedAt = 0; this.finishState = null; this.watched = false;
+    this.out = null; this.over = false; this.follow = null; this.firstFin = null; this.closeAt = 0;
+    const st = (m.status || {})[mp.pid];
+    this.participant = m.grid.some(e => e.pid === mp.pid) && !(st && (st.startsWith('out:') || st === 'finished'));
+    this.build();
+  }
+  // watching someone else's ship (eliminated, out of the race, or after the finish line)
+  get spectating() { return !!this.follow && this.race.player === this.follow; }
+  get canWatch() { return !this.participant || !!this.out || !!(this.me && this.me.finished); }
+
+  build() {
+    const g = this.g, m = this.m, me = this.mp.pid, track = getTrack(m.track);
+    // factory stats for everyone online (no upgrades); paint jobs are cosmetic
+    const racers = m.grid.map((e, k) => e.pid === me && this.participant ? { name: e.name, shipId: e.ship, isPlayer: true, livery: mpLivery(e, k + 1) } : { name: e.name, shipId: e.ship, skill: 0.8 });
+    const race = new Race({ track, laps: m.laps, racers, mode: 'online', seed: m.seed, handling: m.handling, assist: +g.settings.assist, sens: +g.settings.sens, autopilot: g.autotest && devPage(), countdown: 99 });
+    race.racers.forEach((r, k) => {
+      const e = m.grid[k]; r.pid = e.pid; r.ammo = 0; r.fireCD = 1e9; // ion bolts are off online
+      if (r !== race.player) r.remote = { pid: e.pid, base: e.name, buf: new SnapBuffer(), pose: newPose(), lost: false, out: null, fin: null, lap: 0, located: false, at: new Vec3(), wreck: false };
+    });
+    this.race = race; this.me = race.player; this.byPid = new Map(race.racers.map(r => [r.pid, r]));
+    this.all = race.racers.slice(); this.local = this.all.filter(r => !r.remote); this.remotes = this.all.filter(r => r.remote);
+    g.opts.mode = 'online';
+    g.courseScene(m.track, race, false);
+    const sc = g.scene; sc.mp = this; this.view = sc.view;
+    race.racers.forEach((r, k) => {
+      if (!r.remote) return;
+      const e = m.grid[k], v = sc.view.byRacer.get(r); if (v) v.sv.setLivery(mpLivery(e, k + 1));
+      const p = cleanPaint(e.paint, e.ship).paint; if (p && /^#[0-9a-f]{6}$/i.test(p.primary || '')) r.paintCss = p.primary;
+    });
+    const step = race.step.bind(race), upd = sc.view.update.bind(sc.view);
+    race.step = (dt, pc) => this.step(step, dt, pc);
+    sc.view.update = (...a) => { if (!this.over) this.poseRemotes(); return upd(...a); };
+    // the same set-up as a single-player start (main.js startRace), without the course flyover
+    g.ghost = null; g.rec = []; g.recT = 0; g.ghostTi = 0; g.bestSplits = []; g.curSplits = [];
+    g.result = null; g.slowmo = 0; g.hud.setupMinimap(track); g.ui.clearMessages();
+    g.camMode = g.settings.cam; g.input.capture = true; g.audio.music('race');
+    g.endIntro();
+    for (const [pid, s] of Object.entries(m.status || {})) if (pid !== me && typeof s === 'string' && s.startsWith('out:')) this.markOut(pid, s.slice(4));
+    if (!this.participant) this.spectate(0);
+    else this.conn.send(C.LOADED, { rid: this.rid, ok: true });
+  }
+  destroy() { this.over = true; }
+
+  // ---------- simulation ----------
+  step(base, dt, pc) {
+    if (this.over) return;
+    const race = this.race, t = now(), n0 = race.events.length, counting = race.state === 'countdown';
+    if (counting) this.countdown(t);
+    race.racers = this.local;
+    try { base(dt, this.mp.menuOpen ? null : pc); } finally { race.racers = this.all; }
+    if (counting && race.state !== 'countdown') this.goAt = performance.timeOrigin + t; // when this game said GO (wall clock), for checks against the server's start time
+    if (this.me) this.me.ammo = 0;
+    if (race.state === 'finished') race.state = 'racing'; // only the server ends an online race
+    this.poseRemotes();
+    if (this.me && this.participant && !this.out && !this.me.wrecked && race.state === 'racing') this.collide();
+    race.updateStandings();
+    for (let i = race.events.length - 1; i >= n0; i--) {
+      const e = race.events[i];
+      if (e.type === 'raceOver') race.events.splice(i, 1);
+      else if (e.type === 'cell') e.ion = false; // a magenta cell still refills boost; it gives no bolt
+      else if (e.type === 'finish' && e.r === this.me && this.participant && !this.out) this.localFinish(e);
+    }
+    if (this.finishedAt && !this.watched && t - this.finishedAt > 3500) this.afterFinish();
+    this.maybeSend(t);
+  }
+  // before the server's start the grid waits; then the countdown is set from the server's start time (once per frame
+  // at most, and only when it has drifted), so the game's own 3-2-1-GO lands on that moment
+  countdown(t) {
+    const race = this.race;
+    if (!this.startLocal) { race.countdown = 99; return; }
+    const k = this.g.timeScale || 1, target = ((this.startLocal - t) / 1000) * k + 0.6, first = this.g.t !== this.frameT; this.frameT = this.g.t;
+    if (!this.synced) { if (target <= COUNT_FROM) { race.countdown = Math.max(0.6001, target); this.synced = true; } else race.countdown = 99; return; }
+    if (first && Math.abs(race.countdown - target) > 0.1 * k) race.countdown = Math.max(0.6001, target);
+  }
+  // remote ships: drawn a little in the past, between the server's states (interp.js)
+  poseRemotes() {
+    const ts = this.conn.serverNow(), race = this.race, tr = race.track;
+    for (const r of this.remotes) {
+      const R = r.remote;
+      if (R.buf.a.length) {
+        const pose = R.buf.sample(ts - R.buf.delay(), R.pose);
+        if (pose) {
+          applyRemote(r, pose, pose.state);
+          // where the ship is along the course, for the camera and course effects (Race.collideTrack does this for simulated ships)
+          const jump = !R.located || r.ship.pos.distSq(R.at) > 3600;
+          tr.locate(r.ship.pos, jump ? tr.nearestIndex(r.ship.pos) : r.ti, loc);
+          r.ti = loc.i; r.s = loc.s; r.lx = loc.x; r.ly = loc.y; R.located = true; R.at.copy(r.ship.pos);
+          // lap times for the HUD while watching this pilot (display only; official times come from the server)
+          const lap = pose.state.lap;
+          if (lap > R.lap) { if (R.lap >= 1) { const lt = race.time - r.lapStart; if (lt > 0) { r.lapTimes.push(lt); if (lt < r.bestLap) r.bestLap = lt; } } r.lapStart = race.time; R.lap = lap; }
+          if (r.wrecked && !R.wreck && !R.out) race.emit('explode', r, { pos: r.ship.pos.clone() }); // their game reported the ship destroyed
+          R.wreck = r.wrecked;
+        }
+      }
+      if (R.out) r.wrecked = true;
+      if (R.fin != null) { r.finished = true; r.finishTime = R.fin; }
+    }
+  }
+  // bumps between the local ship and a remote ship use the game's own collision code; each game moves only its own
+  // ship, so the remote ship is put back where the server says it is
+  collide() {
+    const race = this.race, me = this.me, a = me.ship;
+    for (const rr of this.remotes) {
+      const R = rr.remote;
+      if (rr.wrecked || R.out || R.lost || !R.buf.a.length || R.pose.stale) continue;
+      const b = rr.ship, min = a.def.radius + b.def.radius;
+      if (a.pos.distSq(b.pos) >= min * min) continue;
+      race.racers = [me, rr];
+      try { race.shipCollisions(); } finally { race.racers = this.all; }
+      b.pos.copy(b.prevPos);
+    }
+  }
+  maybeSend(t) {
+    if (!this.participant || this.out || this.race.state !== 'racing' || t - this.lastSend < 50) return;
+    if (this.finishedAt && this.official == null) return; // the finish waits for the server's answer (see resendFinish)
+    this.lastSend = t; this.conn.send(C.STATE, { rid: this.rid, s: localState(this.race, this.me) });
+  }
+  localFinish(e) {
+    if (this.finishedAt) return;
+    // provisional place until the server's result: remote pilots already over the line, by the server or in this view
+    const line = this.race.cpProg(this.race.laps * this.race.track.cpS.length);
+    e.place = 1 + this.remotes.filter(r => !r.remote.out && (r.remote.fin != null || r.prog >= line)).length;
+    this.provisional = { place: e.place, time: e.time }; this.finishedAt = now();
+    this.finishState = localState(this.race, this.me); this.finishMsg = { rid: this.rid, time: e.time, laps: this.me.lapTimes.slice(0, 20) };
+    this.resendFinish(); this.mp.bar();
+  }
+  // also called when the connection comes back: a finish the server has not answered is sent again with the state at the line
+  resendFinish() {
+    if (!this.finishMsg || this.official != null || this.out || !this.conn.online) return;
+    this.conn.send(C.STATE, { rid: this.rid, s: this.finishState }); this.conn.send(C.FINISH, this.finishMsg);
+  }
+  // after the finish line: watch whoever is still racing, with the HUD back on
+  afterFinish() {
+    this.watched = true;
+    if (this.out || !this.remotes.some(r => !r.remote.out && !r.finished)) return; // nobody left on course: keep the finish camera
+    this.spectate(0); this.g.state = 'race'; this.g.hud.show(true);
+  }
+
+  // ---------- spectating ----------
+  watchable() { return this.remotes.filter(r => !r.remote.out); }
+  spectate(dir) {
+    const list = this.watchable(); if (!list.length) return false;
+    let i = this.follow ? list.indexOf(this.follow) : -1;
+    if (i < 0) { const lead = this.race.order.find(r => list.includes(r) && !r.finished) || this.race.order.find(r => list.includes(r)); i = Math.max(0, list.indexOf(lead)); dir = 0; }
+    this.follow = list[(i + dir + list.length) % list.length];
+    this.race.player = this.follow;
+    if (this.g.camMode === 'cockpit') this.g.camMode = 'chase'; // the cockpit view is the local pilot's own
+    this.g.rig.snap = true; this.mp.bar(); return true;
+  }
+  markOut(pid, reason) {
+    if (pid === this.mp.pid) { if (this.participant || this.me) this.goOut(reason); return; }
+    const r = this.byPid.get(pid); if (!r || !r.remote || r.remote.out) return;
+    r.remote.out = reason; r.name = r.remote.base + ' · OUT'; r.wrecked = true;
+    if (this.follow === r) { this.follow = null; if (!this.spectate(0) && this.me) this.race.player = this.me; }
+    this.mp.bar();
+  }
+  // the server took this pilot out of the race (disconnected too long, inactive, invalid data, left): watch the rest
+  goOut(reason) {
+    if (this.out) return;
+    this.out = reason; this.participant = false; this.local = [];
+    if (this.me) { this.me.wrecked = true; this.me.wreckTimer = 1e9; this.me.name += ' · OUT'; }
+    if (this.g.state === 'finishing') this.g.state = 'race';
+    this.g.hud.show(true); this.spectate(0); this.mp.bar();
+  }
+
+  // ---------- messages ----------
+  onStart(m) { if (m.rid === this.rid && Number.isFinite(m.startAt)) { this.startLocal = this.conn.toLocal(m.startAt); this.mp.bar(); } }
+  onSnap(m) {
+    if (m.rid !== this.rid || !Array.isArray(m.s)) return;
+    const arrival = this.conn.serverNow();
+    for (const e of m.s) {
+      if (!Array.isArray(e) || e.length < 3) continue;
+      const r = this.byPid.get(e[0]); if (!r || !r.remote) continue;
+      const st = unpackState(e.slice(2)); if (st && Number.isFinite(e[1])) r.remote.buf.push(e[1], st, arrival);
+    }
+  }
+  onFin(m) {
+    if (m.rid !== this.rid || !Number.isFinite(m.time)) return;
+    if (this.firstFin == null) { // the race closes a while after the first finish (server rules, shown in the bar)
+      this.firstFin = m.time; const k = this.mp.serverTimeScale || 1;
+      this.closeAt = this.conn.serverNow() + (Math.max(MP.FINISH_WINDOW_S, MP.FINISH_WINDOW_FRAC * m.time) * 1000) / k;
+    }
+    if (m.pid === this.mp.pid) { this.official = m.time; this.adjusted = !!m.adjusted; if (this.me) this.me.finishTime = m.time; }
+    else { const r = this.byPid.get(m.pid); if (r && r.remote) r.remote.fin = m.time; }
+    this.mp.bar();
+  }
+  onStatus(m) {
+    if (m.statuses) { if (m.rid === this.rid) for (const [pid, s] of Object.entries(m.statuses)) if (typeof s === 'string' && s.startsWith('out:')) this.markOut(pid, s.slice(4)); return; }
+    if (m.rid && m.rid !== this.rid) return;
+    if (m.out) { this.markOut(m.pid, m.out); return; }
+    const r = this.byPid.get(m.pid); if (!r || !r.remote || !m.conn) return;
+    if (m.conn === 'gone') { this.markOut(m.pid, 'left'); return; }
+    r.remote.lost = m.conn === 'lost'; if (!r.remote.out) r.name = r.remote.base + (r.remote.lost ? ' · LOST' : '');
+    this.mp.bar();
+  }
+}
+
+return { mpLivery, NetRace };
+})();
+const __m__src_mp_ui_js = (() => {
+// GALACTIC RUSH V8 — markup for the online screens: home (name, create, join, public lobbies), the lobby waiting room,
+// stage results, the tournament result, connection problems and the in-race menu. Built from the game's existing
+// classes (panels, buttons, segmented controls, result tables, wallet), so it looks like the rest of Galactic Rush.
+const { SHIPS } = __m__src_config_js;
+const { esc, walletHTML } = __m__src_ui_garage_js;
+const { MP, fmtTime } = __m__src_mp_protocol_js;
+const mp = (arg, label, o = {}) => `<button class="${o.cls || 'btn'}" data-act="${o.act || 'mp'}" data-arg="${esc(arg)}"${o.disabled ? ' disabled' : ''}${o.pressed != null ? ` aria-pressed="${o.pressed}"` : ''}${o.title ? ` title="${esc(o.title)}"` : ''}>${label}</button>`;
+const seg = (opts, cur) => `<div class="seg" role="group">${opts.map(([arg, l, v]) => `<button data-act="mp" data-arg="${esc(arg)}" aria-pressed="${v === cur}">${l}</button>`).join('')}</div>`;
+const shipName = id => (SHIPS.find(s => s.id === id) || { name: id }).name;
+const css = c => `rgb(${c.map(v => Math.round(Math.min(1, v) * 255)).join(',')})`;
+const swatch = (paint, ship) => `<i class="swatch" style="background:${paint && paint.primary ? esc(paint.primary) : css((SHIPS.find(s => s.id === ship) || SHIPS[0]).color)}"></i>`;
+const STAGE_LABEL = { 1: 'Stage 1 · Qualifier', 2: 'Stage 2 · Final' };
+const REASON = { notloaded: 'Did not load', disconnected: 'Disconnected', left: 'Left', inactive: 'Inactive', invalid: 'Removed (invalid data)', unfinished: 'Did not finish' };
+const reasonText = r => REASON[r] || 'Did not finish';
+const CONN = { connecting: 'Connecting…', online: 'Connected', reconnecting: 'Connection lost · reconnecting…', offline: 'Not connected', failed: 'Not connected', idle: 'Not connected' };
+
+function connLine(c, server) {
+  if (!server.url) return '<span class="conn off">No multiplayer server is set for this copy of the game</span>';
+  return `<span class="conn ${c.state === 'online' ? 'on' : c.state === 'failed' || c.state === 'offline' || c.state === 'idle' ? 'off' : 'wait'}">${esc(c.label || CONN[c.state] || c.state)}</span><span class="srv">${esc(server.url.replace(/^wss?:\/\//, '').replace(/\/ws$/, ''))}</span>`;
+}
+
+// ---------- home ----------
+function homeHTML(v) {
+  const s = v.server, ok = !!s.url && !s.insecure, online = v.conn.state === 'online';
+  const list = v.list == null ? '' : v.list.length
+    ? `<div class="tablewrap"><table class="res"><tr><th>CODE</th><th>HOST</th><th>PILOTS</th><th>HANDLING</th><th></th></tr>${v.list.map(l => `<tr><td class="n"><b>${esc(l.code)}</b></td><td>${esc(l.host)}</td><td class="n">${l.players}/${l.max}</td><td>${l.handling === 'classic' ? 'Classic' : 'Relaxed'}</td><td>${mp('join:' + l.code, 'Join', { cls: 'btn sm buy' })}</td></tr>`).join('')}</table></div>`
+    : '<p class="lede small">No public lobbies are open right now. Create one, or join a friend with their code.</p>';
+  const body = !s.url ? `<div class="panel mpnote"><b>Online play needs the multiplayer server.</b><p>This copy of Galactic Rush has no server address, so it cannot play online. Online races need a running Galactic Rush multiplayer server and a copy of the game published with that server’s address, such as the GitHub Pages version once it is set up. Inside the claude.ai preview the game cannot open network connections at all. The README explains how to run the server and point the game at it.</p></div>`
+    : s.insecure ? `<div class="panel mpnote"><b>The server address is not secure.</b><p>This page is served over https, so it can only reach a wss:// server. Set the server address to its wss:// form.</p></div>`
+    : `<div class="panel mpform">
+        <label class="setting"><span>Pilot name<small>${MP.NAME_MIN}–${MP.NAME_MAX} letters or numbers, shown to other pilots</small></span><input class="mptext" data-mpin="name" maxlength="${MP.NAME_MAX}" value="${esc(v.name)}" spellcheck="false" autocomplete="off" aria-label="Pilot name"></label>
+        <div class="setting"><span>New lobby<small>Private: only pilots with the code can join. Public: listed below for anyone.</small></span>${seg([['vis:private', 'Private', 'private'], ['vis:public', 'Public', 'public']], v.visibility)}</div>
+        <div class="row">${mp('create', 'Create lobby', { cls: 'btn primary', disabled: !online || v.busy })}</div>
+      </div>
+      <div class="panel mpform"><h3>Join a lobby</h3>
+        <div class="row" style="margin-top:8px"><input class="mptext code" data-mpin="code" maxlength="7" value="${esc(v.code || '')}" placeholder="CODE" spellcheck="false" autocomplete="off" aria-label="Room code">${mp('join', 'Join with code', { cls: 'btn sm buy', disabled: !online || v.busy })}</div>
+      </div>
+      <div class="panel"><div class="row between"><h3>Public lobbies</h3>${mp('list', 'Refresh', { cls: 'btn sm', disabled: !online })}</div>${list}</div>`;
+  return `<div class="col mpcol">
+    <div class="row between"><div class="kicker">Online multiplayer</div>${walletHTML(v.wallet)}</div>
+    <h2>Tournament</h2>
+    <p class="lede">Race real pilots over the internet. Everyone in the lobby races a <b>five-lap qualifier</b>; the top two meet in a <b>five-lap final</b>. The server picks both courses.</p>
+    ${ok ? `<div class="mpconn">${connLine(v.conn, s)}</div>` : ''}
+    ${v.error ? `<p class="reason" role="alert">${esc(v.error)}</p>` : ''}
+    ${body}
+    <div class="actbar"><div class="row">${ok && !online && v.conn.state !== 'connecting' && v.conn.state !== 'reconnecting' ? mp('connect', 'Connect', { cls: 'btn primary' }) : ''}<button class="btn" data-act="back" data-arg="mp">Back</button></div></div>
+    <div class="foot">Online races use every ship's factory stats (garage upgrades stay in single-player); your saved paint job comes along. Ion bolts are off online.</div>
+  </div>`;
+}
+
+// ---------- lobby ----------
+function lobbyHTML(v) {
+  const L = v.lobby, me = L.you, host = L.host === me, mine = L.members.find(m => m.pid === me) || {};
+  const on = L.members.filter(m => m.conn === 'ok'), waiting = on.filter(m => !m.ready).length, running = L.phase !== 'open';
+  const startable = host && !running && on.length >= MP.MIN_PLAYERS && waiting === 0;
+  const why = running ? 'A tournament is running.' : on.length < MP.MIN_PLAYERS ? `Waiting for pilots: at least ${MP.MIN_PLAYERS} are needed.` : waiting ? `Waiting for ${waiting} pilot${waiting > 1 ? 's' : ''} to be ready.` : host ? 'Everyone is ready.' : 'Everyone is ready. Waiting for the host to start.';
+  const rows = L.members.map(m => `<tr class="${m.pid === me ? 'me' : ''}"><td>${m.pid === L.host ? '<span class="badge own">Host</span>' : ''}</td><td><b>${esc(m.name)}</b>${m.pid === me ? ' <small class="dim">(you)</small>' : ''}</td>
+    <td>${swatch(m.paint, m.ship)}${esc(shipName(m.ship))}</td><td>${m.conn === 'ok' ? (m.ready ? '<span class="badge eq">Ready</span>' : '<span class="badge">Not ready</span>') : '<span class="badge lock">Reconnecting…</span>'}</td></tr>`).join('');
+  const si = SHIPS.findIndex(s => s.id === mine.ship), ship = SHIPS[si] || SHIPS[0];
+  return `<div class="col mpcol">
+    <div class="row between"><div class="kicker">Online multiplayer · lobby</div>${walletHTML(v.wallet)}</div>
+    <div class="mpcodebox"><span>Room code</span><b class="mpcode" data-code="${esc(L.code)}">${esc(L.code)}</b>${mp('copy', v.copied ? 'Copied' : 'Copy code', { cls: 'btn sm' })}<small>Share it with friends: they choose Online multiplayer → Join with code.</small></div>
+    ${v.error ? `<p class="reason" role="alert">${esc(v.error)}</p>` : ''}
+    ${v.conn && v.conn.state !== 'online' ? `<p class="reason" role="status">${esc(v.conn.label || CONN[v.conn.state] || 'Not connected')}</p>` : ''}
+    <div class="panel tablewrap"><h3>Pilots ${L.members.length}/${L.max}</h3><table class="res mplist"><tr><th></th><th>PILOT</th><th>SHIP</th><th>STATUS</th></tr>${rows}</table></div>
+    <div class="panel mpship"><h3>Your ship</h3>
+      <div class="shipnav">${mp('ship:-1', '‹', { cls: 'arrow', disabled: running })}<div><b class="mpshipname">${esc(ship.name)}</b><div class="dim small">${esc(ship.cls)} · factory stats online</div></div>${mp('ship:1', '›', { cls: 'arrow', disabled: running })}</div>
+      <p class="lede small">Your saved paint job for this ship comes along (Garage → Paint).</p></div>
+    <div class="panel"><div class="setting"><span>Handling<small>${host ? 'The same for every pilot in the tournament.' : 'Set by the host.'}</small></span>${host && !running ? seg([['handling:relaxed', 'Relaxed', 'relaxed'], ['handling:classic', 'Classic', 'classic']], L.handling) : `<b>${L.handling === 'classic' ? 'Classic' : 'Relaxed'}</b>`}</div>
+      <div class="setting"><span>Lobby<small>${L.visibility === 'public' ? 'Listed for everyone.' : 'Only pilots with the code can join.'}</small></span>${host && !running ? seg([['visibility:private', 'Private', 'private'], ['visibility:public', 'Public', 'public']], L.visibility) : `<b>${L.visibility === 'public' ? 'Public' : 'Private'}</b>`}</div></div>
+    <p class="notice ${startable ? 'good' : ''}" role="status">${esc(v.notice || why)}</p>
+    <div class="actbar"><div class="row">${mp('ready', mine.ready ? 'Ready ✓' : 'Ready', { cls: 'btn' + (mine.ready ? ' armed-ok' : ''), pressed: !!mine.ready, disabled: running })}
+      ${host ? mp('start', 'Start tournament', { cls: 'btn primary', disabled: !startable, title: startable ? '' : why }) : ''}
+      ${mp('leave', v.armedLeave ? 'Confirm: leave lobby' : 'Leave lobby', { cls: 'btn' + (v.armedLeave ? ' danger' : '') })}</div></div>
+    <div class="foot">Five laps per stage · top ${MP.QUALIFIERS} of the qualifier race the final · ${MP.MIN_PLAYERS}–${MP.MAX_PLAYERS} pilots</div>
+  </div>`;
+}
+
+// ---------- results ----------
+function rowsTable(rows, me, extra) {
+  return `<div class="tablewrap panel"><table class="res"><tr><th>POS</th><th>PILOT</th><th>SHIP</th><th>TIME</th>${extra ? '<th></th>' : ''}</tr>${rows.map(r => `<tr class="${r.pid === me ? 'me' : ''}">
+    <td class="p">${r.status === 'finished' ? r.place : r.place}</td><td>${esc(r.name)}</td><td>${esc(shipName(r.ship))}</td>
+    <td class="n">${r.status === 'finished' ? fmtTime(r.time) + (r.adjusted ? ' *' : '') : `<span class="dim">${reasonText(r.reason)} · lap ${Math.max(0, r.lap)}</span>`}</td>${extra ? `<td>${extra(r)}</td>` : ''}</tr>`).join('')}</table></div>`;
+}
+function stageResultsHTML(v) {
+  const R = v.results, me = v.me, q = R.qualified || [], iq = q.includes(me), inRace = R.rows.some(r => r.pid === me);
+  const head = q.length >= MP.QUALIFIERS ? (iq ? 'You qualified for the final' : inRace ? 'Eliminated' : 'Qualifier result') : 'Qualifier over';
+  const badge = r => q.includes(r.pid) ? '<span class="badge eq">Qualified</span>' : '<span class="badge lock">Eliminated</span>';
+  const next = R.nextAt ? `<p class="lede">The final starts in <b class="mpcount" data-next="${R.nextAt}">${Math.max(0, Math.ceil(v.nextIn))}</b> s. ${iq ? 'Get ready.' : 'You can watch it.'}</p>` : '';
+  return `<div class="col mpcol" style="width:min(700px,100%)">
+    <div class="kicker">${STAGE_LABEL[1]} · ${esc(R.trackName)} · ${R.laps} laps</div>
+    <h2>${head}</h2>
+    ${rowsTable(R.rows, me, badge)}
+    ${R.rows.some(r => r.adjusted) ? '<p class="lede small">* Timed by the server: that pilot’s game ran behind real time.</p>' : ''}
+    ${next}
+    ${v.notice ? `<p class="notice" role="status">${esc(v.notice)}</p>` : ''}
+    <div class="actbar"><div class="row">${mp('quit', v.armedQuit ? 'Confirm: leave tournament' : 'Leave tournament', { cls: 'btn' + (v.armedQuit ? ' danger' : '') })}</div></div>
+  </div>`;
+}
+const OUTCOME = { raced: '', forfeit: 'The other finalist left the final: the win is by forfeit.', walkover: 'Only one finalist was left: the win is by walkover.', distance: 'Neither finalist finished in time: the pilot who got further wins.', 'no-result': 'No finalist was left, so this tournament has no winner.' };
+function finalHTML(v) {
+  const C = v.complete, me = v.me, fin = C.stages.find(s => s.stage === 2), q = C.stages.find(s => s.stage === 1);
+  const won = C.winner === me, head = C.winner ? (won ? 'You win the tournament' : `${esc(C.winnerName)} wins the tournament`) : 'Tournament over';
+  const rw = v.reward, paid = v.paid;
+  const reward = rw ? `<div class="panel rewards"><div class="rw-top"><span>Your tournament reward</span><b class="cr">+${rw.CR.toLocaleString('en-US')} CR${rw.ST ? ` · +${rw.ST} ST` : ''}</b></div>
+      ${rw.lines.map(l => `<div class="rw-line"><span>${esc(l.name)}</span><b class="${l.CR ? 'cr' : 'st'}">${l.CR ? '+' + l.CR.toLocaleString('en-US') + ' CR' : ''}${l.CR && l.ST ? ' · ' : ''}${l.ST ? '+' + l.ST + ' ST' : ''}</b></div>`).join('')}
+      <div class="rw-bal"><span>${paid === false ? 'Not added' : paid === 'dup' ? 'Already added' : 'Balance'}</span>${walletHTML(v.wallet)}</div>${v.payNote ? `<p class="reason">${esc(v.payNote)}</p>` : ''}</div>`
+    : `<div class="panel"><p class="lede small" style="margin:0">${C.stages.length ? 'No reward this time: rewards are paid for races you finish.' : ''}</p></div>`;
+  return `<div class="col mpcol center" style="width:min(980px,100%)">
+    <div class="row between"><div class="kicker">Online tournament · complete</div>${walletHTML(v.wallet)}</div>
+    <h2>${head}</h2>
+    ${C.winner ? `<div class="unlockbar ace"><b>Winner: ${esc(C.winnerName)}</b>${C.runnerUpName ? `<span>Second: ${esc(C.runnerUpName)}</span>` : ''}${fin ? `<span>Final on ${esc(fin.trackName)} · 5 laps</span>` : ''}</div>` : ''}
+    ${OUTCOME[C.outcome] ? `<p class="lede">${OUTCOME[C.outcome]}</p>` : ''}
+    <div class="split2">
+      ${fin ? `<div><h3>Stage 2 · Final · ${esc(fin.trackName)}</h3>${rowsTable(fin.rows, me)}</div>` : ''}
+      ${q ? `<div><h3>Stage 1 · Qualifier · ${esc(q.trackName)}</h3>${rowsTable(q.rows, me, r => (C.qualified || []).includes(r.pid) ? '<span class="badge eq">Q</span>' : '')}</div>` : ''}
+    </div>
+    ${reward}
+    ${v.notice ? `<p class="notice" role="status">${esc(v.notice)}</p>` : ''}
+    <div class="actbar"><div class="row">${v.isHost ? mp('rematch', 'Start another tournament', { cls: 'btn primary', disabled: !v.canRematch, title: v.canRematch ? '' : 'Needs at least two connected pilots in the lobby' }) : ''}${mp('lobby', 'Back to lobby', { cls: v.isHost ? 'btn' : 'btn primary', disabled: !v.inLobby })}${mp('exit', 'Leave multiplayer')}</div></div>
+  </div>`;
+}
+
+// ---------- problems ----------
+function errorHTML(v) {
+  return `<div class="col mpcol center" style="width:min(560px,100%)"><div class="kicker">Online multiplayer</div><h2>${esc(v.title)}</h2>
+    <p class="lede">${esc(v.text)}</p>
+    <div class="actbar"><div class="row">${v.retry ? mp('retry', 'Try again', { cls: 'btn primary' }) : ''}<button class="btn" data-act="back" data-arg="mp">Back</button></div></div></div>`;
+}
+// in-race menu: the race keeps running (an online race cannot be paused)
+function raceMenuHTML(v) {
+  return `<div class="col center" style="width:min(460px,100%)"><h3>${esc(v.label)}</h3><h2>Online race</h2>
+    <p class="lede">The race keeps going while this menu is open.</p>
+    <div class="menu">${mp('menu:close', 'Keep racing', { cls: 'btn primary' })}${mp('menu:leave', v.armed ? 'Confirm: leave the tournament' : 'Leave the tournament', { cls: 'btn' + (v.armed ? ' danger' : '') })}</div></div>`;
+}
+
+return { STAGE_LABEL, reasonText, homeHTML, lobbyHTML, stageResultsHTML, finalHTML, errorHTML, raceMenuHTML };
+})();
+const __m__src_mp_rewards_js = (() => {
+// GALACTIC RUSH V8 — online tournament rewards, shared by the server (which works them out from its own results) and
+// the game (which checks what it is sent against the published results before paying it). Values follow the V7
+// economy (src/progress/economy.js): a race pays round(150 x field x laps x placement), with the field factor of a Pro
+// race (human rivals), the 5-lap factor 1.5 and V7's placement table. Only races a pilot actually finished pay; the
+// winner gets a bonus. The game pays a reward through the career's transaction system under the event id mp:<tid>,
+// which it refuses to pay twice. Credits and Style Tokens are the game's existing currencies: there is no separate one.
+const MP_REWARDS = Object.freeze({
+  base: 150, field: 1.3, laps: 1.5,
+  place: Object.freeze([1.25, 1.15, 1.08, 1.0, 0.95, 0.9]),
+  winner: Object.freeze({ CR: 500, ST: 3 }),
+  runnerUp: Object.freeze({ CR: 0, ST: 1 }),
+});
+const raceCredits = place => Math.round(MP_REWARDS.base * MP_REWARDS.field * MP_REWARDS.laps * (MP_REWARDS.place[place - 1] ?? MP_REWARDS.place[MP_REWARDS.place.length - 1]));
+const TID = /^t[0-9a-f]{10}$/; // the server's tournament ids (also valid in the career's event ledger as mp:<tid>)
+
+// stages: [{ stage, rows }], rows as in the results; winner/runnerUp: pids or null
+// returns { pid: { CR, ST, lines: [{ name, CR, ST }] } } for every pilot who earned something
+function tournamentRewards({ stages, winner, runnerUp }) {
+  const out = {};
+  const add = (pid, name, CR = 0, ST = 0) => { if (!CR && !ST) return; const o = out[pid] || (out[pid] = { CR: 0, ST: 0, lines: [] }); o.CR += CR; o.ST += ST; o.lines.push({ name, CR, ST }); };
+  for (const s of stages || []) {
+    const label = s.stage === 1 ? 'Qualifier' : 'Final';
+    for (const r of s.rows || []) if (r.status === 'finished') add(r.pid, `${label}: P${r.place}`, raceCredits(r.place));
+  }
+  if (winner) add(winner, 'Tournament winner', MP_REWARDS.winner.CR, MP_REWARDS.winner.ST);
+  if (runnerUp) add(runnerUp, 'Runner-up', MP_REWARDS.runnerUp.CR, MP_REWARDS.runnerUp.ST);
+  return out;
+}
+
+// The game's check before paying: the reward must be exactly what the published results give this pilot.
+// complete: the server's tournament summary; reward: { tid, CR, ST, lines }
+function checkReward(complete, pid, reward) {
+  if (!complete || !reward || typeof complete.tid !== 'string' || !TID.test(complete.tid) || reward.tid !== complete.tid) return { ok: false, why: 'tournament id' };
+  if (!Array.isArray(complete.stages) || !complete.stages.length || complete.stages.length > 2) return { ok: false, why: 'stages' };
+  const want = tournamentRewards(complete)[pid];
+  if (!want) return { ok: false, why: 'nothing earned in these results' };
+  const lines = Array.isArray(reward.lines) ? reward.lines : [];
+  const same = want.CR === reward.CR && want.ST === reward.ST && lines.length === want.lines.length
+    && want.lines.every((l, k) => lines[k] && lines[k].name === l.name && lines[k].CR === l.CR && lines[k].ST === l.ST);
+  return same ? { ok: true, reward: want } : { ok: false, why: 'amounts differ from the results' };
+}
+
+return { MP_REWARDS, raceCredits, TID, tournamentRewards, checkReward };
+})();
+const __m__src_mp_style_js = (() => {
+// GALACTIC RUSH V8 — styles for the online screens and the in-race online bar. Added to the page at run time by the
+// online mode, so the game's own stylesheet (index.html) is unchanged; built from its colour and type variables.
+const MP_CSS = `
+.mpcol { width: min(640px, 100%); }
+.mpcol > * { flex-shrink: 0; } /* a screen taller than the window scrolls; tables never squeeze to nothing */
+.mpform { display: grid; gap: 4px; }
+.mpform h3 { margin: 0; }
+.mpcol .setting > span > small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--dim); }
+.mpconn { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font: 600 11px var(--f-num); letter-spacing: .16em; text-transform: uppercase; }
+.mpconn .conn::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: currentColor; }
+.conn.on { color: var(--good); } .conn.off { color: var(--dim); } .conn.wait { color: var(--signal); }
+.mpconn .srv { color: var(--dim); letter-spacing: .04em; text-transform: none; font-weight: 500; }
+.mptext { background: rgba(0,0,0,.35); color: var(--ink); border: 1px solid var(--line-2); font: 15px var(--f-num); padding: 7px 10px; width: 210px; user-select: text; text-transform: uppercase; }
+.mptext.code { width: 130px; letter-spacing: .3em; }
+.mptext:focus { outline: 2px solid var(--signal); outline-offset: 1px; }
+.mpcodebox { display: grid; grid-template-columns: auto auto auto; gap: 6px 16px; align-items: center; justify-content: start; padding: 12px 16px; border: 1px solid var(--signal); background: rgba(255,181,71,.07); }
+.mpcodebox > span { font: 600 11px var(--f-num); letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+.mpcode { font: 400 34px var(--f-display); letter-spacing: .22em; color: var(--signal); user-select: all; }
+.mpcodebox small { grid-column: 1 / -1; color: var(--dim); font-size: 12.5px; }
+.mpnote p { margin: 6px 0 0; }
+.mplist td { vertical-align: middle; }
+.mpship .shipnav { gap: 14px; }
+.btn.armed-ok { border-color: var(--good); color: var(--good); }
+.btn.danger { border-color: var(--alert); }
+@media (max-width: 560px) { .mpcodebox { grid-template-columns: 1fr auto; } .mpcode { font-size: 28px; } .mptext { width: 100%; } }
+#mpbar { position: absolute; top: calc(max(14px, env(safe-area-inset-top)) + 84px * var(--hud, 1)); left: 50%; transform: translateX(-50%) scale(var(--hud, 1)); transform-origin: top center;
+  z-index: 12; display: flex; gap: 10px; align-items: center; padding: 5px 12px; max-width: calc(100vw - 32px); background: var(--plate); border: 1px solid var(--line);
+  font: 600 11px var(--f-num); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden; pointer-events: none; }
+#mpbar[hidden] { display: none; }
+#mpbar .stg { color: var(--dim); }
+#mpbar b { color: var(--signal); font-weight: 600; }
+#mpbar .good { color: var(--good); }
+#mpbar .warn { color: var(--alert); }
+#mpbar .key { color: var(--dim); font-weight: 500; }
+#mpbar button { pointer-events: auto; background: rgba(0,0,0,.3); border: 1px solid var(--line-2); color: var(--ink); padding: 1px 8px; cursor: pointer; font: inherit; letter-spacing: .1em; }
+#mpbar button:hover, #mpbar button:focus-visible { border-color: var(--signal); }
+`;
+function injectStyle(doc = document) {
+  if (doc.getElementById('mp-style')) return;
+  const s = doc.createElement('style'); s.id = 'mp-style'; s.textContent = MP_CSS; doc.head.appendChild(s);
+}
+
+return { MP_CSS, injectStyle };
+})();
+const __m__src_mp_controller_js = (() => {
+// GALACTIC RUSH V8 — the Online Multiplayer mode: its screens, the connection to the multiplayer server, lobbies, the
+// two-stage tournament as the server runs it, and the rewards. Everything authoritative happens on the server (lobby
+// membership, tournament progress, course choice, start, finish, qualification, winner, rewards); this module shows
+// what the server says, sends what the player does, and runs the local pilot's ship through the game's own race code
+// (netrace.js). It plugs into the game through a handful of calls from main.js (see README, "Changes to the game").
+const { SHIPS, shipById } = __m__src_config_js;
+const { ShipVisual } = __m__src_render_shipvis_js;
+const { esc } = __m__src_ui_garage_js;
+const { C, S, MP, ERRORS, normalizeName, normalizeCode, fmtTime } = __m__src_mp_protocol_js;
+const { Connection } = __m__src_mp_net_js;
+const { mpServer } = __m__src_mp_config_js;
+const { loadName, saveName, loadShip, saveShip, suggestName, loadSession, saveSession, clearSession } = __m__src_mp_identity_js;
+const { NetRace, mpLivery } = __m__src_mp_netrace_js;
+const { homeHTML, lobbyHTML, stageResultsHTML, finalHTML, errorHTML, raceMenuHTML, STAGE_LABEL, reasonText } = __m__src_mp_ui_js;
+const { checkReward } = __m__src_mp_rewards_js;
+const { injectStyle } = __m__src_mp_style_js;
+const shipDef = id => shipById(id) || SHIPS[0];
+
+class Multiplayer {
+  constructor(g) {
+    this.g = g; this.server = mpServer(); this.conn = null; this.view = null; // view: null (not in the online mode), home, lobby, race, stage, final, error
+    this.name = loadName() || suggestName(); this.code = ''; this.visibility = 'private';
+    this.ship = loadShip() || shipDef(g.progress.profile.selectedShip).id;
+    this.pid = null; this.serverName = null; this.serverTimeScale = 1; this.everOnline = false;
+    this.lobby = null; this.list = null; this.error = null; this.notice = null; this.flash = null; this.busy = false; this.copied = false;
+    this.netrace = null; this.results = null; this.complete = null; this.reward = null; this.paid = null; this.payNote = '';
+    this.armed = null; this.menuOpen = false; this.entrants = new Map(); this.timer = null; this.exiting = false; this.shown = null; this.barEl = null;
+    try { const j = normalizeCode(new URLSearchParams(location.search).get('join') || ''); if (j) this.code = j; } catch (e) { /* no query string */ }
+    injectStyle();
+    const root = g.ui.root;
+    root.addEventListener('input', e => { const el = e.target; if (el.dataset && el.dataset.mpin) this.typed(el); });
+    root.addEventListener('keydown', e => { const el = e.target; if (el.dataset && el.dataset.mpin && e.key === 'Enter') { e.preventDefault(); if (el.dataset.mpin === 'code') this.act('join'); else el.blur(); } });
+  }
+
+  // ---------- entering and leaving the mode ----------
+  enter() {
+    const g = this.g;
+    if (this.view == null) { this.prevMode = g.opts.mode; this.baseTimeScale = g.timeScale; }
+    this.view = 'home'; this.error = null; this.notice = null; this.exiting = false;
+    this.toAttract(); this.render();
+    if (this.server.url && !this.server.insecure) this.connect();
+  }
+  exit() {
+    const g = this.g;
+    this.teardownRace(); this.stopTimer(); this.hideBar(); this.dropConn();
+    this.view = null; this.lobby = null; this.list = null; this.results = null; this.complete = null; this.shown = null;
+    g.opts.mode = this.prevMode || 'quick'; if (this.baseTimeScale != null) g.timeScale = this.baseTimeScale;
+    g.toMenu();
+  }
+
+  // ---------- connection ----------
+  connect() {
+    if (!this.server.url || this.server.insecure) return;
+    if (this.conn && ['connecting', 'online', 'reconnecting'].includes(this.conn.state)) return;
+    this.dropConn();
+    const url = this.server.url;
+    const conn = this.conn = new Connection({ url, hello: () => { const s = loadSession(url); return { name: this.helloName(), token: s ? s.token : undefined, rid: this.netrace && !this.netrace.over ? this.netrace.rid : undefined }; } });
+    const on = (type, fn) => conn.on(type, m => { if (this.conn === conn) fn.call(this, m); });
+    on('conn', this.onConn); on(S.WELCOME, this.onWelcome); on(S.ERROR, this.onError); on(S.LOBBY, this.onLobby); on(S.LOBBIES, this.onLobbies); on(S.LEFT, this.onLeft);
+    on(S.PREPARE, this.onPrepare); on(S.START, m => { if (this.netrace) this.netrace.onStart(m); }); on(S.SNAP, m => { if (this.netrace) this.netrace.onSnap(m); });
+    on(S.FINISHED, m => { if (this.netrace) this.netrace.onFin(m); }); on(S.STATUS, m => { if (this.netrace) this.netrace.onStatus(m); });
+    on(S.RESULTS, this.onResults); on(S.COMPLETE, this.onComplete); on(S.NOTICE, this.onNotice);
+    conn.connect();
+  }
+  dropConn() { const c = this.conn; this.conn = null; if (c) c.close(); }
+  helloName() { return normalizeName(this.name) || this.serverName || suggestName(); }
+  online() { return !!this.conn && this.conn.online; }
+  send(type, payload = {}) { return this.conn ? this.conn.send(type, payload) : false; }
+  serverNow() { return this.conn ? this.conn.serverNow() : Date.now(); }
+  connLabel() {
+    const c = this.conn; if (!c) return null;
+    if ((c.state === 'reconnecting' || c.state === 'connecting') && !this.everOnline) return 'Connecting…';
+    if (c.state === 'failed') return c.reason === 'replaced' ? 'Signed in somewhere else' : 'Not connected';
+    return null;
+  }
+  retry() {
+    if (this.view === 'error') {
+      if (this.lobby) { this.errorView = { title: 'Reconnecting…', text: 'Trying to reach the multiplayer server again.', retry: false }; this.render(); }
+      else { this.view = 'home'; this.toAttract(); this.render(); }
+    }
+    this.dropConn(); this.error = null; this.connect(); this.refresh();
+  }
+
+  // ---------- server messages ----------
+  onConn(e) {
+    if (e.state !== 'online') this.busy = false;
+    if (e.state === 'online' && this.netrace) { // back online mid-race: anything the server may have missed goes again
+      const nr = this.netrace; nr.resendFinish();
+      if (nr.participant && !nr.out && !nr.startLocal) this.send(C.LOADED, { rid: nr.rid, ok: true });
+    }
+    if (e.state === 'failed') {
+      if (e.reason === 'replaced') return this.fail('Signed in somewhere else', 'This pilot connected to the server from another tab or window, so this one was disconnected. Close the other one, then try again here.');
+      if (e.reason === 'policy' || e.reason === 'unsupported') return this.fail('The server closed the connection', 'The multiplayer server refused this connection. Reload the page; if it keeps happening the server may not accept this website.');
+      if (this.view === 'home') this.error = this.everOnline ? 'The connection to the server was lost.' : 'Could not reach the multiplayer server. It may be offline, or this network may block it.';
+      else if (this.view === 'final') this.notice = 'Disconnected from the multiplayer server. This result and your reward are kept.'; // the tournament is over: keep its result on screen
+      else if (this.view) return this.fail('Connection lost', 'The connection to the multiplayer server was lost and did not come back within 30 seconds. Try again to rejoin your lobby.');
+    }
+    this.refresh();
+  }
+  onWelcome(m) {
+    this.pid = m.pid; this.serverName = m.name; this.everOnline = true;
+    this.serverTimeScale = Number.isFinite(m.timeScale) && m.timeScale > 0 ? m.timeScale : 1;
+    if (typeof m.token === 'string') saveSession(this.server.url, m.token);
+    if (!m.resumed && this.lobby) { // the server no longer has this pilot's lobby (it restarted, or the pilot was away too long)
+      this.teardownRace(); this.stopTimer(); this.lobby = null; this.results = null; this.complete = null;
+      this.view = 'home'; this.error = 'Your lobby is no longer on the server: it restarted, or you were away too long.'; this.toAttract(); this.render();
+    } else if (this.view === 'error' && !this.lobby) { this.view = 'home'; this.toAttract(); this.render(); }
+    if (this.view === 'home') this.send(C.LIST);
+    this.refresh();
+  }
+  onError(m) {
+    this.busy = false;
+    if (m.code === 'rate') return;
+    if (m.code === 'finish-rejected') { if (this.netrace) { this.netrace.rejected = m.reason || 'rejected'; this.bar(); } return; }
+    if (m.code === 'version') return this.fail('Update needed', m.text, false);
+    this.error = m.text || 'Something went wrong.';
+    if (this.view === 'race') { this.flash = { text: this.error, until: performance.now() + 5000 }; this.bar(); return; }
+    this.render(true);
+  }
+  onLobby(m) {
+    const L = m.lobby; if (!L || !Array.isArray(L.members)) return;
+    this.lobby = L; this.busy = false;
+    for (const e of L.members) this.entrants.set(e.pid, { pid: e.pid, name: e.name, ship: e.ship, paint: e.paint });
+    if (this.view === 'home' || this.view === 'error') { this.view = 'lobby'; this.error = null; this.notice = null; this.showcase(); this.render(); return; }
+    if (this.view === 'lobby' || this.view === 'final') { this.render(true); return; }
+    if (this.view === 'race') this.bar();
+  }
+  onLobbies(m) { this.list = Array.isArray(m.list) ? m.list : []; if (this.view === 'home') this.render(true); }
+  onLeft() {
+    clearTimeout(this.leaveT);
+    this.lobby = null; this.teardownRace(); this.stopTimer(); this.results = null; this.complete = null; this.notice = null; this.error = null;
+    if (this.exiting) { this.exiting = false; this.exit(); return; }
+    if (this.view == null) return;
+    this.view = 'home'; this.toAttract(); this.render(); this.send(C.LIST);
+  }
+  onPrepare(m) {
+    if (!this.lobby || !m || !Array.isArray(m.grid) || typeof m.rid !== 'string') return;
+    if (this.netrace && this.netrace.rid === m.rid) { // a resend after reconnecting: same race; confirm it is loaded in case that was lost
+      const nr = this.netrace; nr.onStatus({ rid: m.rid, statuses: m.status || {} });
+      if (nr.participant && !nr.startLocal) this.send(C.LOADED, { rid: m.rid, ok: true });
+      return;
+    }
+    this.teardownRace(); this.stopTimer();
+    for (const e of m.grid) this.entrants.set(e.pid, { pid: e.pid, name: e.name, ship: e.ship, paint: e.paint });
+    this.view = 'race'; this.shown = null; this.error = null; this.notice = null; this.armed = null;
+    this.g.timeScale = this.serverTimeScale; // 1 on a real server; a test server may run the race clock faster
+    try { this.netrace = new NetRace(this, m); }
+    catch (e) {
+      console.error('online race could not be set up', e); this.netrace = null; this.send(C.LOADED, { rid: m.rid, ok: false });
+      return this.fail('Could not load the race', 'This game could not set up the course for the race, so it is out of this race. You can stay in the lobby for the rest of the tournament.', false);
+    }
+    this.showBar(); this.startTimer();
+  }
+  onResults(m) {
+    if (!m || !Array.isArray(m.rows)) return;
+    this.teardownRace(); this.results = m;
+    this.podium(m.rows.slice(0, m.stage === 1 ? 3 : 2).map(r => r.pid));
+    if (m.stage === 1) { this.view = 'stage'; this.armed = null; this.render(); this.startTimer(); }
+    // the final's result arrives together with the tournament's completion (onComplete)
+  }
+  onComplete(m) {
+    if (!m || !Array.isArray(m.stages)) return;
+    this.teardownRace(); this.stopTimer(); this.complete = m; this.view = 'final'; this.armed = null;
+    this.credit(m);
+    this.podium([m.winner, m.runnerUp].filter(Boolean));
+    this.render();
+  }
+  onNotice(m) {
+    const nm = pid => (this.entrants.get(pid) || {}).name || 'A pilot';
+    if (m.kind === 'shutdown') { this.notice = 'The multiplayer server is restarting.'; this.flash = { text: this.notice, until: performance.now() + 8000 }; this.refresh(); }
+    else if (m.kind === 'finalists') {
+      const parts = [];
+      if (Array.isArray(m.dropped) && m.dropped.length) parts.push(`${m.dropped.map(nm).join(', ')} left before the final`);
+      if (Array.isArray(m.promoted) && m.promoted.length) parts.push(`${m.promoted.map(nm).join(', ')} moves up to race it`);
+      if (parts.length) { this.notice = parts.join(' · '); this.flash = { text: this.notice, until: performance.now() + 8000 }; this.refresh(); }
+    } else if (m.kind === 'state-rejected') console.warn('multiplayer: the server did not accept a ship state:', m.reason);
+  }
+
+  // ---------- rewards ----------
+  // Paid once per tournament through the career's transaction system (event id mp:<tid>), and only if the reward is
+  // exactly what the published results give this pilot.
+  credit(m) {
+    this.reward = m.reward || null; this.paid = null; this.payNote = '';
+    if (!this.reward) return;
+    const chk = checkReward(m, this.pid, this.reward);
+    if (!chk.ok) { this.paid = false; this.payNote = 'This reward did not match the published results, so it was not added.'; console.warn('multiplayer: reward refused:', chk.why); return; }
+    const rw = chk.reward;
+    const res = this.g.progress.transact('mp', `online tournament ${m.tid}`, (d, T) => { for (const l of rw.lines) { if (l.CR) T.credit('CR', l.CR, l.name); if (l.ST) T.credit('ST', l.ST, l.name); } }, { events: ['mp:' + m.tid] });
+    this.paid = res.ok ? true : res.duplicate ? 'dup' : false;
+    if (!res.ok && !res.duplicate) this.payNote = res.message || 'The reward could not be added.';
+    else if (res.ok && res.saved === false) this.payNote = 'Added, but this browser could not save your career.';
+  }
+
+  // ---------- player actions (data-act="mp") ----------
+  act(arg = '') {
+    const [k, v] = String(arg).split(':');
+    if (!(k === 'leave' || k === 'quit' || (k === 'menu' && v === 'leave'))) this.disarm();
+    switch (k) {
+      case 'open': this.enter(); return;
+      case 'back': this.exit(); return;
+      case 'connect': case 'retry': this.retry(); return;
+      case 'vis': this.visibility = v === 'public' ? 'public' : 'private'; this.render(true); return;
+      case 'list': this.send(C.LIST); return;
+      case 'create': this.create(); return;
+      case 'join': this.join(v || this.code); return;
+      case 'copy': this.copyCode(); return;
+      case 'ship': this.cycleShip(+v || 1); return;
+      case 'ready': { const me = this.me(); if (me) this.send(C.READY, { ready: !me.ready }); return; }
+      case 'handling': if (v === 'relaxed' || v === 'classic') this.send(C.SETTINGS, { handling: v }); return;
+      case 'visibility': if (v === 'private' || v === 'public') this.send(C.SETTINGS, { visibility: v }); return;
+      case 'start': this.error = null; this.send(C.START, {}); return;
+      case 'rematch': this.error = null; this.send(C.START, { rematch: true }); return;
+      case 'leave': if (this.arm('leave')) this.leaveLobby('home'); return;
+      case 'quit': if (this.arm('quit')) this.leaveLobby('home'); return;
+      case 'exit': this.leaveLobby('title'); return;
+      case 'lobby': if (this.lobby) { this.view = 'lobby'; this.error = null; this.notice = null; this.showcase(); this.render(); } return;
+      case 'menu': if (v === 'close') this.closeMenu(); else if (v === 'leave' && this.arm('menu')) { this.closeMenu(); this.leaveLobby('home'); } return;
+      case 'openmenu': this.openMenu(); return;
+      case 'watch': if (this.netrace && this.netrace.canWatch && this.netrace.spectate(+v || 1) && this.g.state === 'finishing') { this.g.state = 'race'; this.g.hud.show(true); } return;
+    }
+  }
+  // two presses for leaving: the first arms the button for four seconds
+  arm(which) {
+    if (this.armed === which) { this.disarm(); return true; }
+    this.armed = which; clearTimeout(this.armT);
+    this.armT = setTimeout(() => { if (this.armed === which) { this.armed = null; this.rerender(); } }, 4000);
+    this.rerender(); return false;
+  }
+  disarm() { if (this.armed) { this.armed = null; clearTimeout(this.armT); } }
+  rerender() { if (this.view === 'race') { if (this.menuOpen) this.renderMenu(); } else this.render(true); }
+  typed(el) { if (el.dataset.mpin === 'name') this.name = el.value; else if (el.dataset.mpin === 'code') this.code = el.value; }
+  me() { return this.lobby ? this.lobby.members.find(m => m.pid === this.pid) || null : null; }
+  paint() { return this.g.progress.custom(this.ship) || null; }
+  create() {
+    const name = normalizeName(this.name);
+    if (!name) { this.error = ERRORS['bad-name']; this.render(true); return; }
+    if (!this.online()) return;
+    saveName(name); this.error = null; this.busy = true;
+    this.send(C.CREATE, { name, ship: this.ship, paint: this.paint(), visibility: this.visibility, handling: this.g.settings.handling === 'classic' ? 'classic' : 'relaxed' });
+    this.render(true);
+  }
+  join(raw) {
+    const name = normalizeName(this.name), code = normalizeCode(raw || '');
+    if (!name) { this.error = ERRORS['bad-name']; this.render(true); return; }
+    if (!code) { this.error = ERRORS['bad-code']; this.render(true); return; }
+    if (!this.online()) return;
+    saveName(name); this.code = code; this.error = null; this.busy = true;
+    this.send(C.JOIN, { name, code, ship: this.ship, paint: this.paint() });
+    this.render(true);
+  }
+  copyCode() {
+    const code = this.lobby && this.lobby.code; if (!code) return;
+    const done = ok => {
+      this.copied = ok; this.notice = ok ? null : 'Copy the code by hand: select it and press Ctrl+C (Cmd+C on a Mac).'; this.render(true);
+      if (ok) setTimeout(() => { this.copied = false; if (this.view === 'lobby') this.render(true); }, 2000);
+    };
+    try { navigator.clipboard.writeText(code).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+  }
+  cycleShip(d) {
+    if (this.lobby && this.lobby.phase !== 'open') return;
+    const i = Math.max(0, SHIPS.findIndex(s => s.id === this.ship)), n = SHIPS.length;
+    this.ship = SHIPS[(i + d + n) % n].id; saveShip(this.ship);
+    if (this.lobby) this.send(C.SHIP, { ship: this.ship, paint: this.paint() });
+    if (this.view === 'lobby') { this.showcase(); this.render(true); }
+  }
+  // leave the lobby (and the tournament, if one is running); after: 'home' (online screen) or 'title' (main menu)
+  leaveLobby(after) {
+    this.exiting = after === 'title'; this.disarm();
+    if (this.lobby && this.online()) { this.send(C.LEAVE, {}); clearTimeout(this.leaveT); this.leaveT = setTimeout(() => this.onLeft(), 3000); return; }
+    if (this.lobby) { clearSession(); this.dropConn(); } // offline: start a new pilot session next time, so this one is not put back in the lobby
+    this.onLeft();
+    if (!this.exiting && this.view === 'home' && !this.conn) this.connect();
+  }
+
+  // ---------- scenes behind the screens ----------
+  toAttract() { const g = this.g; if (!(g.scene && g.scene.kind === 'course' && g.scene.attract)) g.startAttract(); this.calm(); g.audio.music('menu'); }
+  // the lobby: the hangar with the ship this pilot will race, in their paint job
+  showcase() {
+    const g = this.g, def = shipDef(this.ship), sv = new ShipVisual(g.gfx, def, mpLivery({ ship: def.id, paint: this.paint(), name: (this.me() || {}).name || this.myName() }, 1));
+    g.hangar.setShow([sv], 'showcase'); g.scene = { kind: 'hangar', mode: 'showcase' }; g.fx.clear(); g.audio.setEnv('hangar'); this.calm(); g.audio.music('menu');
+  }
+  // results: the game's podium with the top pilots' ships and paint jobs
+  podium(pids) {
+    const g = this.g, list = [];
+    pids.forEach((pid, k) => { const e = this.entrants.get(pid); if (e) list.push(new ShipVisual(g.gfx, shipDef(e.ship), mpLivery(e, k + 1))); });
+    g.hangar.setShow(list, 'podium'); g.scene = { kind: 'hangar', mode: 'podium' }; g.fx.clear(); g.audio.setEnv('hangar'); this.calm(); g.audio.music('finish');
+  }
+  calm() { const g = this.g; g.state = 'mp'; g.input.capture = false; g.hud.show(false); g.audio.engine(0, 0, false, false); g.ui.clearMessages(); }
+  myName() { return normalizeName(this.name) || this.serverName || 'PILOT'; }
+  teardownRace() {
+    const nr = this.netrace; if (!nr) return;
+    nr.destroy(); this.netrace = null; this.closeMenu(); this.hideBar();
+    const g = this.g; if (this.baseTimeScale != null) g.timeScale = this.baseTimeScale; g.slowmo = 0; this.calm();
+  }
+  fail(title, text, retry = true) {
+    this.teardownRace(); this.stopTimer();
+    this.view = 'error'; this.errorView = { title, text, retry };
+    this.toAttract(); this.render();
+  }
+
+  // ---------- screens ----------
+  canRematch() { const L = this.lobby; return this.online() && !!L && L.host === this.pid && L.phase === 'open' && !!L.rematch && L.members.filter(m => m.conn === 'ok').length >= MP.MIN_PLAYERS; }
+  render(keep = false) {
+    const g = this.g, v = this.view; if (!v || v === 'race') return;
+    const conn = { state: this.conn ? this.conn.state : 'idle', label: this.connLabel() };
+    let html, cls = 'scrim';
+    if (v === 'home') html = homeHTML({ server: this.server, conn, name: this.name, visibility: this.visibility, code: this.code, list: this.list, error: this.error, busy: this.busy, wallet: g.progress.wallet() });
+    else if (v === 'lobby') { if (!this.lobby) return; html = lobbyHTML({ lobby: this.lobby, wallet: g.progress.wallet(), error: this.error, notice: this.notice, copied: this.copied, armedLeave: this.armed === 'leave', conn }); }
+    else if (v === 'stage') { if (!this.results) return; html = stageResultsHTML({ results: this.results, me: this.pid, nextIn: this.results.nextAt ? (this.results.nextAt - this.serverNow()) / 1000 : 0, armedQuit: this.armed === 'quit', notice: this.notice }); }
+    else if (v === 'final') { if (!this.complete) return; html = finalHTML({ complete: this.complete, me: this.pid, reward: this.reward, paid: this.paid, payNote: this.payNote, wallet: g.progress.wallet(), isHost: !!this.lobby && this.lobby.host === this.pid, canRematch: this.canRematch(), inLobby: !!this.lobby, notice: this.error || this.notice }); }
+    else if (v === 'error') { html = errorHTML(this.errorView || { title: 'Online multiplayer', text: '', retry: true }); cls = 'full'; }
+    if (!html) return;
+    // a redraw while typing keeps the text field focused with the caret where it was
+    const a = document.activeElement, key = a && a.dataset && a.dataset.mpin, sel = key ? [a.selectionStart, a.selectionEnd] : null;
+    g.ui.show(html, cls, !key, keep && this.shown === v && !!g.ui.root.querySelector('.screen'));
+    this.shown = v;
+    if (key) { const el = g.ui.root.querySelector(`[data-mpin="${key}"]`); if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(sel[0], sel[1]); } catch (e) { /* not a text field */ } } }
+  }
+  refresh() { if (this.view === 'race') { if (this.menuOpen) this.renderMenu(); this.bar(); } else if (this.view) this.render(true); }
+
+  // ---------- in the race ----------
+  // keys during an online race (main.js hands them over): Esc / P / Start opens the online menu (an online race cannot
+  // be paused), C changes the camera, and when not flying (out, finished or eliminated) ← → or LB / RB switch pilot
+  raceKeys(I, padStart) {
+    const g = this.g, nr = this.netrace; if (!nr) return;
+    if (this.menuOpen) {
+      if (I.hit('Escape') || I.hit('KeyP') || padStart || I.padHit(1)) { this.closeMenu(); return; }
+      if (I.hit('ArrowDown') || I.padHit(13)) g.ui.nav(1);
+      if (I.hit('ArrowUp') || I.padHit(12)) g.ui.nav(-1);
+      if (I.padHit(0)) g.ui.activate();
+      return;
+    }
+    if (I.hit('Escape') || I.hit('KeyP') || padStart) { this.openMenu(); return; }
+    if (I.hit('KeyC') || I.padHit(15)) { const m = nr.spectating ? ['chase', 'far'] : ['chase', 'far', 'cockpit']; g.camMode = m[(m.indexOf(g.camMode) + 1) % m.length]; g.rig.snap = true; }
+    if (nr.canWatch) {
+      const l = I.hit('ArrowLeft') || I.hit('KeyA') || I.padHit(4) || I.padHit(14), r = I.hit('ArrowRight') || I.hit('KeyD') || I.padHit(5);
+      if ((l || r) && nr.spectate(l ? -1 : 1) && g.state === 'finishing') { g.state = 'race'; g.hud.show(true); }
+    }
+  }
+  openMenu() { if (!this.netrace || this.menuOpen) return; this.menuOpen = true; this.armed = null; this.g.input.capture = false; this.renderMenu(true); }
+  renderMenu(first = false) { const nr = this.netrace; if (!nr) return; this.g.ui.show(raceMenuHTML({ label: `${STAGE_LABEL[nr.stage] || 'Online race'} · ${nr.m.trackName}`, armed: this.armed === 'menu' }), 'scrim', true, !first); }
+  closeMenu() { if (!this.menuOpen) return; this.menuOpen = false; this.disarm(); this.g.ui.hide(); if (this.netrace) this.g.input.capture = true; }
+  showBar() {
+    if (!this.barEl) {
+      const el = this.barEl = document.createElement('div'); el.id = 'mpbar'; el.setAttribute('role', 'status');
+      (document.getElementById('app') || document.body).appendChild(el);
+      el.addEventListener('click', e => { const b = e.target.closest('[data-mpbar]'); if (b) { this.g.audio.ui('click'); this.act(b.dataset.mpbar); } });
+    }
+    this.barEl.hidden = false; this.barHTML = ''; this.bar();
+  }
+  hideBar() { if (this.barEl) this.barEl.hidden = true; }
+  // the online bar under the lap counter: stage, what is happening, who is being watched, connection trouble
+  bar() {
+    const nr = this.netrace, el = this.barEl; if (!nr || !el || el.hidden) return;
+    const t = performance.now(), c = this.conn, out = [`<span class="stg">${esc(STAGE_LABEL[nr.stage] || 'Online race')} · ${esc(nr.m.trackName)}</span>`];
+    let st = '';
+    if (!nr.startLocal) {
+      const T = this.lobby && this.lobby.tournament, ps = T && T.rid === nr.rid ? T.parts : null;
+      st = ps ? `Waiting for pilots · <b>${ps.filter(p => p.status !== 'loading').length}/${ps.length}</b> on the grid` : 'Waiting for pilots';
+    } else if (t < nr.startLocal - 3000) st = `Start in <b>${Math.ceil((nr.startLocal - t) / 1000)}</b>`;
+    else if (nr.out) st = `<span class="warn">Out of the race · ${esc(reasonText(nr.out))}</span>`;
+    else if (nr.me && nr.me.finished) st = nr.official != null ? `<span class="good">Finished · ${fmtTime(nr.official)}${nr.adjusted ? ' · timed by the server' : ''}</span>`
+      : nr.rejected ? `<span class="warn">Finish not accepted by the server (${esc(nr.rejected)})</span>` : `Finished · ${fmtTime(nr.provisional ? nr.provisional.time : null)} · confirming…`;
+    else if (!nr.participant) st = nr.stage === 2 ? 'Watching the final' : 'Watching';
+    if (st) out.push(`<span>${st}</span>`);
+    if (nr.closeAt) { const left = Math.ceil((nr.closeAt - this.serverNow()) / 1000); if (left > 0) out.push(`<span>Race closes in <b>${left}</b> s</span>`); }
+    if (nr.spectating) out.push(`<button data-mpbar="watch:-1" aria-label="Previous pilot">‹</button><span>Watching <b>${esc(nr.follow.remote.base)}</b></span><button data-mpbar="watch:1" aria-label="Next pilot">›</button>`);
+    else if (nr.canWatch && nr.watchable().length) out.push(`<button data-mpbar="watch:1">Watch others ›</button>`);
+    if (c && c.state !== 'online') out.push(`<span class="warn">${c.state === 'reconnecting' ? 'Connection lost · reconnecting…' : 'Not connected'}</span>`);
+    if (this.flash && t < this.flash.until) out.push(`<span>${esc(this.flash.text)}</span>`);
+    out.push('<button data-mpbar="openmenu">Menu · Esc</button>');
+    const html = out.join('');
+    if (html !== this.barHTML) { this.barHTML = html; el.innerHTML = html; }
+  }
+  startTimer() { if (!this.timer) this.timer = setInterval(() => this.tick(), 250); }
+  stopTimer() { clearInterval(this.timer); this.timer = null; }
+  tick() {
+    if (this.view === 'race') this.bar();
+    else if (this.view === 'stage') { const el = this.g.ui.root.querySelector('[data-next]'); if (el && this.results) el.textContent = String(Math.max(0, Math.ceil((this.results.nextAt - this.serverNow()) / 1000))); }
+    else this.stopTimer();
+  }
+}
+
+return { Multiplayer };
 })();
 const __m__src_render_props_js = (() => {
 // Background life and hazard props (original designs): capital carrier, hauler, patrol craft, traffic pod,
@@ -7289,6 +8513,8 @@ const { Progression, standingsOf } = __m__src_progress_index_js;
 const { CHAMPIONSHIP_REWARDS, DIFF_ORDER, lapMult } = __m__src_progress_economy_js;
 const { Garage } = __m__src_garage_js;
 const { champHubHTML, careerHTML } = __m__src_ui_garage_js;
+// V8: online multiplayer tournament mode (src/mp)
+const { Multiplayer } = __m__src_mp_controller_js;
 const $ = s => document.querySelector(s);
 const DEFAULTS = { handling: 'relaxed', sound: 'on', master: 0.8, music: 0.55, sfx: 0.9, sens: 1, padSens: 1, invert: 'false', assist: '0.3', cam: 'chase', preset: '',
   shadows: 'on', ao: 'on', volumetrics: 'on', motionBlur: 'on', grain: 'on', ca: 'on', flare: 'on', resScale: 1, dynRes: 'on', fov: 72, shake: 1, hudScale: 1,
@@ -7316,6 +8542,7 @@ class Game {
     this.audio = new Audio(); this.input = new Input(); this.ui = new UI(this); this.ui.recKey = id => this.recKey(id); this.hud = new HUD(); this.fx = new Effects(this.gfx); this.rig = new CameraRig();
     this.garage = new Garage(this); this.benchMode = params.has('bench');
     this.racefx = new RaceFX(this);
+    this.mp = new Multiplayer(this); // V8
     this.opts = { mode: params.get('mode') || 'quick', track: params.get('track') || 'foundry', laps: +(params.get('laps') || 3), diff: params.get('diff') || 'pro', ship: params.has('ship') ? +params.get('ship') : Math.max(0, SHIPS.findIndex(s => s.id === this.progress.profile.selectedShip)) };
     this.timeScale = +(params.get('ts') || 1); this.autotest = params.has('autotest'); this.camMode = this.settings.cam;
     this.state = 'loading'; this.acc = 0; this.t = 0; this.fps = 60; this.frames = 0; this.fpsT = 0; this.res = 1; this.ftAcc = 0; this.ftN = 0; this.slowmo = 0;
@@ -7476,8 +8703,10 @@ class Game {
       case 'diff': if (o.mode === 'champ' && !this.progress.champUnlocked(arg)) break; o.diff = arg; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
       case 'start': if (o.mode === 'champ' && !this.progress.champUnlocked(o.diff)) break; this.startRace(); break;
       case 'skip': if (this.state === 'intro') this.endIntro(); break;
+      case 'mp': this.mp.act(arg); break; // V8: online screens
       case 'back':
-        if (arg === 'pause') { this.ui.pause(); this.state = 'paused'; }
+        if (arg === 'mp') this.mp.act('back'); // V8: leaving the online screens closes the server connection
+        else if (arg === 'pause') { this.ui.pause(); this.state = 'paused'; }
         else if (arg === 'results') this.showResults();
         else if (this.state === 'ship') this.garage.leave(() => { this.state = 'title'; this.startAttract(); this.ui.title(this.touch); });
         else if (arg === 'title') { this.state = 'title'; if (this.scene.kind !== 'course') this.startAttract(); this.ui.title(this.touch); }
@@ -7613,6 +8842,7 @@ class Game {
 
   handleInput() {
     const I = this.input, st = this.state, padBack = I.padHit(1), padA = I.padHit(0), padStart = I.padHit(9);
+    if ((st === 'race' || st === 'finishing') && this.scene.mp) { this.mp.raceKeys(I, padStart); return; } // V8: an online race cannot be paused
     if (st === 'race') {
       if (I.hit('Escape') || I.hit('KeyP') || padStart) { this.state = 'paused'; this.ui.pause(); this.input.capture = false; this.audio.engine(0, 0, false, false); this.audio.duck(0.5, 0.2); }
       if (I.hit('KeyC') || I.padHit(15)) { const m = ['chase', 'far', 'cockpit']; this.camMode = m[(m.indexOf(this.camMode) + 1) % 3]; this.rig.snap = true; }

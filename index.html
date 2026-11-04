@@ -1,10 +1,5 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<script src="config.js"></script>
-<title>Galactic Rush V8</title>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Galactic Rush V9</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Saira+Semi+Condensed:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -297,8 +292,6 @@ tr.sum td { border-top: 1px solid var(--line); }
 @media (max-height: 800px) { .col { gap: 14px; } .menu .btn { padding-top: 7px; padding-bottom: 7px; } .menu .btn small { margin-top: 0; } }
 @media (prefers-reduced-motion: reduce) { .screen, .bn, #msg div, #reticle svg { animation: none !important; } }
 </style>
-</head>
-<body>
 <div id="app">
   <canvas id="gl"></canvas>
   <div id="markers"></div>
@@ -508,7 +501,7 @@ const AI_ROSTER = [
 ];
 
 const POINTS = [10, 8, 6, 5, 4, 3];
-const CHAMPIONSHIP = ['foundry', 'belt', 'spire', 'ring'];
+const CHAMPIONSHIP = ['foundry', 'belt', 'spire', 'ring', 'pelagos', 'ignara']; // V9: Pelagos and Ignara are rounds 5 and 6
 const SIM_DT = 1 / 120;
 
 return { SHIPS, shipById, STAT_BARS, DIFFICULTY, AI_ROSTER, POINTS, CHAMPIONSHIP, SIM_DT };
@@ -700,10 +693,281 @@ class Track {
 
 return { SPACING, Track };
 })();
+const __m__src_sim_pathtrack_js = (() => {
+// GALACTIC RUSH V9 — courses defined as a 3D path: a plan-view turtle (straights and arcs), a smooth height profile and
+// genuine vertical loops. The result has exactly the fields and methods of Track (track.js), so the race simulation,
+// the AI, the cameras, the renderer and the multiplayer server use it unchanged. Only the V9 courses (Pelagos, Ignara)
+// are built here; the V2–V8 courses are still built by Track from their filleted polygons, byte for byte as before.
+//
+// Course frames: on ordinary sections "up" is the world up (as in Track: right = tangent x up, then the bank angle); in
+// a loop "up" turns with the loop (the inward normal of the loop's own plane), so it points at the loop's centre all the
+// way round and is the world up again at both ends. Every frame stays orthonormal and continuous, so the flight model's
+// roll levelling, the steering assist, the wall collisions, progress, respawns and the chase camera all follow the
+// track through the full 360 degrees without any change to their code.
+//
+// def.path = { x, z, y, heading (deg, 0 = +z), w, h, segs: [...] }. Segments (plan turns: + = right):
+//   { s: length }                    straight
+//   { turn: deg, r: radius }         arc
+//   { loop: R, ramp, shift }         vertical loop: curvature eases in over `ramp` metres, holds 1/R, eases out (the
+//                                    total pitch is exactly 360 deg); the exit is `shift` metres to the right of the
+//                                    entry line (negative: left) so the corridor never passes through itself
+//   any segment may add y (height at its end), w, h (corridor half-width and half-height at its end; both ease in with
+//   smootherstep across the segment), bank (deg, arcs), tunnel: true, tag: 'name' (for the course builders)
+//   free: 'len' on two straights and free: 'turn' on one arc: the builder solves them so the circuit closes exactly
+const { Track, SPACING } = __m__src_sim_track_js;
+const { Vec3, clamp, smoother } = __m__src_math_js;
+const RAD = Math.PI / 180, DS = 0.5, UP = new Vec3(0, 1, 0);
+const dirOf = psi => [Math.sin(psi), Math.cos(psi)]; // plan direction (x, z) of heading psi
+const rightOf = psi => [-Math.cos(psi), Math.sin(psi)]; // tangent x up, as Track's binormal
+
+// Loop in its own plane: X forward, Y up; curvature k(s) = g(s)/R with g easing 0->1 over `ramp`, 1, then 1->0, so
+// the total turn is (L - ramp)/R = 2*PI for L = 2*PI*R + ramp. Integrated finely, then rescaled to exactly 2*PI.
+const LOOPS = new Map();
+function loopProfile(R, ramp) {
+  const key = R + '|' + ramp; if (LOOPS.has(key)) return LOOPS.get(key);
+  const L = 2 * Math.PI * R + ramp, n = Math.ceil(L / 0.05), h = L / n, g = s => s < ramp ? smoother(s / ramp) : s > L - ramp ? smoother((L - s) / ramp) : 1;
+  const phi = new Float64Array(n + 1); for (let k = 1; k <= n; k++) phi[k] = phi[k - 1] + (g((k - 0.5) * h) / R) * h;
+  const fix = 2 * Math.PI / phi[n]; let x = 0, y = 0; const X = new Float64Array(n + 1), Y = new Float64Array(n + 1);
+  for (let k = 1; k <= n; k++) { phi[k] *= fix; const a = (phi[k - 1] + phi[k]) / 2; x += Math.cos(a) * h; y += Math.sin(a) * h; X[k] = x; Y[k] = y; }
+  const at = s => { const f = clamp(s / h, 0, n), k = Math.min(n - 1, Math.floor(f)), u = f - k; return [X[k] + (X[k + 1] - X[k]) * u, Y[k] + (Y[k + 1] - Y[k]) * u, phi[k] + (phi[k + 1] - phi[k]) * u]; };
+  const P = { L, R, ramp, dx: X[n], dy: Y[n], top: Math.max(...Y), at };
+  LOOPS.set(key, P); return P;
+}
+// lateral drift across a loop: 0 -> 1 with zero slope at both ends
+const drift = u => u - Math.sin(2 * Math.PI * u) / (2 * Math.PI);
+
+// plan-view displacement of one segment for heading psi: [dx, dz, dpsi]
+function segMove(sg, psi) {
+  const [dx, dz] = dirOf(psi), [rx, rz] = rightOf(psi);
+  if (sg.loop) { const P = loopProfile(sg.loop, sg.ramp ?? 60), f = P.dx, l = sg.shift || 0; return [dx * f + rx * l, dz * f + rz * l, 0]; }
+  if (sg.turn) { const a = sg.turn * RAD, r = sg.r, fwd = r * Math.sin(Math.abs(a)), lat = r * (1 - Math.cos(Math.abs(a))) * Math.sign(a); return [dx * fwd + rx * lat, dz * fwd + rz * lat, -a]; }
+  return [dx * sg.s, dz * sg.s, 0];
+}
+
+// Solve the free segments so the plan closes: one free arc closes the heading (the turns add up to +-360 deg), then two
+// free straights close the position (a 2x2 linear system). Throws if the design cannot close with positive lengths.
+function closePlan(path) {
+  const segs = path.segs.map(s => ({ ...s })), turnFree = segs.filter(s => s.free === 'turn'), lenFree = segs.filter(s => s.free === 'len');
+  if (turnFree.length !== 1 || lenFree.length !== 2) throw new Error('a path needs one free arc and two free straights');
+  const total = segs.reduce((a, s) => a + (s.turn && s.free !== 'turn' ? s.turn : 0), 0), want = path.turns ?? 360;
+  turnFree[0].turn = want - total;
+  for (const s of lenFree) s.s = 0;
+  let psi = (path.heading || 0) * RAD, X = 0, Z = 0; const dirs = [];
+  for (const s of segs) { if (s.free === 'len') dirs.push(dirOf(psi)); const [dx, dz, dp] = segMove(s, psi); X += dx; Z += dz; psi += dp; }
+  const [a, b] = dirs, det = a[0] * b[1] - a[1] * b[0]; if (Math.abs(det) < 1e-6) throw new Error('free straights are parallel');
+  const L1 = (-X * b[1] + Z * b[0]) / det, L2 = (-Z * a[0] + X * a[1]) / det;
+  lenFree[0].s = L1; lenFree[1].s = L2;
+  if (!(L1 > (lenFree[0].min ?? 40) && L2 > (lenFree[1].min ?? 40))) throw new Error(`path does not close with positive straights (${L1.toFixed(1)}, ${L2.toFixed(1)}), free turn ${turnFree[0].turn.toFixed(1)}`);
+  return segs;
+}
+
+// Fine samples along the closed path (about DS metres apart): position, corridor size, bank target, up vector, tags
+function sample(path, segs) {
+  const pts = []; let psi = (path.heading || 0) * RAD, x = path.x || 0, z = path.z || 0, y = path.y ?? 0, w = path.w, h = path.h;
+  segs.forEach((sg, si) => {
+    const y0 = y, y1 = sg.y ?? y, w0 = w, w1 = sg.w ?? w, h0 = h, h1 = sg.h ?? h, push = (px, py, pz, u, ux, uy, uz, bank, loop) => {
+      const e = smoother(u); pts.push({ x: px, y: py, z: pz, w: w0 + (w1 - w0) * e, h: h0 + (h1 - h0) * e, ux, uy, uz, bank, loop, seg: si }); };
+    if (sg.loop) {
+      if (sg.y !== undefined && sg.y !== y) throw new Error('a loop keeps its height');
+      const P = loopProfile(sg.loop, sg.ramp ?? 60), n = Math.max(2, Math.ceil(P.L / DS)), [ex, ez] = dirOf(psi), [rx, rz] = rightOf(psi), sh = sg.shift || 0;
+      for (let k = 0; k < n; k++) { const u = k / n, [X, Y, ph] = P.at(u * P.L), lat = sh * drift(u);
+        push(x + ex * X + rx * lat, y + Y, z + ez * X + rz * lat, u, -ex * Math.sin(ph), Math.cos(ph), -ez * Math.sin(ph), 0, si); }
+      x += ex * P.dx + rx * sh; z += ez * P.dx + rz * sh;
+    } else if (sg.turn) {
+      const a = sg.turn * RAD, L = Math.abs(a) * sg.r, n = Math.max(2, Math.ceil(L / DS)), sgn = Math.sign(a), bank = sg.bank ?? sgn * Math.min(path.maxBank ?? 22, (path.bankK ?? 2600) / sg.r);
+      const [rx0, rz0] = rightOf(psi), cx = x + rx0 * sg.r * sgn, cz = z + rz0 * sg.r * sgn; // centre of the arc, on the inside
+      for (let k = 0; k < n; k++) { const u = k / n, p = psi - a * u, [rx, rz] = rightOf(p), e = smoother(u);
+        push(cx - rx * sg.r * sgn, y0 + (y1 - y0) * e, cz - rz * sg.r * sgn, u, 0, 1, 0, bank, -1); }
+      psi -= a; const [rx, rz] = rightOf(psi); x = cx - rx * sg.r * sgn; z = cz - rz * sg.r * sgn;
+    } else {
+      const n = Math.max(2, Math.ceil(sg.s / DS)), [dx, dz] = dirOf(psi);
+      for (let k = 0; k < n; k++) { const u = k / n, e = smoother(u); push(x + dx * sg.s * u, y0 + (y1 - y0) * e, z + dz * sg.s * u, u, 0, 1, 0, 0, -1); }
+      x += dx * sg.s; z += dz * sg.s;
+    }
+    y = y1; w = w1; h = h1;
+  });
+  const end = Math.hypot(x - (path.x || 0), z - (path.z || 0)), dpsi = Math.abs(((psi - (path.heading || 0) * RAD) / (2 * Math.PI)) % 1);
+  if (end > 0.05 || Math.min(dpsi, 1 - dpsi) > 1e-6 || Math.abs(y - (path.y ?? 0)) > 1e-6 || Math.abs(w - path.w) > 1e-6 || Math.abs(h - path.h) > 1e-6)
+    throw new Error(`path does not close: ${end.toFixed(3)} m, height ${(y - (path.y ?? 0)).toFixed(2)}, size ${(w - path.w).toFixed(2)} x ${(h - path.h).toFixed(2)}`);
+  return pts;
+}
+
+function buildPathTrack(def) {
+  const segs = closePlan(def.path), pts = sample(def.path, segs), M = pts.length;
+  // bank: the arcs' targets eased along the course (box filter over +-bankEase metres, twice); never inside a loop
+  const ease = Math.round((def.path.bankEase ?? 36) / DS); let bk = Float64Array.from(pts, p => p.bank);
+  for (let pass = 0; pass < 2; pass++) { const o = new Float64Array(M); let acc = 0; for (let k = -ease; k <= ease; k++) acc += bk[(k + M) % M];
+    for (let i = 0; i < M; i++) { o[i] = acc / (2 * ease + 1); acc += bk[(i + ease + 1) % M] - bk[(i - ease + M) % M]; } bk = o; }
+  pts.forEach((p, i) => { p.bank = p.loop >= 0 ? 0 : bk[i]; });
+  const t = Object.create(Track.prototype);
+  t.def = def; t.id = def.id; t.name = def.name; t.segs = segs;
+  // uniform samples SPACING apart along the 3D length, starting at the start line (the first segment)
+  const s3 = new Float64Array(M + 1); for (let i = 1; i <= M; i++) { const a = pts[i - 1], b = pts[i % M]; s3[i] = s3[i - 1] + Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z); }
+  const L = s3[M], N = Math.round(L / SPACING); t.length = L; t.N = N; t.D = L / N;
+  t.pos = []; t.tan = []; t.nrm = []; t.bin = []; t.w = new Float32Array(N); t.h = new Float32Array(N); t.bank = new Float32Array(N);
+  t.loopId = new Int8Array(N).fill(-1); t.segIdx = new Int16Array(N); const ups = [];
+  let j = 0;
+  for (let i = 0; i < N; i++) {
+    const s = i * t.D; while (s3[j + 1] < s) j++;
+    const a = pts[j], b = pts[(j + 1) % M], u = (s - s3[j]) / (s3[j + 1] - s3[j] || 1), L3 = (k) => a[k] + (b[k] - a[k]) * u;
+    t.pos.push(new Vec3(L3('x'), L3('y'), L3('z'))); t.w[i] = L3('w'); t.h[i] = L3('h'); t.bank[i] = L3('bank') * RAD;
+    ups.push(new Vec3(L3('ux'), L3('uy'), L3('uz')).normalize());
+    const near = u < 0.5 ? a : b; t.segIdx[i] = near.seg; if (a.loop >= 0 && b.loop >= 0) t.loopId[i] = a.loop;
+  }
+  for (let i = 0; i < N; i++) {
+    const T = new Vec3().subVectors(t.pos[(i + 1) % N], t.pos[(i - 1 + N) % N]).normalize();
+    const B = new Vec3().crossVectors(T, ups[i]).normalize(), Nn = new Vec3().crossVectors(B, T);
+    const c = Math.cos(t.bank[i]), s = Math.sin(t.bank[i]);
+    t.tan.push(T); t.bin.push(new Vec3(B.x * c - Nn.x * s, B.y * c - Nn.y * s, B.z * c - Nn.z * s)); t.nrm.push(new Vec3(Nn.x * c + B.x * s, Nn.y * c + B.y * s, Nn.z * c + B.z * s));
+  }
+  // curvature and the smoothed racing line: the same formulas as Track
+  t.kLat = new Float32Array(N); t.kVert = new Float32Array(N); t.kAbs = new Float32Array(N);
+  const dT = new Vec3();
+  for (let i = 0; i < N; i++) { dT.subVectors(t.tan[(i + 1) % N], t.tan[(i - 1 + N) % N]).scale(1 / (2 * t.D)); t.kLat[i] = dT.dot(t.bin[i]); t.kVert[i] = dT.dot(t.nrm[i]); t.kAbs[i] = dT.len(); }
+  const smooth = (arr, r, passes) => { let a = arr; for (let p = 0; p < passes; p++) { const o = new Float32Array(N); for (let i = 0; i < N; i++) { let sum = 0; for (let k = -r; k <= r; k++) sum += a[(i + k + N) % N]; o[i] = sum / (2 * r + 1); } a = o; } return a; };
+  t.kLatS = smooth(t.kLat, 10, 2); t.kVertS = smooth(t.kVert, 10, 2);
+  t.lineX = new Float32Array(N); t.lineY = new Float32Array(N);
+  for (let i = 0; i < N; i++) { t.lineX[i] = clamp(t.kLatS[i] * 90, -1, 1) * Math.max(0, t.w[i] - 7) * 0.75; t.lineY[i] = clamp(t.kVertS[i] * 90, -1, 1) * Math.max(0, t.h[i] - 6) * 0.6; }
+  // tunnels and tags from the segments
+  t.tunnel = new Uint8Array(N); t.tags = new Map();
+  for (let i = 0; i < N; i++) { const sg = segs[t.segIdx[i]]; if (sg.tunnel) t.tunnel[i] = 1; if (sg.tag) { if (!t.tags.has(sg.tag)) t.tags.set(sg.tag, []); t.tags.get(sg.tag).push(i); } }
+  // loops: sample range, entry frame and geometry, for the course builders
+  t.loops = [];
+  segs.forEach((sg, si) => { if (!sg.loop) return; let i0 = -1, i1 = -1; for (let i = 0; i < N; i++) if (t.loopId[i] === si) { if (i0 < 0) i0 = i; i1 = i; }
+    const e = new Vec3().copy(t.tan[t.wrapIdx(i0 - 2)]); e.y = 0; e.normalize(); const r = new Vec3().crossVectors(e, UP).normalize(), base = t.pos[t.wrapIdx(i0 - 1)].clone();
+    t.loops.push({ seg: si, i0, i1, R: sg.loop, ramp: sg.ramp ?? 60, shift: sg.shift || 0, e, r, base, profile: loopProfile(sg.loop, sg.ramp ?? 60), tag: sg.tag }); });
+  // checkpoints (index 0 = start/finish line): evenly spaced, or at the fractions the course lists
+  const C = def.checkpoints || 8, at = def.cpAt || Array.from({ length: C }, (_, k) => k / C);
+  t.cpS = []; t.cpIdx = []; for (const f of at) { const i = Math.round(f * N) % N; t.cpIdx.push(i); t.cpS.push(i * t.D); }
+  t.obstacles = []; t.lasers = []; t.traffic = []; t.pads = []; t.cells = []; t.buckets = new Map();
+  return t;
+}
+
+return { loopProfile, closePlan, buildPathTrack };
+})();
+const __m__src_sim_tracks_v9_js = (() => {
+// GALACTIC RUSH V9 — the two new courses, Pelagos (ocean world, two vertical loops) and Ignara (volcanic world).
+// Both are 3D paths built by pathtrack.js; tracks.js appends them to TRACK_DEFS after the four original courses.
+// populate() places checkpoints, boost rings, energy cells and hazards with its own seeded random stream.
+const frac = (t, f) => Math.floor(f * t.N) % t.N;
+const nearAny = (t, i, list, gap) => list.some(o => Math.abs(t.deltaS(i * t.D, o.i * t.D)) < gap);
+const inLoop = (t, i, pad = 0) => { for (let k = -pad; k <= pad; k++) if (t.loopId[t.wrapIdx(i + k)] >= 0) return true; return false; };
+const tagged = (t, tag) => t.tags.get(tag) || [];
+const along = (t, tag, f) => { const a = tagged(t, tag); return a[Math.min(a.length - 1, Math.floor(f * a.length))]; };
+// sample at fraction f of the k-th segment that carries a tag
+const alongSeg = (t, tag, k, f) => { const ids = [...new Set(tagged(t, tag).map(i => t.segIdx[i]))], a = tagged(t, tag).filter(i => t.segIdx[i] === ids[k]); return a[Math.min(a.length - 1, Math.floor(f * a.length))]; };
+
+// checkpoints evenly spaced along the course outside its loops (a gate frame reads better on open track); index 0 is
+// the start line
+function checkpoints(t, n) {
+  const ok = []; for (let i = 0; i < t.N; i++) if (!inLoop(t, i, 12)) ok.push(i);
+  t.cpIdx = []; t.cpS = [];
+  for (let k = 0; k < n; k++) { const i = ok[Math.round(k * ok.length / n)]; t.cpIdx.push(i); t.cpS.push(i * t.D); }
+  if (t.cpIdx[0] !== 0) throw new Error('the start line must be checkpoint 0');
+}
+// boost rings on the racing line
+function pads(t, list) { for (const i of list) t.pads.push({ i, x: t.lineX[i], y: t.lineY[i], r: 8 }); }
+// clusters of four energy cells along one side of the corridor (the third of every other cluster carries an ion bolt)
+function cells(t, list, rng, side0 = 1) {
+  list.forEach((i0, k) => { const side = (k % 2 ? -1 : 1) * side0;
+    for (let j = 0; j < 4; j++) { const i = t.wrapIdx(i0 + j * 5); t.cells.push({ i, x: side * t.w[i] * 0.45 + rng.range(-2, 2), y: rng.range(-0.3, 0.3) * t.h[i], ion: j === 3 && k % 3 === 1 }); } });
+}
+// energy cells in a loop sit on its inside line (toward the loop's centre), where the fast line runs
+function loopCells(t, i0, rng) { for (let j = 0; j < 5; j++) { const i = t.wrapIdx(i0 + j * 6); t.cells.push({ i, x: rng.range(-2, 2), y: t.h[i] * 0.4, ion: j === 2 }); } }
+
+const V9_TRACKS = [
+  {
+    id: 'pelagos', name: 'Pelagos', short: 'OCEAN WORLD', theme: 'ocean', checkpoints: 9, seed: 71,
+    tagline: 'Skim a storm-tossed ocean, thread the extraction rigs and fly two full vertical loops above the waves.',
+    path: { x: 0, z: 0, y: 40, heading: 0, w: 30, h: 20, turns: 360, segs: [
+      { s: 300, tag: 'start' },
+      { turn: 30, r: 450, y: 26 },
+      { s: 200, y: 16, h: 10, w: 26, tag: 'skim' },
+      { s: 380, tag: 'skim' },
+      { turn: -30, r: 400, y: 56, w: 30, h: 18 },
+      { s: 220, w: 18, h: 13, y: 66, tag: 'preloop1' },
+      { loop: 150, ramp: 90, shift: 56, tag: 'loop1' },
+      { s: 180, w: 30, h: 20, tag: 'postloop1' },
+      { turn: 135, r: 190, y: 42, tag: 'hook' },
+      { s: 160, w: 22, tag: 'narrows' },
+      { turn: -40, r: 200, tag: 'narrows' },
+      { turn: 40, r: 200, w: 28, tag: 'narrows' },
+      { s: 200, y: 52, h: 18, tag: 'bridge' },
+      { turn: 45, r: 450, tag: 'island' },
+      { s: 200, y: 66, w: 18, h: 13, tag: 'preloop2' },
+      { loop: 135, ramp: 80, shift: -56, tag: 'loop2' },
+      { s: 180, w: 30, h: 20, tag: 'postloop2' },
+      { turn: 45, r: 350, free: 'turn', y: 40, tag: 'flare' },
+      { s: 260, y: 18, h: 11, w: 26, tag: 'swell' },
+      { s: 400, free: 'len', tag: 'swell' },
+      { s: 240, y: 40, h: 20, w: 30, tag: 'return' },
+      { turn: 45, r: 300, tag: 'return' },
+      { s: 300, free: 'len', tag: 'return' },
+      { turn: 90, r: 260, tag: 'final' },
+      { s: 120, tag: 'final' },
+    ] },
+    populate(t, rng) {
+      checkpoints(t, this.checkpoints);
+      pads(t, [along(t, 'start', 0.5), along(t, 'skim', 0.55), along(t, 'postloop1', 0.6), along(t, 'bridge', 0.5), along(t, 'postloop2', 0.6), along(t, 'swell', 0.5), along(t, 'return', 0.7)]);
+      cells(t, [along(t, 'skim', 0.2), along(t, 'narrows', 0.1), along(t, 'island', 0.4), along(t, 'return', 0.35)], rng);
+      for (const L of t.loops) loopCells(t, t.wrapIdx(L.i0 + Math.round((L.i1 - L.i0) * 0.42)), rng);
+      // the narrows: two support columns of the extraction platform stand in the straight, clear of the racing line,
+      // then a pipe bridge spans the corridor at the end of the S-bend
+      for (const [f, sx] of [[0.3, 1], [0.75, -1]]) { const i = alongSeg(t, 'narrows', 0, f); t.addObstacle({ type: 'vbeam', i, x: sx * t.w[i] * 0.45, r: 3.5 }); }
+      { const i = along(t, 'narrows', 0.86); t.addObstacle({ type: 'hbeam', i, y: t.h[i] * 0.4, r: 2.8 }); }
+    },
+  },
+  {
+    id: 'ignara', name: 'Ignara', short: 'VOLCANIC WORLD', theme: 'volcano', checkpoints: 9, seed: 83,
+    tagline: 'Race a lava canyon, drop down the falls, burn through a ridge tunnel and cross the mines on molten bridges.',
+    path: { x: 0, z: 0, y: 60, heading: 0, w: 24, h: 16, turns: -360, segs: [
+      { s: 320, tag: 'start' },
+      { turn: -40, r: 300, y: 32, tag: 'descent' },
+      { s: 260, y: 20, h: 12, tag: 'canyon' },
+      { turn: 35, r: 260, tag: 'canyon' },
+      { turn: -45, r: 240, tag: 'canyon' },
+      { s: 220, tag: 'canyon' },
+      { s: 300, y: -40, tag: 'falls' },
+      { turn: -150, r: 80, w: 18, h: 13, tag: 'hairpin' },
+      { s: 180, w: 20, h: 14, y: -20, tag: 'basin' },
+      { s: 380, y: 45, w: 18, h: 13, tunnel: true, tag: 'tunnel' },
+      { s: 150, y: 72, w: 24, h: 16, tag: 'portal' },
+      { turn: 60, r: 450, y: 120, w: 26, tag: 'ridge' },
+      { s: 300, tag: 'ridge' },
+      { turn: -70, r: 300, y: 80, w: 24, tag: 'ridgedown' },
+      { s: 350, y: 70, tag: 'bridge' },
+      { turn: -55, r: 110, w: 20, h: 14, tag: 'mine' },
+      { turn: 55, r: 110, tag: 'mine' },
+      { turn: -40, r: 220, w: 24, h: 16, tag: 'arch' },
+      { s: 300, free: 'len', y: 60, tag: 'flats' },
+      { turn: -90, r: 260, free: 'turn', tag: 'sweep' },
+      { s: 200, tag: 'sweep' },
+      { turn: -20, r: 300, tag: 'final' },
+      { s: 150, free: 'len', tag: 'final' },
+    ] },
+    populate(t, rng) {
+      checkpoints(t, this.checkpoints);
+      pads(t, [along(t, 'start', 0.55), along(t, 'canyon', 0.3), along(t, 'basin', 0.5), along(t, 'ridge', 0.6), along(t, 'bridge', 0.4), along(t, 'flats', 0.5)]);
+      cells(t, [along(t, 'canyon', 0.6), along(t, 'tunnel', 0.25), along(t, 'ridge', 0.25), along(t, 'mine', 0.2), along(t, 'final', 0.2)], rng);
+      // basalt columns rising out of the lava river in the canyon, and two in the basin below the falls
+      // (on the straights, outside the racing line)
+      for (const [tag, k, f, sx] of [['canyon', 0, 0.5, 1], ['canyon', 3, 0.45, -1], ['basin', 0, 0.55, -1]]) { const i = alongSeg(t, tag, k, f); t.addObstacle({ type: 'vbeam', kind: 'basalt', i, x: sx * t.w[i] * 0.45, r: 3.8 }); }
+      // the tunnel: two rock ribs across the bore
+      for (const f of [0.35, 0.7]) { const i = along(t, 'tunnel', f); t.addObstacle({ type: 'hbeam', kind: 'rib', i, y: (f < 0.5 ? -1 : 1) * t.h[i] * 0.42, r: 2.6 }); }
+      // the mine: a conveyor gantry over the chicane, above the racing line
+      { const i = along(t, 'mine', 0.5); t.addObstacle({ type: 'hbeam', i, y: t.h[i] * 0.55, r: 2.8 }); }
+    },
+  },
+];
+
+return { V9_TRACKS };
+})();
 const __m__src_sim_tracks_js = (() => {
 // Course definitions (all original). Each course: filleted polygon + hazards placed by populate().
 const { Track } = __m__src_sim_track_js;
 const { makeRng, Vec3 } = __m__src_math_js;
+const { buildPathTrack } = __m__src_sim_pathtrack_js;
+const { V9_TRACKS } = __m__src_sim_tracks_v9_js;
 const TOP = 18; // trench rim height for Foundry Trench
 const tv = (x, z, floor, r, w) => ({ x, z, r, w, y: (TOP + floor) / 2, h: (TOP - floor) / 2 });
 
@@ -820,13 +1084,14 @@ const TRACK_DEFS = [
     },
   },
 ];
+TRACK_DEFS.push(...V9_TRACKS); // V9: Pelagos and Ignara, built as 3D paths (pathtrack.js)
 
 const cache = new Map();
 function getTrack(id) {
   if (!cache.has(id)) {
     const def = TRACK_DEFS.find(d => d.id === id);
     if (!def) throw new Error('unknown track ' + id);
-    const t = new Track(def);
+    const t = def.path ? buildPathTrack(def) : new Track(def);
     def.populate(t, makeRng(def.seed));
     t.updateObstacles(0);
     cache.set(id, t);
@@ -4104,8 +4369,8 @@ const SINGLE_RACE = {
 // Time trial: no rivals, so no difficulty or placement factor; a practice wage per run.
 const TIME_TRIAL = { base: 60 };
 
-// Championships: four rounds. Each round pays its own (slightly smaller) race reward; finishing all four rounds pays a
-// completion bonus once per run, plus a final-standing bonus. Both bonuses scale with difficulty and lap count.
+// Championships: one round per course of the calendar (config.js: six since V9, four before). Each round pays its own
+// (slightly smaller) race reward; finishing every round pays a completion bonus once per run, plus a final-standing bonus. Both bonuses scale with difficulty and lap count.
 const CHAMPIONSHIP_REWARDS = {
   race: { base: 140, difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6 }, placement: [1.25, 1.15, 1.08, 1.0, 0.95, 0.9] },
   completion: { rookie: 500, pro: 800, ace: 1200 }, // x lap multiplier
@@ -4607,6 +4872,7 @@ const __m__src_progress_rewards_js = (() => {
 // GALACTIC RUSH V7 — reward calculation (pure functions, no state): single races, time trials, championship rounds and
 // completion. Results carry their own breakdown so the results screens can show exactly how a number was made.
 const { SINGLE_RACE, TIME_TRIAL, CHAMPIONSHIP_REWARDS: CR_, DIFF_ORDER, lapMult, TOKEN_SOURCES, MILESTONES } = __m__src_progress_economy_js;
+const { CHAMPIONSHIP } = __m__src_config_js;
 const pick = (arr, place) => arr[Math.min(arr.length - 1, Math.max(0, place - 1))];
 const DLAB = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace' };
 
@@ -4638,12 +4904,13 @@ const nextDifficulty = diff => DIFF_ORDER[DIFF_ORDER.indexOf(diff) + 1] || null;
 function tokenLines(ctx) { return TOKEN_SOURCES.filter(s => s.when(ctx)).map(s => ({ id: s.id, name: s.name, ST: s.ST })); }
 function milestonesReached(stats, claimed) { return MILESTONES.filter(m => !claimed.includes(m.id) && (stats[m.stat] || 0) >= m.at); }
 
-// Economy table for documentation and tests: credits for an average finish (P3) per race type
+// Economy table for documentation and tests: credits for an average finish (P3) per race type; a championship run is
+// compared with the same number of single races (V9: six rounds)
 function economyTable() {
-  const rows = [];
+  const rows = [], n = CHAMPIONSHIP.length;
   for (const diff of DIFF_ORDER) for (const laps of [1, 3, 5]) {
     const s = singleRaceReward({ diff, laps, place: 3 }).credits, c = champRaceReward({ diff, laps, place: 3 }).credits, b = champCompletionReward({ diff, laps, standing: 3 });
-    rows.push({ diff, laps, single: s, champRound: c, champTotalP3: c * 4 + b.completion + b.standing, fourSingles: s * 4 });
+    rows.push({ diff, laps, rounds: n, single: s, champRound: c, champTotalP3: c * n + b.completion + b.standing, sameSingles: s * n });
   }
   return rows;
 }
@@ -5173,6 +5440,7 @@ return { esc, DIFF_LABEL, walletHTML, garageHTML, tabShip, tabUpgrades, tabPaint
 const __m__src_ui_js = (() => {
 // Menus, banners and messages (DOM). The in-race HUD lives in hud.js.
 const { SHIPS, STAT_BARS, DIFFICULTY, CHAMPIONSHIP } = __m__src_config_js;
+const ROUNDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'][CHAMPIONSHIP.length] || String(CHAMPIONSHIP.length); // V9: the calendar has six rounds
 const { TRACK_DEFS } = __m__src_sim_tracks_js;
 const { walletHTML, rewardHTML, ladderHTML, DIFF_LABEL } = __m__src_ui_garage_js;
 const $ = s => document.querySelector(s);
@@ -5235,7 +5503,7 @@ class UI {
       <div class="menu">
         ${run ? `<button class="btn primary" data-act="champContinue">Continue championship<small>${DIFF_LABEL[run.diff]} · round ${run.round + 1} of ${CHAMPIONSHIP.length}</small></button>` : ''}
         <button class="btn${run ? '' : ' primary'}" data-act="mode" data-arg="quick">Quick race<small>One course, five rivals · earn credits every race</small></button>
-        <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : 'Four rounds · Rookie → Pro → Ace'}</small></button>
+        <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : `${ROUNDS} rounds · Rookie → Pro → Ace`}</small></button>
         <button class="btn" data-act="mode" data-arg="trial">Time trial<small>Race your ghost for the course record</small></button>
         <button class="btn" data-act="mp" data-arg="open">Online multiplayer<small>Tournament against real pilots · qualifier and final</small></button>
         <button class="btn" data-act="garage">Garage<small>Upgrades, paint shop, inventory and cosmetic shop</small></button>
@@ -5266,7 +5534,7 @@ class UI {
     const list = champ ? CHAMPIONSHIP.map(id => TRACK_DEFS.find(d => d.id === id)) : TRACK_DEFS;
     this.show(`<div class="col center" style="width:min(1000px,100%)">
       <h3>${champ ? 'Championship calendar' : trial ? 'Time trial · choose a course' : 'Quick race · choose a course'}</h3>
-      <h2>${champ ? 'Four rounds' : 'Select course'}</h2>
+      <h2>${champ ? `${ROUNDS} rounds` : 'Select course'}</h2>
       <div class="cards">${list.map((d, k) => { const b = save.best[this.recKey ? this.recKey(d.id) : d.id];
         return `<button class="card" data-act="${champ ? 'noop' : 'track'}" data-arg="${d.id}" aria-pressed="${!champ && o.track === d.id}"><canvas data-map="${d.id}" width="320" height="200"></canvas>
           <span class="chip">${champ ? 'Round ' + (k + 1) : d.short}</span><span class="t">${d.name}</span><span class="d">${d.tagline}</span>
@@ -5786,7 +6054,7 @@ const __m__src_mp_protocol_js = (() => {
 // Every message is a JSON object { t: type, ...fields }. Ship states travel as compact arrays (packState / unpackState).
 // This file has no browser or Node dependencies so both sides validate messages with the same rules.
 
-const PROTOCOL = 1;
+const PROTOCOL = 2; // V9: the course list grew (Pelagos, Ignara); a game and a server must have the same courses
 const MP = Object.freeze({
   MAX_PLAYERS: 6,          // the starting grid has six slots
   MIN_PLAYERS: 2,
@@ -8478,6 +8746,840 @@ function buildRing(gfx, t) {
 
 return { buildRing };
 })();
+const __m__src_render_courses_v9kit_js = (() => {
+// GALACTIC RUSH V9 — shared kit for the two new worlds (Pelagos, Ignara): their own shader programs (ocean, cloud deck,
+// lava, volcanic ground), registered on the renderer at load time next to its existing programs (gfx.js is unchanged:
+// these programs read the same scene uniforms it already supplies), a corridor clearance test so that no scenery
+// intrudes into the racing corridor, and geometry helpers. Nothing here is used by the four original courses.
+const { Vec3, Quat } = __m__src_math_js;
+const { Geo } = __m__src_render_geo_js;
+// ---------------------------------------------------------------- shaders
+const VS = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=2) in vec4 aCol; layout(location=8) in vec4 aMat;
+layout(location=3) in vec4 aI0; layout(location=4) in vec4 aI1; layout(location=5) in vec4 aI2; layout(location=6) in vec4 aI3; layout(location=7) in vec4 aICol;
+uniform mat4 uModel, uVP;
+out vec3 vN; out vec3 vW; out vec4 vC; out vec4 vM; out vec3 vL;
+void main(){ mat4 m = uModel*mat4(aI0, aI1, aI2, aI3); vec4 w = m*vec4(aPos, 1.); vW = w.xyz; vL = aPos; vN = mat3(m)*aNor; vC = aCol*vec4(aICol.rgb, 1.); vM = aMat; gl_Position = uVP*w; }`;
+
+// scene lighting shared by the V9 surface shaders: sun (GGX), image-based sky light, sun shadows, up to four point
+// lights and the same distance and height fog as the main PBR shader
+const LIGHT = `
+uniform vec3 uCam, uSunDir, uSunCol, uFogCol; uniform float uFog, uEnvInt, uTime; uniform vec2 uFogH;
+uniform samplerCube uEnv; uniform sampler2DShadow uShadow; uniform mat4 uShadowVP; uniform float uShadowOn;
+uniform vec4 uPL[4]; uniform vec3 uPLc[4]; uniform int uNPL; uniform highp sampler3D uNoise;
+float D_GGX(float nh, float a){ float a2 = a*a, d = nh*nh*(a2 - 1.) + 1.; return a2/(3.14159*d*d); }
+float shadowAt(vec3 w, vec3 n){ if (uShadowOn < .5) return 1.; vec4 s = uShadowVP*vec4(w + n*.3, 1.); vec3 p = s.xyz/s.w*.5 + .5;
+  float edge = max(abs(p.x - .5), abs(p.y - .5))*2.; if (edge > 1. || p.z > 1. || p.z < 0.) return 1.;
+  vec2 t = 1./vec2(textureSize(uShadow, 0)); float acc = 0.;
+  for (int i = -1; i <= 1; i += 2) for (int j = -1; j <= 1; j += 2) acc += texture(uShadow, vec3(p.xy + vec2(i, j)*t*.75, p.z - .00012));
+  return mix(acc*.25, 1., smoothstep(.8, 1., edge)); }
+vec3 lit(vec3 alb, float rough, float metal, vec3 n, vec3 v, vec3 W, float ao){
+  vec3 L = uSunDir, h = normalize(L + v); float nl = max(dot(n, L), 0.), nv = max(dot(n, v), 1e-3), nh = max(dot(n, h), 0.);
+  vec3 f0 = mix(vec3(.04), alb, metal); float a = max(rough*rough, .002), k = (rough + 1.)*(rough + 1.)/8.;
+  vec3 F = f0 + (1. - f0)*pow(1. - max(dot(v, h), 0.), 5.); float G = nv/(nv*(1. - k) + k)*nl/(nl*(1. - k) + k);
+  vec3 spec = min(D_GGX(nh, a)*G*F/max(4.*nv*nl, 1e-3), vec3(30.))*smoothstep(0., .12, nv);
+  float sh = nl > 0. ? shadowAt(W, n) : 0.;
+  vec3 col = ((1. - F)*(1. - metal)*alb/3.14159 + spec)*uSunCol*nl*sh*3.14159;
+  for (int i = 0; i < 4; i++) { if (i >= uNPL) break; vec3 Lp = uPL[i].xyz - W; float d = length(Lp); Lp /= d; float at = clamp(1. - d/uPL[i].w, 0., 1.); at *= at;
+    col += (1. - metal)*alb*uPLc[i]*max(dot(n, Lp), 0.)*at; }
+  vec3 irr = textureLod(uEnv, n, 5.).rgb, pre = min(textureLod(uEnv, reflect(-v, n), rough*5.).rgb, vec3(6.));
+  vec3 Fr = f0 + (max(vec3(1. - rough), f0) - f0)*pow(1. - nv, 5.);
+  col += ((1. - Fr)*(1. - metal)*alb*irr + pre*Fr*(1. - rough*.7))*uEnvInt*ao;
+  return col; }
+vec3 fogged(vec3 col, vec3 W, float emi){ float dist = length(uCam - W), fog = 1. - exp(-uFog*uFog*dist*dist); vec3 v = normalize(uCam - W);
+  if (uFogH.y > 0.) { float hc = (uCam.y - uFogH.x)/uFogH.y, hp = (W.y - uFogH.x)/uFogH.y, dh = hp - hc, od = abs(dh) > 1e-3 ? (exp(-hc) - exp(-hp))/dh : exp(-hc); fog = 1. - exp(-uFog*uFog*dist*dist*clamp(od, 0., 1.)*2.4); }
+  vec3 fogC = uFogCol + uSunCol*.045*pow(max(dot(-v, uSunDir), 0.), 6.); return mix(col, fogC, fog*(1. - min(emi, 1.)*.6)); }`;
+
+// a cloud deck on the horizontal plane y = uCloud.x: density from the tiling noise volume (two fetches, drifting with
+// the wind), storm cells from a third, much larger one; lightning lights the deck around uFlash.xy
+const CLOUD = `
+uniform vec4 uCloud; /* x altitude, y scale (cycles per metre), z coverage, w storm amount */ uniform vec3 uWind; uniform vec4 uFlash; /* x, z, intensity, radius */
+uniform vec3 uCloudLo, uCloudHi, uGlow; /* storm base, lit top, light from below (lava) */
+float cloudD(vec2 xz){ vec2 q = xz*uCloud.y + uWind.xy*uTime; float a = texture(uNoise, vec3(q, .37)).r, b = texture(uNoise, vec3(q*2.7 + .5, .71)).g;
+  float st = texture(uNoise, vec3(xz*uCloud.y*.23 + .21, .13)).r; return clamp((a*.75 + b*.45 - (1.1 - uCloud.z) + (st - .5)*uCloud.w)*2.6, 0., 1.); }
+// colour (premultiplied) and coverage of the deck seen along ray d from p, faded toward the horizon
+vec4 cloudAt(vec3 p, vec3 d){ if (d.y < .004) return vec4(0.); float t = (uCloud.x - p.y)/d.y; if (t < 0.) return vec4(0.);
+  vec3 h = p + d*t; float den = cloudD(h.xz), den2 = cloudD(h.xz + uSunDir.xz*260.);
+  float lit = clamp(.55 + (den - den2)*1.8, 0., 1.), fwd = pow(max(dot(d, uSunDir), 0.), 8.);
+  vec3 c = mix(uCloudLo, uCloudHi, lit*(1. - den*.45))*(.8 + .4*fwd*(1. - den)) + uGlow*(.6 + .4*den);
+  if (uFlash.z > 0.) { vec2 fd = (h.xz - uFlash.xy)/uFlash.w; c += vec3(.75, .82, 1.)*uFlash.z*exp(-dot(fd, fd))*(.35 + den); }
+  float far = smoothstep(.004, .09, d.y), a = den*far; c = mix(uFogCol*1.1, c, smoothstep(.0, .22, d.y));
+  return vec4(c*a, a); }`;
+
+const CLOUD_VS = `#version 300 es
+layout(location=0) in vec3 aPos; uniform mat4 uModel, uVP; out vec3 vW; void main(){ vec4 w = uModel*vec4(aPos, 1.); vW = w.xyz; gl_Position = uVP*w; }`;
+const CLOUD_FS = `#version 300 es
+precision highp float; in vec3 vW; out vec4 o;
+uniform vec3 uCam, uSunDir, uSunCol, uFogCol; uniform float uTime; uniform highp sampler3D uNoise;
+${CLOUD}
+void main(){ vec3 d = normalize(vW - uCam); vec4 c = cloudAt(uCam, d); if (c.a < .003) discard; o = c; }`;
+
+// Ocean: Gerstner swell displaced in the vertex shader near the camera (the grid follows the camera), the same waves
+// plus two noise layers as per-pixel normals (band-limited with distance), Fresnel reflection of the sky and of the
+// cloud deck, sun glitter, light scattered through thin wave crests, whitecaps and streaks of foam.
+const WAVES = `
+const int NW = 9;
+const vec4 WV[9] = vec4[9](vec4(0.960, 0.280, 160., 1.0), vec4(0.639, 0.769, 113., 0.72), vec4(0.982, -0.186, 79., 0.52), vec4(0.271, 0.963, 57., 0.38), vec4(0.841, -0.541, 41., 0.27), vec4(0.855, 0.519, 29., 0.19), vec4(0.577, -0.817, 21., 0.13), vec4(-0.144, 0.990, 15., 0.085), vec4(0.997, 0.074, 10., 0.055)); /* dir x, dir z, wavelength m, amplitude m */
+uniform float uSea; /* sea state: 1 calm .. 2 storm */
+vec3 waves(vec2 p, float t, float att, out vec3 nrm, out float crest){ vec3 d = vec3(0.); vec3 n = vec3(0., 1., 0.); crest = 0.;
+  att *= .72 + .28*sin(p.x*.0023 + 1.3 + t*.02)*sin(p.y*.0019 - .7) + .12*sin((p.x + p.y)*.0061 + 2.);
+  for (int i = 0; i < NW; i++) { vec4 w = WV[i]; float k = 6.2832/w.z, c = sqrt(9.8/k), A = w.w*uSea*att, Q = .5/(k*A*float(NW) + 1e-4);
+    Q = min(Q, 1.); float f = k*(dot(w.xy, p) - c*t) + float(i)*1.7, cf = cos(f), sf = sin(f);
+    d.x += Q*A*w.x*cf; d.z += Q*A*w.y*cf; d.y += A*sf; n.x -= w.x*k*A*cf; n.z -= w.y*k*A*cf; n.y -= Q*k*A*sf; crest += sf*A; }
+  nrm = normalize(n); return d; }`;
+const OCEAN_VS = `#version 300 es
+layout(location=0) in vec3 aPos; uniform mat4 uModel, uVP; uniform vec3 uCam; uniform float uTime;
+out vec3 vW; out float vCrest; out vec3 vNv;
+${WAVES}
+void main(){ vec4 w = uModel*vec4(aPos, 1.); float d = length(w.xz - uCam.xz), att = 1. - smoothstep(500., 1500., d); vec3 n; float cr;
+  vec3 disp = waves(w.xz, uTime, att, n, cr); vW = vec3(w.x + disp.x, disp.y, w.z + disp.z); vCrest = cr; vNv = n; gl_Position = uVP*vec4(vW, 1.); }`;
+const OCEAN_FS = `#version 300 es
+precision highp float; precision highp sampler2DShadow;
+in vec3 vW; in float vCrest; in vec3 vNv; out vec4 o;
+${LIGHT}
+${CLOUD}
+${WAVES}
+uniform vec3 uDeep, uScatter; uniform vec4 uFoamK; /* x whitecap threshold, y amount, z streaks, w spray darkness */
+void main(){
+  vec3 v = normalize(uCam - vW); float dist = length(uCam - vW), fw = length(fwidth(vW.xz));
+  // the swell at the pixel's footprint: waves shorter than about four pixels fade to flat (no shimmer far away)
+  float attP = 1. - smoothstep(10., 40., fw*6.); vec3 nw; float cr; waves(vW.xz, uTime, max(attP, .25), nw, cr);
+  // two noise layers drifting with the wind: wind chop and capillary ripples
+  vec2 q1 = vW.xz*.021 + vec2(uTime*.012, uTime*.007), q2 = vW.xz*.083 - vec2(uTime*.03, -uTime*.021);
+  float k1 = 1. - smoothstep(.3, 1.2, fw*.021*4.), k2 = 1. - smoothstep(.3, 1.2, fw*.083*4.);
+  vec4 A = texture(uNoise, vec3(q1, uTime*.004)), B = texture(uNoise, vec3(q2, .5 + uTime*.009));
+  vec3 n = normalize(nw + vec3((A.r - .5)*.5*k1 + (B.g - .5)*.35*k2, 0., (A.g - .5)*.5*k1 + (B.r - .5)*.35*k2));
+  if (dot(n, v) < .02) n = normalize(n + v*(.02 - dot(n, v)));
+  float nv = max(dot(n, v), 0.), F = .02 + .98*pow(1. - nv, 5.); vec3 R = reflect(-v, n); R.y = abs(R.y);
+  vec3 sky = min(textureLod(uEnv, R, 1.).rgb, vec3(8.)); vec4 cl = cloudAt(vW, R); vec3 refl = sky*(1. - cl.a) + cl.rgb;
+  // body colour: deep water, brighter blue-green where the sun shines through thin crests
+  float sunUp = max(uSunDir.y, 0.), thin = clamp(vCrest/(2.*uSea) + .5, 0., 1.);
+  vec3 body = uDeep*(.35 + .65*sunUp) + uScatter*pow(thin, 2.)*pow(max(dot(-v, uSunDir) * .5 + .5, 0.), 2.)*sunUp*1.6;
+  body += uScatter*.12*max(dot(n, uSunDir), 0.);
+  vec3 col = mix(body, refl, F);
+  // sun glitter: a GGX lobe that widens with distance (many facets per pixel), dimmed under the clouds
+  vec3 h = normalize(uSunDir + v); float rough = .06 + clamp(fw*.004, 0., .25), nh = max(dot(n, h), 0.);
+  vec4 cs = cloudAt(vW, uSunDir); col += uSunCol*D_GGX(nh, rough*rough)*.04*(1. - cs.a*.85)*smoothstep(0., .05, uSunDir.y);
+  // whitecaps: on the highest crests, torn into filaments by ridged noise stretched across the wind; between them faint
+  // streaks of old foam drawn out along the wind. Both fade to their average once their detail is under a pixel.
+  vec2 wr = vec2(dot(vW.xz, vec2(.96, .28)), dot(vW.xz, vec2(-.28, .96))); /* wind frame */
+  float kf = 1. - smoothstep(.25, 1., fw*.03), ks = 1. - smoothstep(.25, 1., fw*.012);
+  float fil = mix(.45, texture(uNoise, vec3(wr*vec2(.022, .07) + vec2(uTime*.02, 0.), .23)).a, kf), old = mix(.3, texture(uNoise, vec3(wr*vec2(.003, .016), .61) + vec3(uTime*.001, 0., 0.)).a, ks);
+  float patchy = texture(uNoise, vec3(vW.xz*.0011 + .3, .9)).r; /* foam gathers in patches a kilometre across */
+  float cap = smoothstep(uFoamK.x, uFoamK.x + .18, thin + (A.b - .5)*.25)*smoothstep(.3, .6, patchy + .15)*(1. - smoothstep(1.2, 5., fw));
+  float foam = cap*smoothstep(.35, .8, fil)*uFoamK.y + smoothstep(.62, .9, old)*uFoamK.z*(.3 + .7*thin)*smoothstep(.45, .7, patchy)*smoothstep(.3, .6, fil);
+  vec3 foamC = vec3(.62, .66, .7)*(textureLod(uEnv, vec3(0., 1., 0.), 4.).rgb*uEnvInt*.9 + uSunCol*max(uSunDir.y, 0.)*.35);
+  col = mix(col, foamC, clamp(foam, 0., 1.)*.85);
+  for (int i = 0; i < 4; i++) { if (i >= uNPL) break; vec3 Lp = uPL[i].xyz - vW; float d = length(Lp); Lp /= d; float at = clamp(1. - d/uPL[i].w, 0., 1.); col += uPLc[i]*at*at*(.04 + .4*pow(max(dot(n, normalize(Lp + v)), 0.), 60.)); }
+  if (uFlash.z > 0.) { vec2 fd = (vW.xz - uFlash.xy)/(uFlash.w*1.4); col += vec3(.6, .7, .9)*uFlash.z*.06*exp(-dot(fd, fd))*(.3 + F); }
+  o = vec4(fogged(col, vW, 0.), 1.); }`;
+
+// Lava: emissive rock melt flowing along the mesh's own (u, v) coordinates (colour channels: u along the flow in
+// metres/100, v across 0..1, flow speed, heat; material w: the flow's width in metres, material x = 1: lay the
+// pattern out in world x, z instead, for lakes). A dark crust of plates drifts on the flow; the plates crack open to the
+// hot melt beneath, wider where the flow is hotter and faster, and melt away into pools; their rims glow dull red. The
+// banks crust over. A slow wobble of the lookup is the heat shimmer. Detail fades to its average with distance.
+const CELL = `
+vec2 h22(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p)*43758.5453); }
+// cellular pattern: x = F2 - F1 (zero on the cell borders), y = a random value per cell
+vec2 vor(vec2 x){ vec2 n = floor(x), f = fract(x); float d1 = 9., d2 = 9.; vec2 id = n;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { vec2 g = vec2(float(i), float(j)), r = g + .06 + .88*h22(n + g) - f; float d = dot(r, r);
+    if (d < d1) { d2 = d1; d1 = d; id = n + g; } else if (d < d2) d2 = d; }
+  return vec2(sqrt(d2) - sqrt(d1), h22(id*1.37 + 4.1).x); }`;
+const LAVA_FS = `#version 300 es
+precision highp float; precision highp sampler2DShadow;
+in vec3 vN; in vec3 vW; in vec4 vC; in vec4 vM; in vec3 vL; out vec4 o;
+${LIGHT}
+${CELL}
+uniform float uGlowK, uCrustK;
+vec3 heatCol(float t){ return t < .4 ? mix(vec3(.16, .012, 0.), vec3(.85, .11, .008), t/.4) : t < .75 ? mix(vec3(.85, .11, .008), vec3(1.45, .5, .06), (t - .4)/.35) : mix(vec3(1.45, .5, .06), vec3(2., 1.25, .5), (t - .75)/.25); }
+void main(){
+  float u = vC.r*100., vv = vC.g, sp = vC.b, heat = vC.a, W = max(vM.w, 8.);
+  vec2 sh = vec2(sin(uTime*1.7 + vW.x*.07), cos(uTime*1.3 + vW.z*.06))*.35; /* heat shimmer, metres */
+  vec2 m = mix(vec2(u - uTime*sp*5., (vv - .5)*W), vW.xz + vec2(uTime*sp*2., 0.), vM.x) + sh;
+  vec2 pc = m/mix(vec2(7.*(1. + sp*.3), 5.), vec2(12., 10.), vM.x); float fw = max(length(fwidth(pc)), 1e-4);
+  float k = 1. - smoothstep(.22, .7, fw); /* 1 near; 0 where a plate is down to about two pixels */
+  vec4 A = texture(uNoise, vec3(m*.012, .3)), B = texture(uNoise, vec3(m*.05, .7 + uTime*.01)), Lg = texture(uNoise, vec3(m*.0035, .55));
+  vec2 wp = pc + (texture(uNoise, vec3(m*.021, .61)).rg - .5)*1.5; /* warped: irregular plates with curved edges */
+  vec2 V = k > .002 ? vor(wp) : vec2(.5), V2 = k > .002 ? vor(wp*2.6 + 13.7) : vec2(.5); /* plates and the fine fractures within them */
+  float bank = smoothstep(0., .16, vv)*smoothstep(1., .84, vv);
+  /* how far the crust is broken: hotter and faster flows; whole regions of a lake or a slow river crust over */
+  float open = clamp(heat*(.45 + .55*A.r)*bank*(1. - uCrustK*.35)*(.3 + .7*smoothstep(.32, .62, Lg.r)) + min(sp, 4.)*.05, 0., 1.);
+  float cw = (.025 + .22*open*open)*(.3 + 1.4*B.g), aa = fw*1.2 + .004; /* seams narrow and widen along their length */
+  float fine = (1. - smoothstep(cw*.35, cw*.35 + aa*2.6, V2.x))*k*(.25 + .5*open);
+  float crack = mix(min(1., cw*1.9), 1. - smoothstep(cw, cw + aa, V.x), k);
+  float pool = smoothstep(.6, .78, A.g + open*.4 - .22 + (V.y - .5)*.08*k)*bank;
+  float melt = clamp(max(max(crack, pool), fine*.55), 0., 1.);
+  float rim = (1. - smoothstep(cw, cw + .3, V.x))*k*(1. - melt);
+  float core = crack*(1. - smoothstep(0., cw + aa, V.x))*k; /* the middle of a crack is hottest */
+  float temp = clamp(heat*(.45 + .3*melt + .17*core) + (B.r - .5)*.2, 0., 1.);
+  float flick = .93 + .07*sin(uTime*2.3 + A.b*30.);
+  vec3 emi = (heatCol(temp)*melt + vec3(.3, .03, 0.)*rim*heat)*uGlowK*flick;
+  // the crust: dark scoria, each plate tilted a little, rough
+  vec3 v = normalize(uCam - vW), n = normalize(vN + vec3(V.y - .5, 0., fract(V.y*7.3) - .5)*.35*k + vec3(B.g - .5, 0., B.b - .5)*.5*k);
+  vec3 gn = cross(dFdx(vW), dFdy(vW)); if (dot(gn, v) < 0.) gn = -gn; if (dot(n, gn) < 0.) n = -n;
+  vec3 crust = vec3(.045, .038, .034)*(.75 + .5*B.a) + vec3(.03, .006, 0.)*heat;
+  vec3 col = lit(crust, .84, 0., n, v, vW, 1.)*(1. - melt) + emi;
+  o = vec4(fogged(col, vW, min(1., melt*1.5)), 1.); }`;
+
+// Volcanic ground: basalt and scoria with ash settled on the flatter ground, rust streaks, slope cliffs; near lava
+// (vertex heat, colour alpha) the rock is lit orange from below and thin fissures glow, pulsing slowly. Detail from the
+// noise volume and a cellular crack pattern, band-limited by distance.
+const ROCK_FS = `#version 300 es
+precision highp float; precision highp sampler2DShadow;
+in vec3 vN; in vec3 vW; in vec4 vC; in vec4 vM; in vec3 vL; out vec4 o;
+${LIGHT}
+${CELL}
+void main(){
+  vec3 n0 = normalize(vN), v = normalize(uCam - vW); vec3 gn = cross(dFdx(vW), dFdy(vW)); if (dot(gn, v) < 0.) gn = -gn; if (dot(n0, gn) < 0.) n0 = -n0;
+  float fw = length(fwidth(vW)), slope = 1. - abs(n0.y), heat = vC.a;
+  vec2 hp = vW.xz; vec2 cp = abs(n0.x) > abs(n0.z) ? vW.zy : vW.xy; /* horizontal and cliff projections */
+  vec2 pp = mix(hp, cp, step(.55, slope));
+  float kA = 1. - smoothstep(.4, 1.6, fw*.05), kB = 1. - smoothstep(.4, 1.6, fw*.21);
+  vec4 A = texture(uNoise, vec3(pp*.05, .19)), B = texture(uNoise, vec3(pp*.21, .43));
+  vec4 C = texture(uNoise, vec3(hp*.0035, .87));
+  float ash = smoothstep(.35, .05, slope)*smoothstep(.35, .7, C.r + (A.g - .5)*.4*kA)*(1. - heat), rust = smoothstep(.62, .82, C.g + (B.r - .5)*.3*kB);
+  vec3 alb = vC.rgb*(.75 + .5*mix(.5, A.r, kA))*(.85 + .3*mix(.5, B.g, kB));
+  alb = mix(alb, vec3(.2, .19, .18), ash*.8); alb = mix(alb, alb*vec3(1.5, .8, .55), rust*.6*(1. - ash));
+  float strata = step(.55, slope)*(.5 + .5*sin(vW.y*.45 + A.r*4.)); alb *= .85 + .3*strata*kA;
+  vec3 n = normalize(n0 + vec3(A.r - .5, 0., A.g - .5)*.55*kA*(1. - ash*.6) + vec3(B.g - .5, 0., B.b - .5)*.3*kB);
+  vec3 col = lit(alb, .9 - ash*.05, 0., n, v, vW, .8 + .2*A.b);
+  // light from the lava below: strongest on faces turned down and toward it
+  col += alb*vec3(1.25, .38, .08)*heat*heat*(.55 - .45*n.y);
+  // fissures: thin cellular cracks (cells about 9 m), open only where the rock is hot
+  vec2 pc = pp/9. + (A.gb - .5)*.35; float fc = length(fwidth(pc)), kc = 1. - smoothstep(.15, .5, fc);
+  float hot = smoothstep(.35, .9, heat)*smoothstep(.5, .66, A.b + (heat - .5)*.25), cw = .012 + .03*hot; /* in patches */
+  vec2 V = kc*hot > .002 ? vor(pc) : vec2(.5);
+  float cr = mix(cw*1.2, 1. - smoothstep(cw, cw + fc*1.2 + .003, V.x), kc)*hot, pulse = .8 + .2*sin(uTime*1.3 + C.b*20. + V.y*6.);
+  vec3 emi = mix(vec3(.9, .12, .01), vec3(1.6, .6, .1), hot*(1. - smoothstep(0., cw, V.x)))*cr*1.4*pulse + vec3(.5, .07, .01)*smoothstep(.6, 1., heat)*.06;
+  col += emi;
+  o = vec4(fogged(col, vW, cr*.8), 1.); }`;
+
+function ensurePrograms(gfx) {
+  if (gfx.P.v9ocean) return gfx.P;
+  gfx.P.v9ocean = gfx.prog(OCEAN_VS, OCEAN_FS); gfx.P.v9cloud = gfx.prog(CLOUD_VS, CLOUD_FS);
+  gfx.P.v9lava = gfx.prog(VS, LAVA_FS); gfx.P.v9rock = gfx.prog(VS, ROCK_FS);
+  return gfx.P;
+}
+
+// ---------------------------------------------------------------- corridor clearance
+// Is a sphere (centre p, radius r) clear of the racing corridor by `margin` metres? Checks every course sample near
+// the point in the sample's own frame (along, lateral, vertical), so it also holds in banked turns and in loops.
+class Clearance {
+  constructor(t, cell = 80) {
+    this.t = t; this.cell = cell; this.map = new Map();
+    for (let i = 0; i < t.N; i++) { const p = t.pos[i], R = Math.hypot(t.w[i], t.h[i]) + 4, c = cell;
+      for (let x = Math.floor((p.x - R) / c); x <= Math.floor((p.x + R) / c); x++) for (let y = Math.floor((p.y - R) / c); y <= Math.floor((p.y + R) / c); y++) for (let z = Math.floor((p.z - R) / c); z <= Math.floor((p.z + R) / c); z++) {
+        const k = x + ',' + y + ',' + z; let a = this.map.get(k); if (!a) this.map.set(k, a = []); a.push(i); } }
+  }
+  // lateral/vertical distance outside the corridor box (negative inside) for the nearest samples; null if none near
+  sphere(p, r = 0, margin = 4) {
+    const t = this.t, c = this.cell, R = r + margin;
+    for (let x = Math.floor((p.x - R) / c); x <= Math.floor((p.x + R) / c); x++) for (let y = Math.floor((p.y - R) / c); y <= Math.floor((p.y + R) / c); y++) for (let z = Math.floor((p.z - R) / c); z <= Math.floor((p.z + R) / c); z++) {
+      const a = this.map.get(x + ',' + y + ',' + z); if (!a) continue;
+      for (const i of a) { const q = t.pos[i], dx = p.x - q.x, dy = p.y - q.y, dz = p.z - q.z, T = t.tan[i], B = t.bin[i], N = t.nrm[i];
+        const al = dx * T.x + dy * T.y + dz * T.z; if (Math.abs(al) > t.D * 0.6 + R) continue;
+        const lx = Math.abs(dx * B.x + dy * B.y + dz * B.z) - t.w[i], ly = Math.abs(dx * N.x + dy * N.y + dz * N.z) - t.h[i];
+        if (lx < R && ly < R) return false; } }
+    return true;
+  }
+  // a box given by its centre and three half-axis vectors: tested through spheres along its longest axis
+  box(c, ax, ay, az, margin = 4) {
+    const L = [ax, ay, az].map(a => a.len()), k = L.indexOf(Math.max(...L)), a = [ax, ay, az][k], other = [ax, ay, az].filter((_, j) => j !== k), r = Math.hypot(other[0].len(), other[1].len());
+    const n = Math.max(1, Math.ceil(L[k] / Math.max(r, 2))), p = new Vec3();
+    for (let s = -n; s <= n; s++) { p.copy(c).addScaled(a, s / n); if (!this.sphere(p, r, margin)) return false; }
+    return true;
+  }
+}
+
+// ---------------------------------------------------------------- geometry helpers
+const UP = new Vec3(0, 1, 0), X1 = new Vec3(1, 0, 0);
+// rotation taking +Z to direction d (and +Y toward up as far as possible)
+function qLook(d, up = UP) { const z = d.clone().normalize(), x = new Vec3().crossVectors(Math.abs(z.dot(up)) > 0.98 ? X1 : up, z).normalize(), y = new Vec3().crossVectors(z, x); return new Quat().fromBasis(x, y, z); }
+// box spanning two points (a beam or a strut) with cross-section sx x sy
+function beam(g, a, b, sx, sy, col) { const d = new Vec3().subVectors(b, a), L = d.len(); g.at((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, qLook(d)).box(sx, sy, L, col); return g; }
+function rod(g, a, b, r, seg, col) { const d = new Vec3().subVectors(b, a), L = d.len(); g.at((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, qLook(d)).cyl(r, r, L, seg, col, false); return g; }
+// a square box truss between two points: four chords, battens and diagonals every `bay` metres
+function truss(g, a, b, size, bay, col, up = UP) {
+  const d = new Vec3().subVectors(b, a), L = d.len(), z = d.clone().scale(1 / L), x = new Vec3().crossVectors(Math.abs(z.dot(up)) > 0.98 ? X1 : up, z).normalize(), y = new Vec3().crossVectors(z, x);
+  const h = size / 2, cs = Math.max(0.25, size * 0.07), C = [[-h, -h], [h, -h], [h, h], [-h, h]], P = (s, cx, cy) => a.clone().addScaled(z, s).addScaled(x, cx).addScaled(y, cy);
+  for (const [cx, cy] of C) beam(g, P(0, cx, cy), P(L, cx, cy), cs, cs, col);
+  const n = Math.max(1, Math.round(L / bay));
+  for (let k = 0; k <= n; k++) { const s = L * k / n; for (let e = 0; e < 4; e++) { const [ax, ay] = C[e], [bx, by] = C[(e + 1) % 4]; beam(g, P(s, ax, ay), P(s, bx, by), cs * 0.8, cs * 0.8, col);
+    if (k < n) { const s2 = L * (k + 1) / n; beam(g, P(k % 2 ? s : s2, ax, ay), P(k % 2 ? s2 : s, bx, by), cs * 0.6, cs * 0.6, col); } } }
+  return g;
+}
+// flat-shaded mesh from raw arrays (positions, normals, colours rgba, material) without the Geo transform overhead
+function rawMesh(gfx, pos, nor, col, mat, idx) { return gfx.mesh({ pos: Float32Array.from(pos), nor: Float32Array.from(nor), col: Float32Array.from(col), mat: Float32Array.from(mat), idx: Uint32Array.from(idx) }); }
+// hemisphere (dome) for the cloud deck, radius 1, slightly below the horizon
+function domeGeo(seg = 48, rings = 16) {
+  const g = new Geo();
+  const rows = []; for (let j = 0; j <= rings; j++) { const el = -0.06 + (Math.PI / 2 + 0.06) * j / rings, row = []; for (let k = 0; k <= seg; k++) { const a = k / seg * Math.PI * 2; row.push(g.v(Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a), 0, 1, 0, [1, 1, 1, 0])); } rows.push(row); }
+  for (let j = 0; j < rings; j++) for (let k = 0; k < seg; k++) g.quad(rows[j][k], rows[j][k + 1], rows[j + 1][k + 1], rows[j + 1][k]);
+  return g;
+}
+// small deterministic hash noise for CPU-side terrain and placement
+function hash2(x, z, s = 0) { const v = Math.sin(x * 127.1 + z * 311.7 + s * 74.7) * 43758.5453; return v - Math.floor(v); }
+function vnoise2(x, z, s = 0) { const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz, u = fx * fx * (3 - 2 * fx), w = fz * fz * (3 - 2 * fz);
+  const a = hash2(ix, iz, s), b = hash2(ix + 1, iz, s), c = hash2(ix, iz + 1, s), d = hash2(ix + 1, iz + 1, s); return a + (b - a) * u + (c - a) * w + (a - b - c + d) * u * w; }
+function fbm2(x, z, s = 0, o = 5) { let a = 0.5, t = 0, f = 1; for (let i = 0; i < o; i++) { t += a * vnoise2(x * f, z * f, s + i * 13); f *= 2.03; a *= 0.5; } return t; }
+function ridged2(x, z, s = 0, o = 5) { let a = 0.5, t = 0, f = 1, w = 1; for (let i = 0; i < o; i++) { let n = 1 - Math.abs(vnoise2(x * f, z * f, s + i * 7) * 2 - 1); n *= n * w; w = Math.min(1, n * 2); t += a * n; f *= 2.07; a *= 0.5; } return t; }
+
+return { ensurePrograms, Clearance, qLook, beam, rod, truss, rawMesh, domeGeo, hash2, vnoise2, fbm2, ridged2 };
+})();
+const __m__src_render_courses_pelagos_js = (() => {
+// GALACTIC RUSH V9 — Pelagos, the ocean world: a storm-tossed sea to the horizon under a drifting cloud deck with
+// distant lightning, offshore extraction rigs and a research station on stilts, truss bridges between installations,
+// two vertical loops held up by giant towers, islands with a lighthouse, a floating arcology and a space elevator
+// on the skyline, freighters ploughing the swell and spray where ships skim the waves.
+const { Vec3, Quat, makeRng, mat4 } = __m__src_math_js;
+const { Geo, QX, QY, QZ, DET } = __m__src_render_geo_js;
+const { Chunks, fq, P, hexField, gates, pickups, hazards, routeGuides, movers, planetItems, v3 } = __m__src_render_courses_common_js;
+const { buildPatrol, buildHauler } = __m__src_render_props_js;
+const { Frustum } = __m__src_render_lod_js;
+const { ensurePrograms, Clearance, beam, rod, truss, domeGeo, qLook, fbm2, ridged2 } = __m__src_render_courses_v9kit_js;
+const STEEL = [[0.36, 0.37, 0.39, 0], [0.3, 0.31, 0.33, 0], [0.42, 0.4, 0.37, 0], [0.26, 0.27, 0.29, 0]];
+const PAINT = [[0.78, 0.36, 0.12, 0], [0.82, 0.68, 0.16, 0], [0.86, 0.86, 0.84, 0], [0.18, 0.36, 0.52, 0], [0.62, 0.16, 0.12, 0]];
+const LAMP = [1, 0.82, 0.55, 1], RED = [1, 0.12, 0.08, 1], GRN = [0.2, 1, 0.35, 1], CYAN = [0.4, 0.9, 1, 1];
+const SEA = 0;
+
+function buildPelagos(gfx, t) {
+  ensurePrograms(gfx);
+  const rng = makeRng(t.def.seed * 19 + 7), items = [], N = t.N, clear = new Clearance(t);
+  const ch = new Chunks(t, 96), big = new Geo(), bigLit = new Geo().mat(0, 0.4, 4, 0), lights = []; // big: scenery far from the course (one mesh each)
+  let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9; for (const p of t.pos) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
+  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+  const at = tag => t.tags.get(tag) || [], mid = tag => { const a = at(tag); return a[a.length >> 1]; };
+  // world point beside the course: sample i, lateral offset x (right +), height y above the sea
+  const beside = (i, x) => { const p = t.pos[i], B = t.bin[i], b = new Vec3(B.x, 0, B.z).normalize(); return new Vec3(p.x + b.x * x, 0, p.z + b.z * x); };
+  const okBox = (c, sx, sy, sz, q = new Quat(), m = 6) => clear.box(c, new Vec3(sx / 2, 0, 0).applyQuat(q), new Vec3(0, sy / 2, 0).applyQuat(q), new Vec3(0, 0, sz / 2).applyQuat(q), m);
+
+  // ---------------------------------------------------------------- the sea and the sky
+  const U = { uSea: 1.35, uDeep: [0.006, 0.028, 0.036], uScatter: [0.025, 0.2, 0.19], uFoamK: [0.74, 0.85, 0.16, 0], uCloud: [1500, 0.00011, 0.62, 0.9], uWind: [0.0011, 0.0006, 0],
+    uFlash: [0, 0, 0, 1], uCloudLo: [0.09, 0.1, 0.115], uCloudHi: [0.55, 0.58, 0.62], uGlow: [0, 0, 0] };
+  let ocean = null;
+  { // ocean: rings around the camera, dense near it, out to 40 km; displaced by the swell near the camera only
+    const pos = [], nor = [], col = [], mat = [], idx = [], seg = 160, rings = [0]; let r = 0; while (r < 40000) { r += Math.max(2, r * 0.055); rings.push(r); }
+    for (const rr of rings) for (let k = 0; k <= seg; k++) { const a = k / seg * Math.PI * 2; pos.push(Math.cos(a) * rr, 0, Math.sin(a) * rr); nor.push(0, 1, 0); col.push(1, 1, 1, 0); mat.push(0, 0.1, 1, 0); }
+    for (let j = 0; j < rings.length - 1; j++) for (let k = 0; k < seg; k++) { const a = j * (seg + 1) + k, b = a + seg + 1; idx.push(a, b, b + 1, a, b + 1, a + 1); }
+    const mesh = gfx.mesh({ pos: new Float32Array(pos), nor: new Float32Array(nor), col: new Float32Array(col), mat: new Float32Array(mat), idx: new Uint32Array(idx) });
+    items.push(ocean = { mesh, prog: 'v9ocean', pos: new Vec3(), quat: new Quat(), scale: 1, uniforms: U, visible: true });
+  }
+  const dome = { mesh: gfx.mesh(domeGeo(64, 18).build()), prog: 'v9cloud', pos: new Vec3(), quat: new Quat(), scale: 26000, uniforms: U, blend: 'normal', layer: -1, visible: true }; items.push(dome);
+
+  // ---------------------------------------------------------------- loops: helical side rails and a keel under the corridor,
+  // U-frames every few samples, lights, and the towers and legs that carry them out of the sea
+  const loopTowers = [];
+  for (const L of t.loops) {
+    const g = ch.get(L.i0, 'loop'), gl = ch.get(L.i0, 'loopLit'), i0 = L.i0 - 14, i1 = L.i1 + 14;
+    for (let i = i0; i < i1; i += 2) {
+      const k = t.wrapIdx(i), k2 = t.wrapIdx(i + 2), q = fq(t, k), w = t.w[k], h = t.h[k];
+      const seg = (x, y, sx, sy, geo, c) => { const a = P(t, k, x, y), b = P(t, k2, x, y), m = new Vec3().lerpVectors(a, b, 0.5); geo.at(m.x, m.y, m.z, q).box(sx, sy, a.dist(b) + 0.4, c); };
+      seg(0, -h - 4.2, 10, 3.2, g.mat(0.6, 0.45, 1, DET.struct), [0.32, 0.33, 0.35, 0]); // keel
+      for (const s of [-1, 1]) { seg(s * (w + 4), -h - 2, 2.6, 2.6, g, [0.38, 0.38, 0.4, 0]); seg(s * (w + 4), h * 0.25, 1.8, 1.8, g, [0.3, 0.31, 0.33, 0]); seg(s * (w + 2.4), -h - 0.6, 0.4, 0.4, gl.mat(0, 0.4, 5, 0), s > 0 ? [0.4, 0.9, 1, 1] : [1, 0.72, 0.3, 1]); }
+      if (i % 8 === 0) { // U-frame: under the keel and up both sides, never inside the corridor
+        for (const s of [-1, 1]) { const a = P(t, k, s * (w + 4), -h - 2), b = P(t, k, s * (w + 4), h * 0.25), c = P(t, k, s * 6, -h - 4.2);
+          g.at((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, q).box(2.2, a.dist(b), 2.2, [0.28, 0.29, 0.31, 0]);
+          g.at((a.x + c.x) / 2, (a.y + c.y) / 2, (a.z + c.z) / 2, q.clone().multiply(QZ(s * Math.atan2(2.2, w - 2) * 57.3))).box(a.dist(c), 1.8, 1.8, [0.28, 0.29, 0.31, 0]); }
+        const lp = P(t, k, 0, -h - 2.4); gl.at(lp.x, lp.y, lp.z, q).box(5, 0.3, 0.8, [1, 0.8, 0.45, 1]);
+      }
+    }
+    // towers: beside the loop at its fore and aft extremes (where it runs straight up and straight down), each with an
+    // arm to the side rail; a tower is only built where it stands clear of the corridor
+    let iUp = L.i0, iDn = L.i0; for (let i = L.i0; i <= L.i1; i++) { if (t.tan[i].y > t.tan[iUp].y) iUp = i; if (t.tan[i].y < t.tan[iDn].y) iDn = i; }
+    for (const ia of [iUp, iDn]) for (const s of [-1, 1]) {
+      const rail = P(t, ia, s * (t.w[ia] + 4), 0), side = new Vec3().copy(t.bin[ia]).scale(s); side.y = 0; side.normalize();
+      for (const off of [34, 52, 70]) { const head = rail.clone().addScaled(side, off), foot = head.clone(); foot.y = SEA - 6;
+        if (!clear.box(new Vec3().lerpVectors(foot, head, 0.5), v3(11, 0, 0), v3(0, (head.y - foot.y) / 2, 0), v3(0, 0, 11), 6)) continue;
+        truss(big.mat(0.7, 0.5, 1, DET.struct), foot, head, 18, 18, [0.34, 0.33, 0.33, 0]); truss(big, head, rail, 7, 8, [0.34, 0.33, 0.33, 0]);
+        big.mat(0.5, 0.6, 1, DET.struct).at(foot.x, SEA + 2, foot.z).bbox(32, 18, 32, 2, [0.25, 0.26, 0.27, 0]);
+        for (let y = 30; y < head.y; y += 60) { const p = v3(head.x, y, head.z); bigLit.at(p.x, p.y, p.z).box(1.4, 1.4, 1.4, RED); lights.push({ p, c: [3, 0.25, 0.15], s: 6, blink: 0.6 }); }
+        loopTowers.push(head); break; }
+    }
+    for (const ia of [L.i0 + 6, L.i1 - 6]) for (const s of [-1, 1]) { const top = P(t, ia, s * (t.w[ia] + 4), -t.h[ia] - 2), foot = top.clone(); foot.y = SEA - 4;
+      truss(big.mat(0.7, 0.5, 1, DET.struct), foot, top, 9, 12, [0.33, 0.33, 0.34, 0]); big.mat(0.5, 0.6, 1, DET.struct).at(foot.x, SEA + 1.5, foot.z).bbox(16, 10, 16, 1.5, [0.25, 0.26, 0.27, 0]); }
+    // a beacon crown at the top of the loop
+    { let iTop = L.i0; for (let i = L.i0; i <= L.i1; i++) if (t.pos[i].y > t.pos[iTop].y) iTop = i; const p = P(t, iTop, 0, -t.h[iTop] - 9); lights.push({ p, c: [3.5, 0.3, 0.2], s: 10, blink: 1.2 }); bigLit.at(p.x, p.y, p.z).box(2, 2, 2, RED); }
+  }
+
+  // ---------------------------------------------------------------- platforms on stilts
+  // deck at height y, size sx x sz, yaw a (deg); legs into the sea; kind: 'rig' (derrick, flare), 'station' (domes,
+  // labs, helipad), 'plant' (tanks, pipe racks); every part is checked against the corridor
+  const flares = [];
+  const platform = (x, z, y, sx, sz, a, kind, seed) => {
+    const r = makeRng(seed), q = QY(a), c = v3(x, y, z), g = big, gl = bigLit, X = (lx, ly, lz) => new Vec3(lx, ly, lz).applyQuat(q).add(c);
+    // legs and bracing
+    const lx = sx / 2 - 6, lz = sz / 2 - 6, legR = Math.min(6, 2.5 + sx * 0.03);
+    for (const [px, pz] of [[-lx, -lz], [lx, -lz], [-lx, lz], [lx, lz], ...(sx > 90 ? [[0, -lz], [0, lz]] : [])]) {
+      const top = X(px, -3, pz), foot = top.clone(); foot.y = SEA - 12;
+      g.mat(0.5, 0.65, 1, DET.struct).at(top.x, (top.y + foot.y) / 2, top.z, QX(90)).cyl(legR, legR * 1.2, top.y - foot.y, 18, [0.42, 0.4, 0.36, 0], false);
+      g.at(top.x, SEA + 1.2, top.z, QX(90)).cyl(legR * 1.6, legR * 1.6, 6, 18, [0.62, 0.32, 0.12, 0]); // splash-zone collar
+    }
+    for (const yy of [SEA + 9, (SEA + y) * 0.55]) for (const [ax, az, bx, bz] of [[-lx, -lz, lx, -lz], [-lx, lz, lx, lz], [-lx, -lz, -lx, lz], [lx, -lz, lx, lz]]) beam(g.mat(0.7, 0.5, 1, DET.struct), X(ax, yy - y, az), X(bx, yy - y, bz), 1.6, 1.6, STEEL[1]);
+    // decks
+    g.mat(0.55, 0.6, 1, DET.struct).at(c.x, c.y, c.z, q).bbox(sx, 5, sz, 0.8, STEEL[0]);
+    { const p9 = X(0, -9, 0); g.at(p9.x, p9.y, p9.z, q).bbox(sx - 8, 3, sz - 8, 0.5, STEEL[3]); }
+    for (let e = -1; e <= 1; e += 2) { const p1 = X(0, 3.2, e * sz / 2), p2 = X(e * sx / 2, 3.2, 0); g.at(p1.x, p1.y, p1.z, q).box(sx, 1.2, 0.3, [0.8, 0.66, 0.15, 0]); g.at(p2.x, p2.y, p2.z, q).box(0.3, 1.2, sz, [0.8, 0.66, 0.15, 0]); }
+    for (let k = 0; k < 12; k++) { const u = (k + 0.5) / 12, p = X(-sx / 2 + u * sx, -2, sz / 2 + 0.2); gl.at(p.x, p.y, p.z, q).box(0.6, 0.6, 0.6, LAMP); const p2 = X(-sx / 2 + u * sx, -2, -sz / 2 - 0.2); gl.at(p2.x, p2.y, p2.z, q).box(0.6, 0.6, 0.6, LAMP); }
+    // modules
+    const block = (bx, bz, w, h, d, col, win = true) => { const p = X(bx, 2.5 + h / 2, bz); g.mat(0.35, 0.6, 1, DET.struct).at(p.x, p.y, p.z, q).bbox(w, h, d, 0.4, col);
+      if (win) for (let f = 0; f < Math.floor(h / 4); f++) { const wp = X(bx, 2.5 + 2.2 + f * 4, bz + d / 2 + 0.05); gl.at(wp.x, wp.y, wp.z, q).box(w * 0.82, 0.8, 0.1, r() < 0.3 ? [0.55, 0.8, 1, 1] : LAMP); } };
+    if (kind === 'rig') {
+      block(-sx * 0.22, sz * 0.2, sx * 0.35, 16, sz * 0.3, PAINT[seed % 5]); block(sx * 0.25, -sz * 0.25, sx * 0.25, 10, sz * 0.25, PAINT[(seed + 2) % 5]);
+      const d0 = X(sx * 0.12, 2.5, -sz * 0.05), d1 = d0.clone(); d1.y += 70; truss(g.mat(0.7, 0.5, 1, DET.struct), d0, d1, 12, 10, [0.75, 0.62, 0.18, 0]);
+      gl.at(d1.x, d1.y + 2, d1.z).box(1.4, 1.4, 1.4, RED); lights.push({ p: v3(d1.x, d1.y + 2, d1.z), c: [3, 0.3, 0.2], s: 5, blink: 0.9 });
+      // flare boom out over the sea, burning at its tip
+      const fb0 = X(sx / 2 - 4, 6, sz * 0.3), fb1 = X(sx / 2 + 46, 34, sz * 0.3); truss(g, fb0, fb1, 4, 6, [0.5, 0.5, 0.52, 0]); flares.push({ p: fb1.clone().add(v3(0, 3, 0)), s: 1 + r() * 0.5 });
+      // crane
+      const cb = X(-sx * 0.38, 2.5, -sz * 0.35); g.at(cb.x, cb.y + 9, cb.z, QX(90)).cyl(2, 2, 18, 12, PAINT[1], true); const tip = X(-sx * 0.38 - 30, 30, -sz * 0.35 + 18); truss(g, v3(cb.x, cb.y + 18, cb.z), tip, 2.4, 4, PAINT[1]);
+      for (let k = 0; k < 3; k++) { const p = X(sx * 0.3 - k * 9, 2.5 + 7, sz * 0.32); g.at(p.x, p.y, p.z, QX(90)).cyl(3.6, 3.6, 14, 16, [0.7, 0.7, 0.68, 0], true); }
+    } else if (kind === 'station') {
+      for (let k = 0; k < 3; k++) { const p = X(-sx * 0.28 + k * sx * 0.24, 2.5, -sz * 0.2 + (k % 2) * 8), R = 9 + r() * 6; g.mat(0.2, 0.25, 1, DET.struct).at(p.x, p.y, p.z, QX(-90)).lathe([[R, 0], [R * 0.96, R * 0.3], [R * 0.75, R * 0.68], [R * 0.4, R * 0.92], [0.2, R]], 24, [0.82, 0.84, 0.86, 0]);
+        for (let m = 0; m < 6; m++) { const aa = m / 6 * Math.PI * 2, wp = new Vec3(Math.cos(aa) * R * 0.97, 1.6, Math.sin(aa) * R * 0.97).add(p); gl.at(wp.x, wp.y, wp.z).box(1.6, 0.7, 1.6, [0.55, 0.85, 1, 1]); } }
+      block(sx * 0.25, sz * 0.18, sx * 0.3, 14, sz * 0.4, [0.78, 0.8, 0.82, 0]); block(-sx * 0.2, sz * 0.3, sx * 0.3, 8, sz * 0.22, [0.2, 0.36, 0.5, 0]);
+      const hp = X(sx * 0.28, 2.6, -sz * 0.3); g.at(hp.x, hp.y + 0.4, hp.z, QX(90)).cyl(12, 12, 0.8, 32, [0.22, 0.24, 0.26, 0]); gl.at(hp.x, hp.y + 0.9, hp.z, QX(90)).torus(10.5, 0.25, 40, 4, [0.4, 1, 0.6, 1]);
+      const mast = X(-sx * 0.42, 2.5, sz * 0.42); g.at(mast.x, mast.y + 30, mast.z, QX(90)).cyl(0.8, 0.5, 60, 8, [0.85, 0.85, 0.85, 0], false); gl.at(mast.x, mast.y + 61, mast.z).box(1.2, 1.2, 1.2, RED); lights.push({ p: v3(mast.x, mast.y + 61, mast.z), c: [3, 0.3, 0.2], s: 4, blink: 0.7 });
+      const dp = X(sx * 0.42, 2.5, sz * 0.4); g.at(dp.x, dp.y + 6, dp.z, QX(90)).cyl(1.2, 1.4, 12, 10, [0.7, 0.7, 0.7, 0], false);
+      g.at(dp.x, dp.y + 14, dp.z, QX(-50).multiply(QY(30))).lathe([[0.4, -2.6], [5, -1.2], [8, 1.2]], 24, [0.86, 0.86, 0.85, 0]);
+    } else {
+      for (let k = 0; k < 6; k++) { const p = X(-sx * 0.35 + (k % 3) * sx * 0.25, 2.5 + 9, -sz * 0.18 + Math.floor(k / 3) * sz * 0.36); g.mat(0.5, 0.5, 1, DET.struct).at(p.x, p.y, p.z, QX(90)).cyl(9, 9, 18, 20, [0.72, 0.72, 0.7, 0], true); }
+      for (const zz of [-sz * 0.42, sz * 0.42]) beam(g, X(-sx / 2, 6, zz), X(sx / 2, 6, zz), 3, 3, PAINT[0]);
+      block(sx * 0.36, 0, sx * 0.2, 12, sz * 0.5, PAINT[3]);
+      const st = X(-sx * 0.42, 2.5, sz * 0.42); g.at(st.x, st.y + 25, st.z, QX(90)).cyl(3, 2.5, 50, 14, [0.35, 0.35, 0.36, 0], false); flares.push({ p: v3(st.x, st.y + 52, st.z), s: 0.6 });
+    }
+  };
+  // places a platform beside sample i at lateral offset `off` (+ right), checks the whole footprint is clear
+  const placed = [], placePlat = (i, off, y, sx, sz, a, kind, seed) => {
+    const p = beside(i, off); for (let tries = 0; tries < 8; tries++) {
+      const q = QY(a); if (okBox(v3(p.x, y - 1, p.z), sx + 10, 14, sz + 10, q, 8) && okBox(v3(p.x, y + 40, p.z), sx, 70, sz, q, 8) && okBox(v3(p.x, (y + SEA) / 2, p.z), sx, y - SEA, sz, q, 8)) {
+        platform(p.x, p.z, y, sx, sz, a, kind, seed); placed.push({ x: p.x, z: p.z, y, r: Math.hypot(sx, sz) / 2 }); return p; }
+      p.x += Math.sign(off) * t.bin[i].x * 25; p.z += Math.sign(off) * t.bin[i].z * 25; }
+    return null;
+  };
+  const heading = i => Math.atan2(t.tan[i].x, t.tan[i].z) * 57.3;
+  placePlat(mid('start'), -95, 32, 120, 90, heading(mid('start')), 'station', 3); // research station by the start straight
+  placePlat(at('start')[8], 120, 26, 70, 60, heading(0) + 20, 'plant', 5);
+  placePlat(mid('skim'), 110, 34, 90, 70, heading(mid('skim')) + 10, 'rig', 7);
+  placePlat(at('swell')[30], -120, 30, 90, 80, heading(at('swell')[30]), 'rig', 11);
+  placePlat(mid('flare'), 140, 36, 100, 80, heading(mid('flare')) + 30, 'rig', 13);
+  placePlat(mid('return'), 130, 30, 110, 80, heading(mid('return')) - 15, 'plant', 17);
+  placePlat(at('hook')[20], 150, 40, 80, 70, heading(at('hook')[20]), 'station', 19);
+  // the skim platform: its deck spans the corridor above the wave-skimming section, legs well clear on both sides
+  const skimDeck = (() => { const i = at('skim')[Math.floor(at('skim').length * 0.62)], p = t.pos[i], y = p.y + t.h[i] + 16, W = 2 * t.w[i] + 60, a = heading(i), q = QY(a), g = big;
+    g.mat(0.55, 0.6, 1, DET.struct).at(p.x, y, p.z, q).bbox(W, 6, 50, 0.8, STEEL[0]); g.at(p.x, y + 8, p.z, q).bbox(W * 0.6, 10, 30, 0.5, PAINT[0]);
+    for (const s of [-1, 1]) for (const zz of [-18, 18]) { const lp = new Vec3(s * (W / 2 - 6), 0, zz).applyQuat(q).add(p), top = lp.clone(); top.y = y; const foot = lp.clone(); foot.y = SEA - 12;
+      g.at(lp.x, (top.y + foot.y) / 2, lp.z, QX(90)).cyl(4, 4.6, top.y - foot.y, 16, [0.42, 0.4, 0.36, 0], false); g.at(lp.x, SEA + 1.2, lp.z, QX(90)).cyl(6.5, 6.5, 6, 16, [0.62, 0.32, 0.12, 0]); }
+    for (let k = 0; k < 10; k++) { const lp = new Vec3(-W / 2 + (k + 0.5) * W / 10, -3.4, 0).applyQuat(q).add(v3(p.x, y, p.z)); bigLit.at(lp.x, lp.y, lp.z, q).box(4, 0.3, 1.5, [1, 0.85, 0.6, 1]); }
+    return { p: v3(p.x, y, p.z) }; })();
+  // the narrows: twin platforms either side and a deck over the corridor, carried by the two columns that stand in it
+  const narrowsDeck = (() => { const cols = t.obstacles.filter(o => o.type === 'vbeam'), i = cols.length ? cols[0].i : at('narrows')[20], p = cols.length ? cols.reduce((a, o) => a.add(t.pos[o.i]), v3(0, 0, 0)).scale(1 / cols.length) : t.pos[i];
+    const L = cols.length > 1 ? t.pos[cols[0].i].dist(t.pos[cols[cols.length - 1].i]) + 70 : 120, y = Math.max(...cols.map(o => t.pos[o.i].y + t.h[o.i])) + 14, a = heading(i), q = QY(a), W = 2 * t.w[i] + 50;
+    big.mat(0.55, 0.6, 1, DET.struct).at(p.x, y, p.z, q).bbox(W, 6, L, 0.8, STEEL[3]); big.at(p.x, y + 7, p.z, q).bbox(W * 0.5, 8, L * 0.5, 0.5, PAINT[3]);
+    for (const o of t.obstacles) if (o.type === 'vbeam') { const c = P(t, o.i, o.x, 0), topY = y - 3, botY = SEA - 10, gTop = c.y + t.h[o.i] + 4, gBot = c.y - t.h[o.i] - 4;
+      big.mat(0.5, 0.65, 1, DET.struct).at(c.x, (topY + gTop) / 2, c.z, QX(90)).cyl(o.r * 0.98, o.r * 1.1, topY - gTop, 18, [0.42, 0.4, 0.36, 0], false).at(c.x, (gBot + botY) / 2, c.z, QX(90)).cyl(o.r * 1.15, o.r * 1.3, gBot - botY, 18, [0.42, 0.4, 0.36, 0], false).at(c.x, SEA + 1.2, c.z, QX(90)).cyl(o.r * 1.9, o.r * 1.9, 6, 18, [0.62, 0.32, 0.12, 0]); }
+    return { p: v3(p.x, y, p.z), a }; })();
+  placePlat(at('narrows')[10], 115, 44, 120, 90, heading(at('narrows')[10]), 'plant', 23);
+  placePlat(at('narrows')[60], -120, 46, 110, 90, heading(at('narrows')[60]), 'rig', 29);
+  // truss bridges: from the narrows platforms to the bridge-straight platforms, crossing over the course
+  const bridgeA = placePlat(at('bridge')[10], -130, 52, 90, 80, heading(at('bridge')[10]), 'station', 31), bridgeB = placePlat(at('island')[6], 140, 50, 90, 70, heading(at('island')[6]), 'plant', 37);
+  const bridgeLine = (a, b, y) => { if (!a || !b) return; const A = v3(a.x, y, a.z), B = v3(b.x, y, b.z), n = 24; for (let k = 0; k <= n; k++) { const p = new Vec3().lerpVectors(A, B, k / n); if (!clear.sphere(p, 10, 6)) return; }
+    truss(big.mat(0.7, 0.5, 1, DET.struct), A, B, 9, 14, [0.36, 0.35, 0.34, 0]); const d = new Vec3().subVectors(B, A); for (let k = 1; k < 20; k++) { const p = new Vec3().lerpVectors(A, B, k / 20); bigLit.at(p.x, p.y + 4.8, p.z, qLook(d)).box(0.5, 0.3, 2, LAMP); } };
+  bridgeLine(bridgeA, narrowsDeck.p, 96); bridgeLine(bridgeA, bridgeB, 92);
+  { const a = placed[0], b = placed[6]; if (a && b) bridgeLine(v3(a.x, 0, a.z), v3(b.x, 0, b.z), 70); }
+
+  // ---------------------------------------------------------------- islands, a lighthouse, buoys
+  const island = (x, z, R, H, seed) => {
+    const g = new Geo(), seg = 72, rings = 18, rows = [];
+    for (let j = 0; j <= rings; j++) { const row = [], u = j / rings; for (let k = 0; k <= seg; k++) { const a = k / seg * Math.PI * 2, n = fbm2(Math.cos(a) * 2 + seed, Math.sin(a) * 2, seed, 4), rr = R * (1 - u) * (0.75 + 0.5 * n);
+      const px = x + Math.cos(a) * rr, pz = z + Math.sin(a) * rr, cliff = Math.min(1, u * 6), hh = SEA - 8 + (H * (0.35 + 0.65 * Math.pow(u, 0.6)) * cliff) * (0.7 + 0.6 * ridged2(px * 0.006, pz * 0.006, seed, 4));
+      const grass = u > 0.25 ? [0.12, 0.17, 0.09, 0] : [0.15, 0.14, 0.13, 0]; row.push(g.mat(0, 0.92, 1, 13).v(px, hh, pz, 0, 1, 0, grass)); } rows.push(row); }
+    for (let j = 0; j < rings; j++) for (let k = 0; k < seg; k++) g.quad(rows[j][k], rows[j][k + 1], rows[j + 1][k + 1], rows[j + 1][k]);
+    // normals from the faces
+    const NN = new Float32Array(g.p.length); for (let k = 0; k < g.i.length; k += 3) { const a = g.i[k] * 3, b = g.i[k + 1] * 3, c = g.i[k + 2] * 3, ux = g.p[b] - g.p[a], uy = g.p[b + 1] - g.p[a + 1], uz = g.p[b + 2] - g.p[a + 2], vx = g.p[c] - g.p[a], vy = g.p[c + 1] - g.p[a + 1], vz = g.p[c + 2] - g.p[a + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; for (const m of [a, b, c]) { NN[m] += nx; NN[m + 1] += ny; NN[m + 2] += nz; } }
+    for (let m = 0; m < NN.length; m += 3) { const l = Math.hypot(NN[m], NN[m + 1], NN[m + 2]) || 1, s = NN[m + 1] < 0 ? -1 : 1; g.n[m] = NN[m] / l * s; g.n[m + 1] = NN[m + 1] / l * s; g.n[m + 2] = NN[m + 2] / l * s; }
+    return g;
+  };
+  const isl = [];
+  { // one inside the sweeper around the island turn, more out to sea, kept clear of the course
+    const i = mid('island'), p = t.pos[i], s = Math.sign(t.kLat[i]) || 1, ctr = beside(i, s * 520), spots = [[ctr.x, ctr.z, 260, 140], [cx + 2600, cz + 1800, 520, 210], [cx - 3200, cz - 900, 700, 260], [cx + 900, cz - 3300, 380, 150], [cx - 2100, cz + 3600, 460, 190], [cx + 3800, cz - 1600, 300, 120]];
+    void p; spots.forEach(([x, z, R, H], k) => { let ok = true; for (let j = 0; j < N; j += 4) if (Math.hypot(t.pos[j].x - x, t.pos[j].z - z) < R * 1.25 + t.w[j] + 40) { ok = false; break; } if (!ok) return;
+      items.push({ mesh: gfx.mesh(island(x, z, R, H, 40 + k * 7).build()), prog: 'pbrRock', visible: true, cast: k === 0 }); isl.push({ x, z, R, H }); });
+  }
+  const beacon = { p: null, a: 0 };
+  if (isl.length) { const I = isl[0], b = v3(I.x, SEA + I.H * 0.95, I.z); big.mat(0.2, 0.6, 1, DET.struct).at(b.x, b.y + 16, b.z, QX(90)).cyl(4.2, 3, 32, 20, [0.88, 0.88, 0.86, 0], false);
+    for (let k = 0; k < 4; k++) big.at(b.x, b.y + 4 + k * 8, b.z, QX(90)).cyl(4.3 - k * 0.3, 4.3 - k * 0.3, 2.4, 20, [0.75, 0.12, 0.1, 0], false);
+    big.mat(0.8, 0.3, 1, DET.struct).at(b.x, b.y + 33.5, b.z, QX(90)).cyl(3.4, 3.4, 3, 16, [0.2, 0.2, 0.22, 0], true); bigLit.at(b.x, b.y + 36, b.z, QX(90)).cyl(2.6, 2.6, 3.6, 16, [1, 0.95, 0.75, 1]);
+    beacon.p = v3(b.x, b.y + 36, b.z); }
+  // buoys along the wave-skimming sections, just outside the corridor
+  for (const tag of ['skim', 'swell']) { const ids = at(tag); for (let k = 0; k < ids.length; k += 18) for (const s of [-1, 1]) { const i = ids[k], b = beside(i, s * (t.w[i] + 16)); b.y = SEA + 1;
+    big.mat(0.4, 0.6, 1, 0).at(b.x, b.y, b.z, QX(90)).cyl(1.4, 1.8, 4, 12, s > 0 ? [0.75, 0.1, 0.08, 0] : [0.1, 0.55, 0.2, 0], true); big.at(b.x, b.y + 3.6, b.z, QX(90)).cyl(0.25, 0.25, 4, 6, [0.6, 0.6, 0.6, 0], false);
+    lights.push({ p: v3(b.x, b.y + 5.8, b.z), c: s > 0 ? [3.5, 0.3, 0.2] : [0.3, 3.5, 0.6], s: 2.2, blink: 1.4, ph: k * 0.11 }); } }
+
+  // ---------------------------------------------------------------- the skyline: a floating arcology, a space elevator, wind turbines
+  { const A = v3(cx - 7800, SEA, cz + 6400), g = big;
+    g.mat(0.4, 0.5, 1, DET.struct).at(A.x, SEA + 6, A.z, QX(90)).cyl(900, 980, 24, 64, [0.3, 0.31, 0.33, 0], true);
+    for (let k = 0; k < 26; k++) { const a = k / 26 * 6.283 + (k % 3) * 0.2, rr = 150 + (k * 97 % 600), p = v3(A.x + Math.cos(a) * rr, 0, A.z + Math.sin(a) * rr), hh = 120 + ((k * 53) % 9) * 55, w = 40 + (k % 4) * 15;
+      g.mat(0.5, 0.35, 1, DET.facade).at(p.x, SEA + 18 + hh / 2, p.z, QY(k * 23)).box(w, hh, w * 0.8, [0.45, 0.48, 0.52, 0]); }
+    g.mat(0.1, 0.15, 1, DET.glass).at(A.x, SEA + 18, A.z, QX(-90)).lathe([[700, 0], [660, 160], [520, 330], [300, 450], [10, 490]], 48, [0.22, 0.3, 0.36, 0]);
+    for (let k = 0; k < 40; k++) { const a = k / 40 * 6.283, p = v3(A.x + Math.cos(a) * 905, SEA + 20, A.z + Math.sin(a) * 905); bigLit.at(p.x, p.y, p.z).box(8, 3, 8, LAMP); }
+    // space elevator: anchor platform and the tether rising through the clouds
+    const E = v3(cx + 6200, SEA, cz - 7400); g.mat(0.5, 0.5, 1, DET.struct).at(E.x, SEA + 20, E.z, QX(90)).cyl(260, 300, 40, 40, [0.32, 0.33, 0.35, 0], true);
+    g.at(E.x, SEA + 1500, E.z, QX(90)).cyl(14, 14, 3000, 12, [0.55, 0.56, 0.6, 0], false); for (let y = 200; y < 3000; y += 250) { bigLit.at(E.x, SEA + y, E.z).box(30, 4, 30, CYAN); lights.push({ p: v3(E.x, SEA + y, E.z), c: [0.6, 2.2, 3], s: 40, blink: 0.4, ph: y * 0.001 }); }
+    for (let k = 0; k < 9; k++) { const p = v3(cx + 5200 + (k % 3) * 520, SEA, cz + 2800 + Math.floor(k / 3) * 600); g.mat(0.3, 0.5, 1, DET.struct).at(p.x, SEA + 70, p.z, QX(90)).cyl(3.5, 2.2, 140, 12, [0.85, 0.86, 0.87, 0], false); g.at(p.x, SEA + 141, p.z).bbox(5, 5, 12, 1, [0.85, 0.86, 0.87, 0]); }
+  }
+  const turbines = gfx.mesh((() => { const g = new Geo().mat(0.3, 0.45, 1, DET.struct); for (let k = 0; k < 3; k++) g.at(0, 0, 0, QZ(k * 120).multiply(QX(-90))).plate([[-1.4, 1], [1.4, 1], [0.6, 60], [-0.6, 60]], 0.6, [0.85, 0.86, 0.87, 0]); return g.build(); })());
+  const rotors = []; for (let k = 0; k < 9; k++) { const it = { mesh: turbines, pos: v3(cx + 5200 + (k % 3) * 520, SEA + 141, cz + 2800 + Math.floor(k / 3) * 600 - 6), quat: new Quat(), scale: 1, visible: true, br: 70, ph: k * 0.7 }; items.push(it); rotors.push(it); }
+
+  // ---------------------------------------------------------------- ships at sea and craft in the sky
+  const freighter = gfx.mesh((() => { const g = new Geo(); g.mat(0.4, 0.6, 1, DET.hull).plate([[-14, -90], [14, -90], [16, 60], [0, 95], [-16, 60]], 14, [0.18, 0.2, 0.24, 0], 1.5);
+    g.at(0, -6, 0).plate([[-14.2, -90.2], [14.2, -90.2], [16.2, 60], [0, 95.5], [-16.2, 60]], 4, [0.5, 0.12, 0.1, 0], 0.5);
+    const C = [[0.7, 0.3, 0.15], [0.2, 0.4, 0.6], [0.65, 0.6, 0.2], [0.3, 0.5, 0.3], [0.5, 0.5, 0.52]];
+    for (let k = 0; k < 30; k++) { const x = -9 + (k % 3) * 9, z = -60 + Math.floor(k / 3) * 12, hh = 1 + (k * 7 % 3); g.mat(0.35, 0.6, 1, 16).at(x, 7 + hh * 1.3, z).bbox(8.4, 2.6 * hh, 11.4, 0.2, [...C[(k * 5) % 5], 0]); }
+    g.mat(0.4, 0.5, 1, DET.struct).at(0, 18, -76).bbox(26, 22, 12, 1, [0.85, 0.85, 0.83, 0]); g.mat(0, 0.4, 3, 0).at(0, 25, -69.9).box(20, 1.4, 0.2, LAMP); return g.build(); })());
+  const boats = [];
+  for (let k = 0; k < 4; k++) { const a = k * 1.7 + 0.4, R0 = 2600 + k * 700, it = { mesh: freighter, pos: new Vec3(), quat: new Quat(), scale: 1, visible: true, br: 100, cast: false }; items.push(it); boats.push({ it, a, R0, w: (k % 2 ? 1 : -1) * 0.004 / (1 + k * 0.3) }); }
+  const patrol = gfx.mesh(buildPatrol()), hauler = gfx.mesh(buildHauler());
+  const mv = movers([
+    ...[0, 1, 2].map(k => ({ mesh: patrol, br: 20, path: (time, p, q) => { const a = time * (0.07 + k * 0.02) + k * 2.1, R = 900 + k * 260; p.set(cx + Math.cos(a) * R, 240 + k * 70, cz + Math.sin(a) * R); q.setAxisAngle(0, 1, 0, -a); },
+      lights: [{ x: 7.2, y: 0, z: -6, s: 2.4, c: [4, 0.4, 0.3], blink: 1.4, ph: k }, { x: -7.2, y: 0, z: -6, s: 2.4, c: [0.4, 4, 0.6], blink: 1.4, ph: k + 0.4 }] })),
+    ...[0, 1].map(k => ({ mesh: hauler, scale: 2.5, br: 140, path: (time, p, q) => { const a = time * 0.02 * (k ? 1 : -1) + k * 2.6, R = 2200 + k * 600; p.set(cx + Math.cos(a) * R, 700 + k * 160, cz + Math.sin(a) * R); q.setAxisAngle(0, 1, 0, -a + (k ? 0 : Math.PI)); },
+      lights: [{ x: 9, y: 0, z: -40, s: 5, c: [4, 0.5, 0.3], blink: 1.1, ph: k }] }))]);
+  items.push(...mv.items);
+
+  // ---------------------------------------------------------------- the course kit: energy walls, gates on stilts, pickups,
+  // the platform columns in the narrows, route lights
+  const hex = hexField(gfx, t, (i, f) => t.loopId[i] < 0 || f === 'T', [0.35, 0.85, 1]); // in the loops the rails and the keel mark the walls; only the inner face glows
+  const gt = gates(gfx, t), pk = pickups(gfx, t), hz = hazards(gfx, t), rg = routeGuides(gfx, t, { colL: [1, 0.72, 0.3], colR: [0.3, 0.9, 1] });
+  for (const i of t.cpIdx) { const W = t.w[i] + 1.2, H = t.h[i] + 1.2; for (const s of [-1, 1]) { const top = P(t, i, s * (W + 1.3), -H - 1.3), foot = top.clone(); foot.y = SEA - 6; if (top.y - foot.y < 6) continue;
+    truss(big.mat(0.7, 0.5, 1, DET.struct), foot, top, 3.2, 6, [0.32, 0.32, 0.33, 0]); big.mat(0.5, 0.6, 1, DET.struct).at(foot.x, SEA + 1, foot.z).bbox(7, 5, 7, 0.8, [0.6, 0.3, 0.12, 0]); } }
+  items.push(...hex.items, ...gt.items, ...pk.items, ...hz.items, ...rg.items);
+  items.push(...ch.items(gfx, 'loop', { cast: true, prog: 'pbrStruct', maxDist: 6000 }), ...ch.items(gfx, 'loopLit', { prog: 'pbrStruct', maxDist: 6000 }));
+  items.push({ mesh: gfx.mesh(big.build()), visible: true, prog: 'pbrCity' }, { mesh: gfx.mesh(bigLit.build()), visible: true, prog: 'pbrStruct' });
+
+  const env = { sunDir: v3(0.52, 0.34, 0.78).normalize(), sunCol: [2.7, 2.45, 2.15], fogCol: [0.15, 0.18, 0.21], fog: 0.00026, fogH: [SEA, 420], sky: 'atmo', zen: [0.045, 0.06, 0.08], hor: [0.3, 0.34, 0.38],
+    dirt: 0.35, streak: 0.55, flare: 0.65, envInt: 0.95, expo: 1.06, shafts: 0.55, reverb: 'open',
+    nebA: [0.2, 0.3, 0.4], nebB: [0.3, 0.4, 0.5], nebC: [0.8, 0.9, 1], base: [0.02, 0.025, 0.03], neb: 0, seed: 7.7, sat: 0.94, lift: [0.004, 0.008, 0.012], gain: [0.98, 1.0, 1.03],
+    planet: { dir: v3(-0.45, 0.42, -0.79), dist: 42000, r: 7000, type: 2, a: [0.74, 0.8, 0.86], b: [0.5, 0.58, 0.68], c: [0.94, 0.97, 1], atmo: [0.55, 0.72, 1], bright: 0.55 } };
+  items.push(...planetItems(gfx, env, t.def.seed));
+
+  // ---------------------------------------------------------------- per frame
+  const fr = new Frustum(); let flash = null, nextBolt = 2.5, sprayT = 0, flameT = 0;
+  const strike = (cam) => { // a lightning strike somewhere in the storm, 1.5-7 km from the camera, mostly ahead
+    const a = Math.atan2(cam.fwd.x, cam.fwd.z) + (Math.random() - 0.5) * 2.2, d = 1500 + Math.random() * 5500, x = cam.pos.x + Math.sin(a) * d, z = cam.pos.z + Math.cos(a) * d, pts = [v3(x, U.uCloud[0] * 0.95, z)];
+    for (let k = 1; k <= 12; k++) { const p = pts[k - 1], y = U.uCloud[0] * 0.95 * (1 - k / 12); pts.push(v3(p.x + (Math.random() - 0.5) * 140, y, p.z + (Math.random() - 0.5) * 140)); }
+    flash = { x, z, t: 0, life: 0.55 + Math.random() * 0.3, pts, branch: Math.floor(3 + Math.random() * 5), fl: [0, 0.07, 0.16, 0.3].map(v => v + Math.random() * 0.05) }; };
+  return { items, env, cull(cam) { fr.set(cam, gfx); },
+    hexState: me => { hex.state.ship.copy(me ? me.ship.pos : v3(0, 0, 0)); return hex.state; }, hexHit: (p, time) => hex.hit(p, time),
+    update(dt, time, race, fx, cam) {
+      gt.update(race, time); pk.update(dt, time, fx); hz.update(dt, time, race, fx, cam); mv.update(dt, time, fx); rg.update(fx, cam, race, time);
+      const c = cam.pos; ocean.pos.set(Math.round(c.x / 4) * 4, 0, Math.round(c.z / 4) * 4); dome.pos.set(c.x, 0, c.z);
+      // lightning: a flicker of 3-4 pulses, the bolt drawn as glowing streaks, the deck and the sea lit around it
+      if ((nextBolt -= dt) < 0 && !flash) { strike(cam); nextBolt = 3 + Math.random() * 6; }
+      U.uFlash[2] = 0;
+      if (flash) { flash.t += dt; const f = flash, on = f.fl.some(s => f.t > s && f.t < s + 0.05) ? 1 : Math.max(0, 1 - f.t / f.life) * 0.25;
+        U.uFlash[0] = f.x; U.uFlash[1] = f.z; U.uFlash[2] = on * 2.4; U.uFlash[3] = 1100;
+        if (on > 0.5) for (let k = 0; k < f.pts.length - 1; k++) { const a = f.pts[k], b = f.pts[k + 1], d = new Vec3().subVectors(b, a), L = d.len(); d.scale(1 / L);
+          fx.bbAdd.add((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, 5, 3.2, 3.5, 4.5, 1, d.x, d.y, d.z, L * 1.05); if (k === f.branch) { const e = v3(b.x + (Math.random() - 0.5) * 300, b.y - 200, b.z + (Math.random() - 0.5) * 300), d2 = new Vec3().subVectors(e, b), L2 = d2.len(); d2.scale(1 / L2); fx.bbAdd.add((b.x + e.x) / 2, (b.y + e.y) / 2, (b.z + e.z) / 2, 3, 2, 2.3, 3, 0.8, d2.x, d2.y, d2.z, L2); } }
+        if (f.t > f.life) flash = null; }
+      // flare stacks: a roaring flame and a dark smoke trail bent by the wind
+      if ((flameT -= dt) < 0) { flameT = 0.05; for (const f of flares) if (f.p.dist(c) < 4500) { const s = f.s; fx.spawn(f.p.x, f.p.y, f.p.z, 2 + Math.random() * 2, 6 + Math.random() * 6, 1, 0.5, 4 * s, 9 * s, 3.4, 1.4, 0.35, 0.9, true, 0.6);
+        if (Math.random() < 0.5) fx.spawn(f.p.x, f.p.y + 8 * s, f.p.z, 6, 7, 2, 5, 8 * s, 40 * s, 0.07, 0.065, 0.06, 0.5, false, 0.15); } }
+      for (const f of flares) if (f.p.dist(c) < 9000) { const fl = 0.75 + 0.25 * Math.sin(time * 23 + f.p.x) * Math.sin(time * 7.1 + f.p.z); fx.bbAdd.add(f.p.x, f.p.y + 1, f.p.z, 3.2 * f.s, 3.4, 2.2, 0.9, fl); // core and the flame tongue bending downwind
+        fx.bbAdd.add(f.p.x + 2 * f.s, f.p.y + 9 * f.s, f.p.z + 1 * f.s, 4 * f.s, 2.8, 1.1, 0.25, 0.8 * fl, 0.22, 1, 0.1, 20 * f.s * (0.8 + 0.3 * fl)); fx.bbAdd.add(f.p.x, f.p.y + 4, f.p.z, 22 * f.s, 0.5, 0.22, 0.06, 0.4 * fl); }
+      // spray where any ship skims the waves
+      if ((sprayT -= dt) < 0 && race) { sprayT = 0.03; for (const r of race.racers) { const s = r.ship, p = s.pos, alt = p.y - SEA; if (r.wrecked || alt > 13 || p.dist(c) > 600) continue;
+        const v = s.vel, sp = v.len(); if (sp < 40) continue; const k = (13 - alt) / 13;
+        for (let n = 0; n < 3; n++) fx.spawn(p.x - v.x * 0.03 + (Math.random() - 0.5) * 3, SEA + 1, p.z - v.z * 0.03 + (Math.random() - 0.5) * 3, -v.x * 0.08 + (Math.random() - 0.5) * 8, 6 + Math.random() * 10 * k, -v.z * 0.08 + (Math.random() - 0.5) * 8, 0.9 + Math.random() * 0.6, 1.2, 6 + 6 * k, 0.6, 0.66, 0.7, 0.32 * k, false, 1.2, 0, 9.8); } }
+      // freighters on their courses, with a bow wave and a wake
+      for (const b of boats) { const a = b.a + time * b.w, p = b.it.pos; p.set(cx + Math.cos(a) * b.R0, SEA - 1.5 + Math.sin(time * 0.6 + b.R0) * 0.6, cz + Math.sin(a) * b.R0);
+        const dir = v3(-Math.sin(a) * Math.sign(b.w), 0, Math.cos(a) * Math.sign(b.w)); b.it.quat.copy(qLook(dir)).multiply(new Quat().setAxisAngle(0, 0, 1, Math.sin(time * 0.4 + b.R0) * 0.02));
+        if (p.dist(c) < 5000 && Math.random() < dt * 8) { const st = p.clone().addScaled(dir, -88); fx.spawn(st.x + (Math.random() - 0.5) * 20, SEA + 1, st.z + (Math.random() - 0.5) * 20, 0, 1, 0, 6, 10, 40, 0.5, 0.55, 0.58, 0.25, false, 0.3); } }
+      for (const it of rotors) it.quat.setAxisAngle(0, 0, 1, time * 0.8 + it.ph);
+      // lights: navigation and warning lamps, the lighthouse beam sweeping the sea
+      for (const l of lights) { if (l.blink && Math.floor((time + (l.ph || 0)) / l.blink) % 2) continue; if (l.p.dist(c) > 9000) continue; fx.bbAdd.add(l.p.x, l.p.y, l.p.z, l.s, l.c[0], l.c[1], l.c[2], 1); }
+      if (beacon.p) { const a = time * 1.6, d = v3(Math.cos(a), -0.04, Math.sin(a)); fx.bbAdd.add(beacon.p.x, beacon.p.y, beacon.p.z, 9, 3, 2.8, 2.2, 1); fx.bbAdd.add(beacon.p.x + d.x * 600, beacon.p.y + d.y * 600, beacon.p.z + d.z * 600, 22, 0.5, 0.48, 0.4, 0.5, d.x, d.y, d.z, 1200); }
+    },
+    light(me) { if (!flash || U.uFlash[2] < 0.5) return null; return { pos: v3(flash.x, 700, flash.z), col: [3.2, 3.5, 4.2].map(v => v * U.uFlash[2]), range: 5200 }; } };
+}
+
+return { buildPelagos };
+})();
+const __m__src_render_courses_ignara_js = (() => {
+// GALACTIC RUSH V9 — Ignara, the volcanic world: a lava river in a basalt canyon, lava falls pouring off the rims, a
+// rock tunnel lit by glowing fissures, a ridge with the volcanoes on the horizon (one of them erupting), a mining
+// complex on stilts above a lava lake, a natural arch, smoke, ash and embers under a sky lit orange from below.
+const { Vec3, Quat, makeRng } = __m__src_math_js;
+const { Geo, QX, QY, QZ, DET } = __m__src_render_geo_js;
+const { Chunks, ribbon, fq, P, hexField, gates, pickups, routeGuides, movers, v3 } = __m__src_render_courses_common_js;
+const { buildHauler, buildPatrol } = __m__src_render_props_js;
+const { rockGeo } = __m__src_render_courses_belt_js;
+const { Frustum } = __m__src_render_lod_js;
+const { ensurePrograms, Clearance, beam, truss, domeGeo, qLook, fbm2, ridged2, vnoise2 } = __m__src_render_courses_v9kit_js;
+const LAMP = [1, 0.75, 0.45, 1], RED = [1, 0.12, 0.08, 1];
+const STEEL = [[0.3, 0.29, 0.28, 0], [0.24, 0.23, 0.22, 0], [0.36, 0.3, 0.24, 0], [0.2, 0.2, 0.21, 0]];
+const RUST = [[0.42, 0.22, 0.12, 0], [0.55, 0.42, 0.18, 0], [0.32, 0.18, 0.12, 0]];
+
+function buildIgnara(gfx, t) {
+  ensurePrograms(gfx);
+  const rng = makeRng(t.def.seed * 29 + 3), items = [], N = t.N, clear = new Clearance(t);
+  const at = tag => t.tags.get(tag) || [], mid = tag => { const a = at(tag); return a[a.length >> 1]; };
+  let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9; for (const p of t.pos) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
+  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+  const ch = new Chunks(t, 96), big = new Geo(), bigLit = new Geo().mat(0, 0.4, 4, 0), lights = [], vents = [], smokes = [];
+  const STEEP = new Set(['descent', 'canyon', 'falls', 'hairpin', 'basin', 'tunnel', 'portal', 'mine']);
+  const tagOf = i => t.def.path.segs[t.segIdx[i]].tag || ''; void tagOf;
+
+  // ---------------------------------------------------------------- lava: rivers along polylines and lakes
+  const rivers = [], lakes = [];
+  { // the canyon river follows the course from the canyon down the falls into the basin lake; its surface never climbs downstream
+    const ids = [...at('canyon'), ...at('falls'), ...at('hairpin')], pts = []; let lvl = Infinity;
+    for (let k = 0; k < ids.length; k += 2) { const i = ids[k], p = t.pos[i]; lvl = Math.min(lvl, p.y - t.h[i] - 9); pts.push({ x: p.x, z: p.z, y: lvl, w: t.w[i] * 1.25 }); }
+    rivers.push({ pts, speed: 1.6, heat: 0.95 });
+    const b = t.pos[mid('basin')]; lakes.push({ x: b.x, z: b.z, r: 210, y: lvl - 1.5 });
+  }
+  { const i = mid('bridge'), p = t.pos[i]; lakes.push({ x: p.x, z: p.z, r: 330, y: p.y - t.h[i] - 30 }); }
+  { // a river crossing under the start bridge, from the hills to the mine lake
+    const i = mid('start'), p = t.pos[i], B = t.bin[i], b = new Vec3(B.x, 0, B.z).normalize(), y0 = p.y - t.h[i] - 32, pts = [];
+    for (let k = -14; k <= 14; k++) { const d = k * 80, wob = Math.sin(k * 0.7) * 40; pts.push({ x: p.x + b.x * d + t.tan[i].x * wob, z: p.z + b.z * d + t.tan[i].z * wob, y: y0 - k * 1.2, w: 34 }); }
+    rivers.push({ pts, speed: 0.9, heat: 0.85 });
+  }
+  // nearest lava (distance in plan, surface height) for terrain carving and heat
+  const lavaAt = (x, z) => { let best = 1e9, y = 0, w = 0;
+    for (const R of rivers) for (let k = 0; k < R.pts.length - 1; k++) { const a = R.pts[k], b = R.pts[k + 1], ux = b.x - a.x, uz = b.z - a.z, L2 = ux * ux + uz * uz || 1, s = Math.max(0, Math.min(1, ((x - a.x) * ux + (z - a.z) * uz) / L2));
+      const d = Math.hypot(x - a.x - ux * s, z - a.z - uz * s); if (d - (a.w + (b.w - a.w) * s) < best) { best = d - (a.w + (b.w - a.w) * s); y = a.y + (b.y - a.y) * s; w = a.w; } }
+    for (const L of lakes) { const d = Math.hypot(x - L.x, z - L.z) - L.r; if (d < best) { best = d; y = L.y; w = L.r; } }
+    return { d: best, y, w }; };
+
+  // ---------------------------------------------------------------- terrain: the near field around the course and the far field
+  // natural relief: ridged mountains with plateaus; near the course the ground is held below the corridor (with margin
+  // for its bank), rising steeply into canyon walls on the technical sections and gently on the open ones
+  const natural = (x, z) => 55 + 120 * ridged2(x / 950 + 3.1, z / 950 - 1.7, 11, 5) + 45 * fbm2(x / 260, z / 260, 5, 4) - 40;
+  const SP = 14, X0 = Math.floor((minX - 1100) / SP) * SP, X1 = Math.ceil((maxX + 1100) / SP) * SP, Z0 = Math.floor((minZ - 1100) / SP) * SP, Z1 = Math.ceil((maxZ + 1100) / SP) * SP;
+  const NX = (X1 - X0) / SP + 1, NZ = (Z1 - Z0) / SP + 1, H = new Float32Array(NX * NZ), HEAT = new Float32Array(NX * NZ);
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) H[j * NX + i] = natural(X0 + i * SP, Z0 + j * SP);
+  // the corridor holds the ground down: each course sample lowers the cells in its own slab (14 m either side along the
+  // course) to below the corridor's lowest corner, then lets it rise with distance (steep or gentle by section)
+  for (let i = 0; i < N; i++) {
+    const p = t.pos[i], T = t.tan[i], th = Math.hypot(T.x, T.z) || 1, tx = T.x / th, tz = T.z / th, w = t.w[i], tg = t.def.path.segs[t.segIdx[i]].tag || '', k = STEEP.has(tg) ? 2.6 : 0.45;
+    const low = p.y - t.h[i] * Math.cos(t.bank[i]) - w * Math.abs(Math.sin(t.bank[i])) - 7, reach = w + 14 + Math.min(420, (260 - low) / k);
+    const i0 = Math.max(0, Math.floor((p.x - reach - X0) / SP)), i1 = Math.min(NX - 1, Math.ceil((p.x + reach - X0) / SP)), j0 = Math.max(0, Math.floor((p.z - reach - Z0) / SP)), j1 = Math.min(NZ - 1, Math.ceil((p.z + reach - Z0) / SP));
+    for (let jj = j0; jj <= j1; jj++) for (let ii = i0; ii <= i1; ii++) { const dx = X0 + ii * SP - p.x, dz = Z0 + jj * SP - p.z, al = dx * tx + dz * tz; if (al > 14 || al < -14) continue;
+      const dl = Math.abs(dx * tz - dz * tx); if (dl > reach) continue; const lim = dl < w + 14 ? low : low + (dl - w - 14) * k, m = jj * NX + ii; if (lim < H[m]) H[m] = lim; } }
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const x = X0 + i * SP, z = Z0 + j * SP, m = j * NX + i, lv = lavaAt(x, z);
+    H[m] = lv.d < 18 ? Math.min(H[m], lv.y - 2 + Math.max(0, lv.d) * 0.6) : Math.min(H[m], lv.y - 2 + lv.d * 1.8 + 6);
+    // heat: next to the lava and not far above it, plus a few hot fields
+    HEAT[m] = Math.max(0, 1 - Math.max(0, lv.d) / 45) * Math.max(0, 1 - Math.max(0, H[m] - lv.y) / 32) * (0.75 + 0.25 * vnoise2(x * 0.02, z * 0.02, 3)) + 0.25 * Math.max(0, vnoise2(x * 0.004, z * 0.004, 9) - 0.72) * 4; }
+  const hAt = (x, z) => { const fi = (x - X0) / SP, fj = (z - Z0) / SP; if (fi < 0 || fj < 0 || fi >= NX - 1 || fj >= NZ - 1) return natural(x, z); const i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j, A = H[j * NX + i], B = H[j * NX + i + 1], C = H[(j + 1) * NX + i], D = H[(j + 1) * NX + i + 1]; return A + (B - A) * u + (C - A) * v + (A - B - C + D) * u * v; };
+  const BASALT = [[0.17, 0.15, 0.135], [0.13, 0.12, 0.11], [0.2, 0.16, 0.13], [0.15, 0.13, 0.12]];
+  const CS = 40; // chunk size in cells
+  for (let cj = 0; cj < NZ - 1; cj += CS) for (let ci = 0; ci < NX - 1; ci += CS) {
+    const pos = [], nor = [], col = [], mat = [], idx = [], ni = Math.min(CS, NX - 1 - ci) + 1, nj = Math.min(CS, NZ - 1 - cj) + 1;
+    let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (let j = 0; j < nj; j++) for (let i = 0; i < ni; i++) { const gi = ci + i, gj = cj + j, k = gj * NX + gi, x = X0 + gi * SP, z = Z0 + gj * SP, y = H[k];
+      const hx = H[gj * NX + Math.min(NX - 1, gi + 1)] - H[gj * NX + Math.max(0, gi - 1)], hz = H[Math.min(NZ - 1, gj + 1) * NX + gi] - H[Math.max(0, gj - 1) * NX + gi], nl = Math.hypot(hx, 2 * SP, hz);
+      const c = BASALT[(Math.floor(vnoise2(x * 0.01, z * 0.01, 2) * 4)) & 3], v = 0.8 + 0.4 * vnoise2(x * 0.05, z * 0.05, 4);
+      pos.push(x, y, z); nor.push(-hx / nl, 2 * SP / nl, -hz / nl); col.push(c[0] * v, c[1] * v, c[2] * v, Math.min(1, HEAT[k])); mat.push(0, 0.9, 1, 0);
+      lo = [Math.min(lo[0], x), Math.min(lo[1], y), Math.min(lo[2], z)]; hi = [Math.max(hi[0], x), Math.max(hi[1], y), Math.max(hi[2], z)]; }
+    for (let j = 0; j < nj - 1; j++) for (let i = 0; i < ni - 1; i++) { const a = j * ni + i, b = a + 1, c = a + ni, d = c + 1; idx.push(a, c, d, a, d, b); }
+    const c = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2], r = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2;
+    items.push({ mesh: gfx.mesh({ pos: new Float32Array(pos), nor: new Float32Array(nor), col: new Float32Array(col), mat: new Float32Array(mat), idx: new Uint32Array(idx) }), prog: 'v9rock', visible: true, cast: true, bs: { x: c[0], y: c[1], z: c[2], r } });
+  }
+  // far field: 26 km of mountains and three volcanoes, coarse, dropped below the near field where they overlap; the
+  // erupting one stands straight ahead of the ridge and the ridge descent, the open high section of the course
+  const volc = [{ x: cx + 1500, z: cz - 7400, h: 2300, r: 4200, erupt: true }, { x: cx - 6200, z: cz + 2600, h: 1500, r: 3200 }, { x: cx + 5600, z: cz + 4200, h: 1800, r: 3600 }];
+  const farH = (x, z) => { let h = natural(x, z) * 1.6;
+    for (const V of volc) { const d = Math.hypot(x - V.x, z - V.z); if (d < V.r) { const u = 1 - d / V.r, cone = V.h * Math.pow(u, 1.6) * (0.9 + 0.2 * fbm2(x / 300, z / 300, 7, 3)), crater = d < 260 ? (260 - d) * 0.55 : 0; h = Math.max(h, cone - crater); } }
+    const inNear = x > X0 + SP && x < X1 - SP && z > Z0 + SP && z < Z1 - SP; return inNear ? Math.min(h, hAt(x, z)) - 25 : h; };
+  { const FS = 160, R = 13000, n = Math.floor(2 * R / FS) + 1, x0 = cx - R, z0 = cz - R, pos = [], nor = [], col = [], mat = [], idx = [], Hf = new Float32Array(n * n);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) Hf[j * n + i] = farH(x0 + i * FS, z0 + j * FS);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = x0 + i * FS, z = z0 + j * FS, y = Hf[j * n + i], hx = Hf[j * n + Math.min(n - 1, i + 1)] - Hf[j * n + Math.max(0, i - 1)], hz = Hf[Math.min(n - 1, j + 1) * n + i] - Hf[Math.max(0, j - 1) * n + i], nl = Math.hypot(hx, 2 * FS, hz);
+      let heat = 0; for (const V of volc) if (V.erupt) { const d = Math.hypot(x - V.x, z - V.z); heat = Math.max(heat, d < 300 ? 1 : 0); }
+      const c = BASALT[(i + j) & 3]; pos.push(x, y, z); nor.push(-hx / nl, 2 * FS / nl, -hz / nl); col.push(c[0], c[1], c[2], heat); mat.push(0, 0.9, 1, 0); }
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) { const a = j * n + i, b = a + 1, c = a + n, d = c + 1; const xm = x0 + (i + 0.5) * FS, zm = z0 + (j + 0.5) * FS;
+      if (xm > X0 + FS && xm < X1 - FS && zm > Z0 + FS && zm < Z1 - FS) continue; idx.push(a, c, d, a, d, b); }
+    items.push({ mesh: gfx.mesh({ pos: new Float32Array(pos), nor: new Float32Array(nor), col: new Float32Array(col), mat: new Float32Array(mat), idx: new Uint32Array(idx) }), prog: 'v9rock', visible: true });
+  }
+
+  // ---------------------------------------------------------------- lava meshes: (u along /100, v across, speed, heat) in the colour channels
+  const lava = new Geo().mat(0, 0.6, 1, 0);
+  for (const R of rivers) { let u = 0; const rows = []; lava.mat(0, 0.6, 1, 2.3 * R.pts[R.pts.length >> 1].w); // material w: the flow's width (metres)
+    for (let k = 0; k < R.pts.length; k++) { const a = R.pts[Math.max(0, k - 1)], b = R.pts[Math.min(R.pts.length - 1, k + 1)], p = R.pts[k], dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L;
+      if (k) u += Math.hypot(p.x - R.pts[k - 1].x, p.z - R.pts[k - 1].z, p.y - R.pts[k - 1].y);
+      const row = []; for (let m = 0; m <= 6; m++) { const v = m / 6, o = (v - 0.5) * 2 * p.w * 1.15; row.push(lava.v(p.x + nx * o, p.y + (Math.abs(v - 0.5) > 0.45 ? 0.6 : 0), p.z + nz * o, 0, 1, 0, [u / 100, v, R.speed * (1 + Math.max(0, (R.pts[Math.max(0, k - 1)].y - p.y)) * 0.08), R.heat])); }
+      rows.push(row); }
+    for (let k = 0; k < rows.length - 1; k++) for (let m = 0; m < 6; m++) lava.quad(rows[k][m], rows[k + 1][m], rows[k + 1][m + 1], rows[k][m + 1]); }
+  for (const L of lakes) { const rows = []; lava.mat(1, 0.6, 1, 2 * L.r); /* material x = 1: the pattern in world x, z */ for (let j = 0; j <= 10; j++) { const rr = L.r * 1.08 * j / 10, row = []; for (let k = 0; k <= 48; k++) { const a = k / 48 * Math.PI * 2, x = L.x + Math.cos(a) * rr, z = L.z + Math.sin(a) * rr;
+      row.push(lava.v(x, L.y, z, 0, 1, 0, [(x - L.x) / 100, 0.5 + 0.5 * (j / 10), 0.25, 0.7])); } rows.push(row); }
+    for (let j = 0; j < 10; j++) for (let k = 0; k < 48; k++) lava.quad(rows[j][k], rows[j][k + 1], rows[j + 1][k + 1], rows[j + 1][k]); }
+  // lava falls pouring off the canyon rims into the river, and down the erupting volcano
+  const falls = [];
+  for (const [tag, f, s] of [['canyon', 0.25, 1], ['canyon', 0.62, -1], ['falls', 0.3, 1], ['falls', 0.7, -1], ['canyon', 0.88, -1]]) {
+    const ids = at(tag), i = ids[Math.floor(ids.length * f)], p = t.pos[i], B = t.bin[i], b = new Vec3(B.x, 0, B.z).normalize(); let top = null;
+    for (let d = t.w[i] + 30; d < t.w[i] + 140; d += 6) { const x = p.x + b.x * s * d, z = p.z + b.z * s * d, h = hAt(x, z); if (h > p.y + t.h[i] + 10) { top = v3(x, h, z); break; } }
+    if (!top) continue; lava.mat(0, 0.6, 1, 12); const lv = lavaAt(top.x, top.z), bot = v3(p.x + b.x * s * (t.w[i] * 1.1), lv.y, p.z + b.z * s * (t.w[i] * 1.1)), n = 10, W = 9 + rng() * 6, tg = new Vec3(t.tan[i].x, 0, t.tan[i].z).normalize(), rows = [];
+    for (let k = 0; k <= n; k++) { const u = k / n, e = u * u, pk = v3(top.x + (bot.x - top.x) * (0.15 * u + 0.85 * e), top.y + (bot.y - top.y) * u, top.z + (bot.z - top.z) * (0.15 * u + 0.85 * e)), row = [];
+      for (let m = 0; m <= 2; m++) { const v = m / 2, o = (v - 0.5) * W * (1 + u * 0.6); row.push(lava.v(pk.x + tg.x * o, pk.y, pk.z + tg.z * o, b.x * -s, 0.2, b.z * -s, [u * 2.4, v, 3.2, 1])); } rows.push(row); }
+    for (let k = 0; k < n; k++) for (let m = 0; m < 2; m++) lava.quad(rows[k][m], rows[k + 1][m], rows[k + 1][m + 1], rows[k][m + 1]);
+    falls.push({ bot, top, W });
+  }
+  { const V = volc[0]; lava.mat(0, 0.6, 1, 120); for (let f = 0; f < 5; f++) { const a = f * 1.3 + 0.4, pts = []; let x = V.x + Math.cos(a) * 270, z = V.z + Math.sin(a) * 270;
+      for (let k = 0; k < 40; k++) { const h = farH(x, z) + 3; pts.push({ x, z, y: h, w: 40 + k * 2 }); const e = 30, gx = farH(x + e, z) - farH(x - e, z), gz = farH(x, z + e) - farH(x, z - e), gl = Math.hypot(gx, gz) || 1; x -= gx / gl * 90 + Math.cos(a) * 20; z -= gz / gl * 90 + Math.sin(a) * 20; }
+      let u = 0; const rows = pts.map((p, k) => { if (k) u += Math.hypot(p.x - pts[k - 1].x, p.y - pts[k - 1].y, p.z - pts[k - 1].z); const b = pts[Math.min(pts.length - 1, k + 1)], a2 = pts[Math.max(0, k - 1)], dx = b.x - a2.x, dz = b.z - a2.z, L = Math.hypot(dx, dz) || 1;
+        return [-1, 0, 1].map(s => lava.v(p.x - dz / L * s * p.w, p.y, p.z + dx / L * s * p.w, 0, 1, 0, [u / 100, (s + 1) / 2, 1.2, 1 - k / 50])); });
+      for (let k = 0; k < rows.length - 1; k++) for (let m = 0; m < 2; m++) lava.quad(rows[k][m], rows[k + 1][m], rows[k + 1][m + 1], rows[k][m + 1]); }
+    // crater lake
+    lava.mat(1, 0.6, 1, 420); const rows = []; for (let j = 0; j <= 4; j++) { const rr = 210 * j / 4, row = []; for (let k = 0; k <= 32; k++) { const a = k / 32 * 6.283; row.push(lava.v(V.x + Math.cos(a) * rr, V.h - 120, V.z + Math.sin(a) * rr, 0, 1, 0, [Math.cos(a) * rr / 100, 0.5 + j / 8, 0.4, 1])); } rows.push(row); }
+    for (let j = 0; j < 4; j++) for (let k = 0; k < 32; k++) lava.quad(rows[j][k], rows[j][k + 1], rows[j + 1][k + 1], rows[j + 1][k]); }
+  items.push({ mesh: gfx.mesh(lava.build()), prog: 'v9lava', visible: true, uniforms: { uGlowK: 0.85, uCrustK: 0.78 } });
+
+  // ---------------------------------------------------------------- the rock tunnel: a bore exactly on the corridor walls, a
+  // thick rock lid over it, fissures glowing in the walls; tunnel ribs are the two rock ribs that cross the bore
+  { const tun = i => !!t.tunnel[i], RK = [0.12, 0.1, 0.09, 0.62];
+    for (let c = 0; c < N; c += 48) { const i1 = Math.min(N, c + 48), g = ch.get(c, 'tun').mat(0, 0.9, 1, 0);
+      ribbon(g, t, i => [-t.w[i], -t.h[i]], i => [t.w[i], -t.h[i]], RK, c, i1, 2, tun); ribbon(g, t, i => [t.w[i], t.h[i]], i => [-t.w[i], t.h[i]], RK, c, i1, 2, tun);
+      ribbon(g, t, i => [-t.w[i], t.h[i]], i => [-t.w[i], -t.h[i]], RK, c, i1, 2, tun); ribbon(g, t, i => [t.w[i], -t.h[i]], i => [t.w[i], t.h[i]], RK, c, i1, 2, tun);
+      ribbon(g, t, i => [-t.w[i] - 60, t.h[i] + 26 + 6 * Math.sin(i * 0.3)], i => [t.w[i] + 60, t.h[i] + 26 + 6 * Math.cos(i * 0.21)], [0.12, 0.105, 0.1, 0.1], c, i1, 2, tun);
+      for (const s of [-1, 1]) ribbon(g, t, i => [s * (t.w[i] + 60), t.h[i] + 26], i => [s * (t.w[i] + 60), -t.h[i] - 10], [0.11, 0.1, 0.09, 0.05], c, i1, 2, tun);
+      ribbon(g, t, i => [-t.w[i] - 1, t.h[i] + 1], i => [t.w[i] + 1, t.h[i] + 1], [0.1, 0.09, 0.08, 0.2], c, i1, 2, tun); }
+    // lighting: amber work lamps on both walls, a seam of glowing rock low on each wall, light rings at the mouths
+    for (let i = 0; i < N; i++) { if (!t.tunnel[i]) continue; const q = fq(t, i), w = t.w[i], h = t.h[i], gl = ch.get(i, 'tunLit').mat(0, 0.4, 5, 0);
+      if (i % 5 === 0) for (const s of [-1, 1]) { const lp = P(t, i, s * (w + 0.1), h * 0.55); gl.at(lp.x, lp.y, lp.z, q).box(0.3, 0.7, 2.2, [1, 0.62, 0.25, 1]); }
+      const i2 = t.wrapIdx(i + 1); for (const s of [-1, 1]) { const a = P(t, i, s * (w + 0.05), -h * 0.62 + Math.sin(i * 0.4) * 1.2), b = P(t, i2, s * (w + 0.05), -h * 0.62 + Math.sin(i2 * 0.4) * 1.2), m = new Vec3().lerpVectors(a, b, 0.5); gl.mat(0, 0.4, 3, 0).at(m.x, m.y, m.z, q).box(0.2, 0.45, a.dist(b) + 0.1, [1, 0.32, 0.06, 1]); }
+      if (!t.tunnel[t.wrapIdx(i - 1)] || !t.tunnel[t.wrapIdx(i + 1)] || i % 24 === 0) for (const [x, y, sx, sy] of [[0, h + 0.3, 2 * w, 0.5], [0, -h - 0.3, 2 * w, 0.5], [w + 0.3, 0, 0.5, 2 * h], [-w - 0.3, 0, 0.5, 2 * h]]) { const p = P(t, i, x, y); gl.mat(0, 0.4, 4, 0).at(p.x, p.y, p.z, q).box(sx, sy, 0.8, [1, 0.5, 0.12, 1]); } }
+    items.push(...ch.items(gfx, 'tunLit', { prog: 'pbrStruct' }));
+    // portal frames: heavy basalt lintels at both mouths
+    const ids = at('tunnel'); for (const i of [ids[0], ids[ids.length - 1]]) { const q = fq(t, i), w = t.w[i], h = t.h[i];
+      for (const [x, y, sx, sy] of [[0, h + 9.5, 2 * w + 40, 16], [w + 14, -2, 24, 2 * h + 24], [-w - 14, -2, 24, 2 * h + 24]]) { const p = P(t, i, x, y); ch.get(i, 'tunR').mat(0, 0.9, 1, 14).at(p.x, p.y, p.z, q).polyRock(1, i * 0.37 + x, [0.13, 0.11, 0.1, 0], { planes: 16, lo: 0.85, hi: 1.05, stretch: [sx / 2, sy / 2, 14], seg: 0.3, rings: 2 }); } }
+    items.push(...ch.items(gfx, 'tun', { prog: 'v9rock', cast: true }), ...ch.items(gfx, 'tunR', { prog: 'pbrRock', cast: true }));
+  }
+
+  // ---------------------------------------------------------------- rock formations: obstacles (basalt pillars, rock ribs), the
+  // hairpin spire, basalt column clusters along the canyon, the natural arch
+  const rocks = new Geo(), ribLit = new Geo().mat(0, 0.4, 4, 0), hz = [];
+  for (const o of t.obstacles) {
+    if (o.kind === 'basalt') { const base = P(t, o.i, o.x, 0), lv = lavaAt(base.x, base.z), y0 = Math.min(lv.y, base.y - t.h[o.i]) - 4, y1 = base.y + t.h[o.i] + 18 + rng() * 20;
+      for (let k = 0; k < 4; k++) { const a = k * 1.57 + 0.4, d = k ? o.r * 1.05 : 0, hh = (y1 - y0) * (k ? 0.55 + rng() * 0.35 : 1), rr = k ? o.r * 0.55 : o.r * 0.97; if (k && !clear.sphere(v3(base.x + Math.cos(a) * d, base.y, base.z + Math.sin(a) * d), rr, 2)) continue;
+        rocks.mat(0.1, 0.85, 1, 14).at(base.x + Math.cos(a) * d, y0 + hh / 2, base.z + Math.sin(a) * d, QX(90)).cyl(rr * 1.04, rr * 1.04, hh, 6, [0.12, 0.105, 0.1, 0], true); } // hexagonal: 0.9..1.04 of the collision radius
+      hz.push({ o, p: base }); }
+    else if (o.kind === 'rib') { const q = fq(t, o.i), c = P(t, o.i, 0, o.y); rocks.mat(0, 0.9, 1, 14).at(c.x, c.y, c.z, q).polyRock(1, o.i * 0.71, [0.13, 0.11, 0.1, 0], { planes: 18, lo: 0.95, hi: 1.02, stretch: [t.w[o.i] + 4, o.r, o.r], seg: 0.25, rings: 2 }); hz.push({ o, p: c });
+      // the rib is a hazard in a dark bore: a glowing seam along both faces and a red lamp where it meets each wall
+      for (const s of [-1, 1]) { const p = new Vec3(0, 0, s * o.r * 1.01).applyQuat(q).add(c); ribLit.at(p.x, p.y, p.z, q).box(2 * t.w[o.i] - 1.5, 0.32, 0.3, [1, 0.42, 0.08, 1]); }
+      for (const s of [-1, 1]) { const lp = P(t, o.i, s * (t.w[o.i] - 0.6), o.y + o.r * 1.05); ribLit.at(lp.x, lp.y, lp.z, q).box(0.6, 0.6, 0.6, [1, 0.2, 0.08, 1]); } }
+  }
+  { // the spire at the heart of the hairpin
+    const ids = at('hairpin'), m = ids[ids.length >> 1], s = Math.sign(t.kLat[m]) || -1, B = t.bin[m], p = t.pos[m], R = Math.abs(1 / t.kLat[m]), cx2 = p.x + B.x * s * R, cz2 = p.z + B.z * s * R, r = Math.max(12, R - t.w[m] - 22), base = hAt(cx2, cz2) - 10;
+    if (clear.sphere(v3(cx2, base + 60, cz2), r * 1.1, 4)) for (let k = 0; k < 4; k++) { const hh = 220 - k * 45, rr = r * (1 - k * 0.2); rocks.mat(0, 0.9, 1, 14).at(cx2 + (k % 2) * 4, base + hh / 2 + k * 30, cz2, QX(-90)).polyRock(1, 77 + k, [0.13, 0.11, 0.1, 0], { planes: 20, lo: 0.8, hi: 1.05, stretch: [rr, rr, hh / 2], seg: 0.35, rings: 2, strata: { axis: [0, 0, 1], k: 3, depth: 0.05 } }); }
+  }
+  // basalt column clusters on the canyon rims and in the basin: columns packed on a hexagonal grid, tallest at the
+  // cluster's heart, stepping down to its edge
+  { const ids = [...at('canyon'), ...at('falls'), ...at('basin'), ...at('descent')];
+    for (let n = 0; n < 34; n++) { const i = ids[Math.floor(rng() * ids.length)], s = rng() < 0.5 ? -1 : 1, d = t.w[i] + 45 + rng() * 150, B = t.bin[i], p = t.pos[i];
+      const x0 = p.x + B.x * s * d, z0 = p.z + B.z * s * d, rr = 2.2 + rng() * 1.6, top = 14 + rng() * 34, ring = 1 + Math.floor(rng() * 3), a0 = rng() * 6.283;
+      for (let qa = -ring; qa <= ring; qa++) for (let qb = Math.max(-ring, -qa - ring); qb <= Math.min(ring, -qa + ring); qb++) { if (rng() < 0.18) continue;
+        const hx = (qa + qb * 0.5) * rr * 1.78, hz = qb * rr * 1.54, x = x0 + hx * Math.cos(a0) - hz * Math.sin(a0), z = z0 + hx * Math.sin(a0) + hz * Math.cos(a0), y = hAt(x, z);
+        const k = Math.max(Math.abs(qa), Math.abs(qb), Math.abs(qa + qb)) / (ring + 1), hh = top * (1 - 0.7 * k) * (0.8 + rng() * 0.3);
+        if (!clear.sphere(v3(x, y + hh / 2, z), Math.max(rr, hh / 2), 4)) continue;
+        rocks.mat(0.1, 0.85, 1, 14).at(x, y + hh / 2 - 3, z, QX(90).multiply(QZ(a0 * 57.3))).cyl(rr, rr, hh + 6, 6, [0.11 + rng() * 0.03, 0.1, 0.095, 0], true); } } }
+  { // the natural arch over the course
+    const i = mid('arch'), q = fq(t, i), w = t.w[i], h = t.h[i], R = w + 34, top = h + 38, c = P(t, i, 0, -h - 10);
+    for (let j = 0; j <= 14; j++) { const a = Math.PI * j / 14, x = Math.cos(a) * R, y = Math.sin(a) * (top + h + 10), pc = new Vec3(x, y, 0), p = P(t, i, pc.x, pc.y - h - 10), rr = 13 + 5 * Math.sin(a);
+      if (!clear.sphere(p, rr * 0.9, 2)) continue; rocks.mat(0, 0.9, 1, 14).at(p.x, p.y, p.z, q.clone().multiply(QZ(a * 57.3))).polyRock(rr, 90 + j * 3.3, [0.14, 0.115, 0.1, 0], { planes: 14, lo: 0.8, hi: 1.15, stretch: [1.3, 1, 1.4], seg: 0.3, rings: 2, strata: { axis: [0, 1, 0], k: 2.4, depth: 0.05 } }); }
+    void c; }
+  items.push({ mesh: gfx.mesh(rocks.build()), prog: 'pbrRock', visible: true, cast: true }, { mesh: gfx.mesh(ribLit.build()), prog: 'pbrStruct', visible: true });
+
+  // ---------------------------------------------------------------- industry: the start bridge, the mine bridge across the lava
+  // lake, smelters, cooling towers, drill rigs, conveyors and pipelines
+  const deckUnder = (tag, f0, f1, col) => { const ids = at(tag), a = Math.floor(ids.length * f0), b = Math.floor(ids.length * f1);
+    for (let k = a; k < b; k += 2) { const i = ids[k], i2 = t.wrapIdx(i + 2), q = fq(t, i), w = t.w[i] + 6, h = t.h[i], g = ch.get(i, 'ind').mat(0.6, 0.55, 1, DET.struct), m = new Vec3().lerpVectors(P(t, i, 0, -h - 3), P(t, i2, 0, -h - 3), 0.5);
+      g.at(m.x, m.y, m.z, q).box(2 * w, 3, t.D * 2 + 0.2, col); for (const s of [-1, 1]) { const r = new Vec3().lerpVectors(P(t, i, s * w, -h + 1.5), P(t, i2, s * w, -h + 1.5), 0.5); g.at(r.x, r.y, r.z, q).box(1, 4.5, t.D * 2 + 0.2, [0.6, 0.45, 0.12, 0]); }
+      if (k % 6 === 0) { const gl = ch.get(i, 'indLit'); for (const s of [-1, 1]) { const lp = P(t, i, s * (w - 0.6), -h + 3.9); gl.mat(0, 0.4, 5, 0).at(lp.x, lp.y, lp.z, q).box(0.5, 0.5, 0.5, LAMP); } }
+      if (k % 12 === 0) for (const s of [-1, 1]) { const top = P(t, i, s * (w - 3), -h - 4.5), foot = top.clone(); foot.y = Math.min(lavaAt(top.x, top.z).y, hAt(top.x, top.z)) - 6;
+        if (top.y - foot.y > 4) { truss(g, foot, top, 5, 9, [0.28, 0.27, 0.26, 0]); vents.push(v3(foot.x, foot.y + 6, foot.z)); } } } };
+  deckUnder('start', 0.05, 0.95, [0.3, 0.29, 0.28, 0]); deckUnder('bridge', 0.08, 0.92, [0.32, 0.27, 0.22, 0]);
+  const okAt = (x, z, rr, hh) => { const y = hAt(x, z); return clear.box(v3(x, y + hh / 2, z), v3(rr, 0, 0), v3(0, hh / 2 + 6, 0), v3(0, 0, rr), 8) ? y : null; };
+  const building = (x, z, kind, seed) => { const r = makeRng(seed), g = big;
+    if (kind === 'smelter') { const sx = 50 + r() * 40, sz = 70 + r() * 50, hh = 40 + r() * 30, y = okAt(x, z, Math.hypot(sx, sz) / 2, hh + 40); if (y === null) return false; const q = QY(r() * 180);
+      g.mat(0.5, 0.65, 1, DET.struct).at(x, y + hh / 2, z, q).bbox(sx, hh, sz, 1, STEEL[seed % 4]);
+      for (let k = 0; k < 3; k++) { const p = new Vec3(0, hh * (0.3 + k * 0.22), sz / 2 + 0.3).applyQuat(q); bigLit.at(x + p.x, y + p.y, z + p.z, q).box(sx * 0.8, 1.6, 0.2, [1, 0.45, 0.1, 1]); }
+      for (let k = 0; k < 2; k++) { const p = new Vec3((k - 0.5) * sx * 0.5, hh, 0).applyQuat(q); g.at(x + p.x, y + hh + 20, z + p.z, QX(90)).cyl(4, 3.4, 40, 14, [0.26, 0.24, 0.23, 0], false); smokes.push(v3(x + p.x, y + hh + 42, z + p.z)); }
+      return true; }
+    if (kind === 'tower') { const R0 = 26 + r() * 14, hh = 90 + r() * 60, y = okAt(x, z, R0, hh); if (y === null) return false;
+      g.mat(0.2, 0.8, 1, DET.struct).at(x, y + hh / 2, z, QX(-90)).lathe([[R0, -hh / 2], [R0 * 0.74, -hh * 0.05], [R0 * 0.66, hh * 0.22], [R0 * 0.72, hh / 2]], 28, [0.42, 0.39, 0.36, 0]); smokes.push(v3(x, y + hh + 4, z)); return true; }
+    if (kind === 'rig') { const hh = 60 + r() * 40, y = okAt(x, z, 14, hh + 10); if (y === null) return false; truss(g.mat(0.7, 0.5, 1, DET.struct), v3(x, y - 2, z), v3(x, y + hh, z), 10, 8, RUST[seed % 3]);
+      g.mat(0.5, 0.6, 1, DET.struct).at(x, y + 3, z).bbox(26, 6, 26, 1, STEEL[1]); bigLit.at(x, y + hh + 2, z).box(1.4, 1.4, 1.4, RED); lights.push({ p: v3(x, y + hh + 2, z), c: [3.5, 0.3, 0.2], s: 5, blink: 0.8 }); vents.push(v3(x, y + 1, z)); return true; }
+    if (kind === 'tanks') { const y = okAt(x, z, 36, 30); if (y === null) return false; for (let k = 0; k < 4; k++) g.mat(0.6, 0.45, 1, DET.struct).at(x + (k % 2) * 22 - 11, y + 11, z + Math.floor(k / 2) * 22 - 11, QX(90)).cyl(9, 9, 22, 20, [0.5, 0.48, 0.44, 0], true); return true; }
+    return false; };
+  const sites = []; for (const tag of ['bridge', 'mine', 'arch', 'ridgedown', 'start', 'final', 'sweep']) { for (const i of at(tag).filter((_, k) => k % 7 === 0)) for (const s of [-1, 1]) { const d = t.w[i] + 70 + rng() * 260, B = t.bin[i], p = t.pos[i]; sites.push([p.x + B.x * s * d, p.z + B.z * s * d]); } }
+  let nb = 0; const KIND = ['smelter', 'tower', 'rig', 'tanks', 'rig', 'smelter'];
+  for (const [x, z] of sites) { if (nb > 46) break; if (building(x, z, KIND[nb % KIND.length], 300 + nb)) nb++; }
+  // the mine chicane: towers either side carrying the conveyor gantry (the obstacle) across the corridor
+  for (const o of t.obstacles) if (!o.kind && o.type === 'hbeam') { const q = fq(t, o.i), w = t.w[o.i], h = t.h[o.i], c = P(t, o.i, 0, o.y), g = ch.get(o.i, 'ind');
+    g.mat(0.6, 0.5, 1, DET.struct).at(c.x, c.y, c.z, q.clone().multiply(QY(90))).cyl(o.r * 0.98, o.r * 0.98, 2 * w + 8, 16, [0.62, 0.48, 0.14, 0], false);
+    for (const s of [-1, 1]) { const top = P(t, o.i, s * (w + 8), o.y + 30), foot = top.clone(); foot.y = hAt(foot.x, foot.z) - 4; truss(g, foot, top, 9, 9, RUST[0]); beam(g, P(t, o.i, s * (w + 1), o.y), P(t, o.i, s * (w + 8), o.y), 3, 3, RUST[1]); }
+    const span = P(t, o.i, 0, o.y + 30); truss(g, P(t, o.i, -w - 8, o.y + 30), P(t, o.i, w + 8, o.y + 30), 6, 8, RUST[1]); void span;
+    for (let k = -3; k <= 3; k++) { const lp = P(t, o.i, k * w / 3.5, o.y + o.r + 0.4); ch.get(o.i, 'indLit').mat(0, 0.4, 5, 0).at(lp.x, lp.y, lp.z, q).box(0.6, 0.3, 0.6, [1, 0.5, 0.15, 1]); } }
+  // pipelines on stilts across the flats, conveyors between the smelters
+  for (let n = 0; n < 6; n++) { const i = at('sweep')[Math.floor(rng() * at('sweep').length)], B = t.bin[i], p = t.pos[i], s = n % 2 ? 1 : -1, a = v3(p.x + B.x * s * (t.w[i] + 40), 0, p.z + B.z * s * (t.w[i] + 40)), dir = v3(B.x * s, 0, B.z * s), b = a.clone().addScaled(dir, 500);
+    let ok = true; for (let k = 0; k <= 10; k++) { const pp = new Vec3().lerpVectors(a, b, k / 10); pp.y = hAt(pp.x, pp.z) + 8; if (!clear.sphere(pp, 6, 4)) ok = false; } if (!ok) continue;
+    for (let k = 0; k < 10; k++) { const p0 = new Vec3().lerpVectors(a, b, k / 10), p1 = new Vec3().lerpVectors(a, b, (k + 1) / 10); p0.y = hAt(p0.x, p0.z) + 8; p1.y = hAt(p1.x, p1.z) + 8;
+      big.mat(0.8, 0.4, 1, DET.struct); const d = new Vec3().subVectors(p1, p0); big.at((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2, qLook(d)).cyl(1.6, 1.6, d.len(), 10, [0.36, 0.33, 0.3, 0], false); big.at(p0.x, p0.y - 4, p0.z).box(1, 8, 1, STEEL[1]); } }
+  items.push(...ch.items(gfx, 'ind', { prog: 'pbrStruct', cast: true }), ...ch.items(gfx, 'indLit', { prog: 'pbrStruct' }));
+  items.push({ mesh: gfx.mesh(big.build()), visible: true, prog: 'pbrStruct' }, { mesh: gfx.mesh(bigLit.build()), visible: true, prog: 'pbrStruct' });
+
+  // ---------------------------------------------------------------- the course kit
+  const hex = hexField(gfx, t, i => !t.tunnel[i], [1, 0.45, 0.15]);
+  const gt = gates(gfx, t), pk = pickups(gfx, t), rg = routeGuides(gfx, t, { colL: [1, 0.55, 0.15], colR: [1, 0.85, 0.4], corners: i => t.tunnel[i] ? [] : [0, 1, 2, 3], open: i => !t.tunnel[i] });
+  items.push(...hex.items, ...gt.items, ...pk.items, ...rg.items);
+  const hauler = gfx.mesh(buildHauler()), patrol = gfx.mesh(buildPatrol());
+  const mv = movers([
+    { mesh: hauler, scale: 2.2, br: 150, path: (time, p, q) => { const a = time * 0.025, R = 1900; p.set(cx + Math.cos(a) * R, 520, cz + Math.sin(a) * R); q.setAxisAngle(0, 1, 0, -a); }, lights: [{ x: 9, y: 0, z: -40, s: 5, c: [4, 0.5, 0.3], blink: 1.1, ph: 0 }] },
+    ...[0, 1].map(k => ({ mesh: patrol, br: 20, path: (time, p, q) => { const a = -time * (0.09 + k * 0.03) + k * 2.4, R = 800 + k * 300; p.set(cx + Math.cos(a) * R, 230 + k * 50, cz + Math.sin(a) * R); q.setAxisAngle(0, 1, 0, -a + Math.PI); },
+      lights: [{ x: 7.2, y: 0, z: -6, s: 2.4, c: [4, 0.4, 0.3], blink: 1.3, ph: k }] }))]);
+  items.push(...mv.items);
+
+  // ---------------------------------------------------------------- sky: ash clouds lit from below by the lava
+  const U = { uCloud: [1700, 0.00016, 0.78, 0.7], uWind: [0.0016, -0.0009, 0], uFlash: [0, 0, 0, 1], uCloudLo: [0.035, 0.025, 0.022], uCloudHi: [0.2, 0.12, 0.08], uGlow: [0.16, 0.035, 0.008] };
+  const dome = { mesh: gfx.mesh(domeGeo(64, 18).build()), prog: 'v9cloud', pos: new Vec3(), quat: new Quat(), scale: 26000, uniforms: U, blend: 'normal', layer: -1, visible: true }; items.push(dome);
+  const env = { sunDir: v3(-0.62, 0.34, -0.72).normalize(), sunCol: [2.4, 1.35, 0.8], fogCol: [0.1, 0.045, 0.028], fog: 0.00032, fogH: [-60, 460], sky: 'atmo', zen: [0.025, 0.018, 0.018], hor: [0.42, 0.14, 0.05],
+    dirt: 0.4, streak: 0.6, flare: 0.5, envInt: 1.2, expo: 1.1, shafts: 0.35, reverb: 'open', nebA: [0.4, 0.1, 0.05], nebB: [0.5, 0.2, 0.05], nebC: [1, 0.6, 0.3], base: [0.01, 0.005, 0.004], neb: 0, seed: 9.3, sat: 1.04, lift: [0.01, 0.004, 0.002], gain: [1.04, 0.98, 0.92] };
+
+  // ---------------------------------------------------------------- per frame: embers, smoke, eruptions, lava bubbles, ash
+  const fr = new Frustum(), V = volc[0], crater = v3(V.x, V.h - 110, V.z); let emberT = 0, smokeT = 0, eruptT = 4, erupting = 0, bubbleT = 0;
+  return { items, env, cull(cam) { fr.set(cam, gfx); },
+    hexState: me => { hex.state.ship.copy(me ? me.ship.pos : v3(0, 0, 0)); return hex.state; }, hexHit: (p, time) => hex.hit(p, time),
+    update(dt, time, race, fx, cam) {
+      gt.update(race, time); pk.update(dt, time, fx); mv.update(dt, time, fx); rg.update(fx, cam, race, time);
+      const c = cam.pos; dome.pos.set(c.x, 0, c.z);
+      // embers rising off the lava around the camera, and ash drifting down
+      if ((emberT -= dt) < 0) { emberT = 0.02; for (let n = 0; n < 6; n++) { const a = Math.random() * 6.283, d = 20 + Math.random() * 380, x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d, lv = lavaAt(x, z);
+          if (lv.d < 30) fx.spawn(x, lv.y + 2, z, (Math.random() - 0.5) * 4, 6 + Math.random() * 10, (Math.random() - 0.5) * 4, 2 + Math.random() * 2.5, 0.35 + Math.random() * 0.4, 0.1, 3, 1.1, 0.25, 1, true, 0.3, 0, -1.5); }
+        const a = Math.random() * 6.283, d = Math.random() * 120; fx.spawn(c.x + Math.cos(a) * d, c.y + 40 + Math.random() * 30, c.z + Math.sin(a) * d, 3, -4, 1, 6, 0.25, 0.25, 0.05, 0.045, 0.04, 0.6, false, 0.1); }
+      // lava bubbles bursting near the camera
+      if ((bubbleT -= dt) < 0) { bubbleT = 0.15; const a = Math.random() * 6.283, d = 30 + Math.random() * 300, x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d, lv = lavaAt(x, z);
+        if (lv.d < 0) { fx.spawn(x, lv.y + 0.5, z, 0, 0, 0, 0.6, 1, 5, 3, 1.4, 0.35, 0.9, true, 0); for (let k = 0; k < 6; k++) fx.spawn(x, lv.y + 1, z, (Math.random() - 0.5) * 10, 8 + Math.random() * 10, (Math.random() - 0.5) * 10, 1 + Math.random(), 0.6, 0.2, 3.2, 1.3, 0.3, 1, true, 0.2, 0, 14); } }
+      // smoke from stacks, vents and the lava falls
+      if ((smokeT -= dt) < 0) { smokeT = 0.08; for (const s of smokes) if (s.dist(c) < 3000 && Math.random() < 0.4) fx.spawn(s.x, s.y, s.z, 3, 8 + Math.random() * 4, 1, 9, 10, 60, 0.09, 0.08, 0.075, 0.5, false, 0.05);
+        for (const v of vents) if (v.dist(c) < 1200 && Math.random() < 0.3) fx.spawn(v.x, v.y, v.z, 1, 6, 0, 5, 4, 26, 0.18, 0.1, 0.07, 0.35, false, 0.1);
+        for (const f of falls) if (f.bot.dist(c) < 1800) { fx.spawn(f.bot.x, f.bot.y + 2, f.bot.z, 0, 6, 0, 3, f.W * 0.6, f.W * 2.5, 0.25, 0.08, 0.03, 0.4, false, 0.2); fx.spawn(f.bot.x + (Math.random() - 0.5) * f.W, f.bot.y + 1, f.bot.z + (Math.random() - 0.5) * f.W, (Math.random() - 0.5) * 12, 10 + Math.random() * 12, (Math.random() - 0.5) * 12, 1.2, 0.7, 0.2, 3.2, 1.3, 0.3, 1, true, 0.1, 0, 12); } }
+      for (const f of falls) if (f.bot.dist(c) < 4000) fx.bbAdd.add(f.bot.x, f.bot.y + 6, f.bot.z, f.W * 2.2, 1.6, 0.45, 0.08, 0.6);
+      // the volcano: a plume always, eruptions every so often: a flash, glowing bombs arcing out and a dark column
+      if (Math.random() < dt * 6) fx.spawn(crater.x + (Math.random() - 0.5) * 120, crater.y + 60, crater.z + (Math.random() - 0.5) * 120, 8, 40 + Math.random() * 20, -4, 30, 120, 520, 0.07, 0.055, 0.05, 0.5, false, 0.02);
+      fx.bbAdd.add(crater.x, crater.y + 40, crater.z, 420, 1.4, 0.35, 0.06, 0.6 + 0.2 * Math.sin(time * 2.1));
+      if ((eruptT -= dt) < 0) { eruptT = 9 + Math.random() * 12; erupting = 2.5; }
+      if (erupting > 0) { erupting -= dt; for (let k = 0; k < 6; k++) { const a = Math.random() * 6.283, sp = 120 + Math.random() * 200; fx.spawn(crater.x, crater.y + 40, crater.z, Math.cos(a) * sp * 0.5, sp, Math.sin(a) * sp * 0.5, 6 + Math.random() * 3, 18, 8, 3.4, 1.4, 0.3, 1, true, 0, 0, 40); }
+        if (Math.random() < dt * 10) fx.spawn(crater.x, crater.y + 100, crater.z, 0, 80, 0, 14, 200, 900, 0.06, 0.045, 0.04, 0.6, false, 0.03);
+        fx.bbAdd.add(crater.x, crater.y + 120, crater.z, 900, 2.2, 0.7, 0.15, Math.min(1, erupting)); }
+      for (const l of lights) { if (l.blink && Math.floor((time + (l.ph || 0)) / l.blink) % 2) continue; if (l.p.dist(c) > 7000) continue; fx.bbAdd.add(l.p.x, l.p.y, l.p.z, l.s, l.c[0], l.c[1], l.c[2], 1); }
+      for (const h of hz) if (h.o.kind === 'basalt' && h.p.dist(c) < 400 && Math.random() < dt * 3) { const p = h.p; fx.spawn(p.x, p.y - t.h[h.o.i], p.z, 0, 4, 0, 3, 2, 12, 0.2, 0.09, 0.05, 0.3, false, 0.1); }
+    },
+    // the lava lights the ship's underside wherever it flies over it
+    light(me) { if (!me) return null; const p = me.ship.pos, lv = lavaAt(p.x, p.z); if (lv.d > 40) return null; const k = Math.max(0, 1 - Math.max(0, lv.d) / 40) * Math.max(0, 1 - (p.y - lv.y) / 70);
+      return k > 0.02 ? { pos: v3(p.x, lv.y + 2, p.z), col: [3.2 * k, 1.1 * k, 0.25 * k], range: 70 } : null; } };
+}
+
+return { buildIgnara };
+})();
 const __m__src_render_courses_all_js = (() => {
 // Registers the V2 course builders.
 const { registerCourse } = __m__src_render_courses_index_js;
@@ -8485,10 +9587,14 @@ const { buildTrench } = __m__src_render_courses_trench_js;
 const { buildBelt } = __m__src_render_courses_belt_js;
 const { buildCity } = __m__src_render_courses_city_js;
 const { buildRing } = __m__src_render_courses_ring_js;
+const { buildPelagos } = __m__src_render_courses_pelagos_js;
+const { buildIgnara } = __m__src_render_courses_ignara_js;
 registerCourse('trench', buildTrench);
 registerCourse('asteroids', buildBelt);
 registerCourse('city', buildCity);
 registerCourse('gasgiant', buildRing);
+registerCourse('ocean', buildPelagos); // V9
+registerCourse('volcano', buildIgnara); // V9
 
 return {  };
 })();
@@ -8921,5 +10027,5 @@ new Game();
 return {  };
 })();
 </script>
-</body>
-</html>
+
+</body></html>

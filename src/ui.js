@@ -1,5 +1,6 @@
 // Menus, banners and messages (DOM). The in-race HUD lives in hud.js.
-import { SHIPS, STAT_BARS, DIFFICULTY, CHAMPIONSHIP } from './config.js';
+import { SHIPS, STAT_BARS, DIFFICULTY, CHAMPIONSHIP, CHAMPIONSHIP_ROUNDS } from './config.js';
+const ROUNDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'][CHAMPIONSHIP.length] || String(CHAMPIONSHIP.length); // V9: the calendar has six rounds
 import { TRACK_DEFS } from './sim/tracks.js';
 import { walletHTML, rewardHTML, ladderHTML, DIFF_LABEL } from './ui-garage.js';
 
@@ -63,7 +64,7 @@ export class UI {
       <div class="menu">
         ${run ? `<button class="btn primary" data-act="champContinue">Continue championship<small>${DIFF_LABEL[run.diff]} · round ${run.round + 1} of ${CHAMPIONSHIP.length}</small></button>` : ''}
         <button class="btn${run ? '' : ' primary'}" data-act="mode" data-arg="quick">Quick race<small>One course, five rivals · earn credits every race</small></button>
-        <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : 'Four rounds · Rookie → Pro → Ace'}</small></button>
+        <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : `${ROUNDS} rounds · Rookie → Pro → Ace`}</small></button>
         <button class="btn" data-act="mode" data-arg="trial">Time trial<small>Race your ghost for the course record</small></button>
         <button class="btn" data-act="mp" data-arg="open">Online multiplayer<small>Tournament against real pilots · qualifier and final</small></button>
         <button class="btn" data-act="garage">Garage<small>Upgrades, paint shop, inventory and cosmetic shop</small></button>
@@ -90,22 +91,24 @@ export class UI {
   }
 
   trackSelect(o, save, maps) {
-    const champ = o.mode === 'champ', trial = o.mode === 'trial';
-    const list = champ ? CHAMPIONSHIP.map(id => TRACK_DEFS.find(d => d.id === id)) : TRACK_DEFS;
+    const champ = o.mode === 'champ', trial = o.mode === 'trial', picks = champ ? o.champTracks || [] : null, full = champ && picks.length === CHAMPIONSHIP_ROUNDS;
+    const list = TRACK_DEFS; // V10: a championship's six courses are picked from all of them; the order of the picks is the order of the rounds
     this.show(`<div class="col center" style="width:min(1000px,100%)">
-      <h3>${champ ? 'Championship calendar' : trial ? 'Time trial · choose a course' : 'Quick race · choose a course'}</h3>
-      <h2>${champ ? 'Four rounds' : 'Select course'}</h2>
-      <div class="cards">${list.map((d, k) => { const b = save.best[this.recKey ? this.recKey(d.id) : d.id];
-        return `<button class="card" data-act="${champ ? 'noop' : 'track'}" data-arg="${d.id}" aria-pressed="${!champ && o.track === d.id}"><canvas data-map="${d.id}" width="320" height="200"></canvas>
-          <span class="chip">${champ ? 'Round ' + (k + 1) : d.short}</span><span class="t">${d.name}</span><span class="d">${d.tagline}</span>
+      <h3>${champ ? `Championship · pick ${ROUNDS.toLowerCase()} of the ${TRACK_DEFS.length} courses` : trial ? 'Time trial · choose a course' : 'Quick race · choose a course'}</h3>
+      <h2>${champ ? `${picks.length} of ${CHAMPIONSHIP_ROUNDS} rounds chosen` : 'Select course'}</h2>
+      ${champ ? `<div class="row" style="gap:12px"><p class="lede small" style="margin:0">Pick a course to make it the next round; pick it again to take it out. You race them in the order you pick them.</p><button class="btn" data-act="champRandom">Random ${ROUNDS.toLowerCase()}</button><button class="btn" data-act="champClear"${picks.length ? '' : ' disabled'}>Clear</button></div>` : ''}
+      <div class="cards">${list.map(d => { const b = save.best[this.recKey ? this.recKey(d.id) : d.id], k = champ ? picks.indexOf(d.id) : -1;
+        return `<button class="card" data-act="${champ ? 'champPick' : 'track'}" data-arg="${d.id}" aria-pressed="${champ ? k >= 0 : o.track === d.id}"${champ && k < 0 && full ? ' data-full="1"' : ''}><canvas data-map="${d.id}" width="320" height="200"></canvas>
+          <span class="chip">${champ ? (k >= 0 ? 'Round ' + (k + 1) : d.short) : d.short}</span><span class="t">${d.name}</span><span class="d">${d.tagline}</span>
           <span class="m"><span>LENGTH <b>${(this.g.trackLen(d.id) / 1000).toFixed(1)} KM</b></span><span>BEST <b>${b ? fmt(b.lap) : '--'}</b></span></span></button>`; }).join('')}</div>
       <div class="row" style="gap:22px"><div class="row"><h3>Laps</h3>${seg('laps', [[1, '1'], [2, '2'], [3, '3'], [5, '5']], o.laps)}</div>
         ${trial || champ ? '' : `<div class="row"><h3>Rivals</h3>${seg('diff', Object.entries(DIFFICULTY).map(([k, v]) => [k, v.label]), o.diff)}</div>`}</div>
       ${champ ? `<div class="panel"><h3>Championship difficulty · Rookie → Pro → Ace</h3>${ladderHTML(this.g.progress.profile.championships, o.diff, o.laps)}</div>` : ''}
-      <div class="actbar"><div class="row"><button class="btn primary" data-act="start"${champ && !this.g.progress.champUnlocked(o.diff) ? ' disabled' : ''}>${champ ? `Start ${DIFF_LABEL[o.diff] || ''} championship` : 'Launch'}</button><button class="btn" data-act="back">Back</button></div></div>
+      <div class="actbar"><div class="row"><button class="btn primary" data-act="start"${champ && (!this.g.progress.champUnlocked(o.diff) || !full) ? ' disabled' : ''}>${champ ? (full ? `Start ${DIFF_LABEL[o.diff] || ''} championship` : `Pick ${CHAMPIONSHIP_ROUNDS - picks.length} more course${CHAMPIONSHIP_ROUNDS - picks.length > 1 ? 's' : ''}`) : 'Launch'}</button><button class="btn" data-act="back">Back</button></div></div>
     </div>`, 'scrim', false);
     this.root.querySelectorAll('canvas[data-map]').forEach(c => { const m = maps(c.dataset.map); if (m) c.getContext('2d').drawImage(m, 0, 0); });
-    const f = this.root.querySelector('.card[aria-pressed="true"]') || this.root.querySelector('.btn.primary'); if (f) f.focus({ preventScroll: true });
+    const f = (champ && this.focusArg && this.root.querySelector(`.card[data-arg="${this.focusArg}"]`)) || this.root.querySelector('.card[aria-pressed="true"]') || this.root.querySelector('.btn.primary'); if (f) f.focus({ preventScroll: true });
+    this.focusArg = null; // V10: after a championship pick the focus stays on the course just picked
   }
 
   preRace(name, sub) {
@@ -113,14 +116,14 @@ export class UI {
   }
 
   champHub(ch) {
-    const st = ch.c.standings(), done = ch.round >= CHAMPIONSHIP.length;
+    const cal = ch.tracks || CHAMPIONSHIP, st = ch.c.standings(), done = ch.round >= cal.length;
     this.show(`<div class="col center">
-      <h3>Championship · after round ${ch.round} of ${CHAMPIONSHIP.length}</h3>
+      <h3>Championship · after round ${ch.round} of ${cal.length}</h3>
       <h2>${done ? (st[0].name === 'YOU' ? 'You are champion' : esc(st[0].name) + ' takes the title') : 'Standings'}</h2>
       <div class="tablewrap panel"><table class="res"><tr><th>POS</th><th>PILOT</th><th>WINS</th><th>POINTS</th></tr>
       ${st.map((e, k) => `<tr class="${e.name === 'YOU' ? 'me' : ''}"><td class="p">${k + 1}</td><td>${esc(e.name)}</td><td class="n">${e.wins}</td><td class="n"><b>${e.points}</b></td></tr>`).join('')}</table></div>
       <div class="row">${done ? '<button class="btn primary" data-act="menu">Main menu</button>'
-        : `<button class="btn primary" data-act="nextRound">Round ${ch.round + 1}: ${TRACK_DEFS.find(d => d.id === CHAMPIONSHIP[ch.round]).name}</button><button class="btn" data-act="menu">Retire to menu</button>`}</div>
+        : `<button class="btn primary" data-act="nextRound">Round ${ch.round + 1}: ${TRACK_DEFS.find(d => d.id === cal[ch.round]).name}</button><button class="btn" data-act="menu">Retire to menu</button>`}</div>
     </div>`, 'full');
   }
 

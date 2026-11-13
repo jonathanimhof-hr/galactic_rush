@@ -10,7 +10,7 @@ const order = place => { const n = AI_ROSTER.map(a => a.name); n.splice(place - 
 const tracks = ['foundry', 'belt', 'spire', 'ring'], places = [2, 1, 4, 3, 1, 5, 2, 6, 3, 1];
 let k = 0; const race = o => P.completeRace({ finished: true, raceId: P.newRaceId(), mode: 'quick', track: tracks[k % 4], diff: 'pro', laps: 3, ship: 'kestrel', place: places[k++ % places.length], field: 6, time: 120 + k, record: k < 5, ...o });
 for (let i = 0; i < 30; i++) race({ diff: i < 6 ? 'rookie' : i < 22 ? 'pro' : 'ace' });
-for (const [diff, pl] of [['rookie', [2, 1, 3, 1]], ['pro', [4, 2, 3, 2]]]) {
+for (const [diff, pl] of [['rookie', [2, 1, 3, 1, 2, 1]], ['pro', [4, 2, 3, 2, 3, 2]]]) { // V9: one place per round of the calendar (six rounds)
   const r = P.startRun({ diff, laps: 3, ship: 'kestrel' });
   CHAMPIONSHIP.forEach((trk, i) => P.completeRace({ finished: true, raceId: P.newRaceId(), mode: 'champ', runId: r.run.runId, track: trk, diff, laps: 3, ship: 'kestrel', place: pl[i], field: 6, order: order(pl[i]) }));
 }

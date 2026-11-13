@@ -83,21 +83,22 @@ with sync_playwright() as pw:
       check('only the Rookie championship is open at first', pg.evaluate("() => __game.progress.profile.championships.unlocked.join()") == 'rookie')
       def run_champ(diff):
           go(f'?skipmenu=1&autotest=1&mode=champ&diff={diff}&laps=1&quality=low&nointro=1'); last = None
-          for rnd in range(4):
+          for rnd in range(8):  # V9: as many rounds as the calendar has (six since V9), until the run completes
               finish_race(); last = reward()
-              if rnd < 3:
-                  click('[data-act=champHub]'); W("() => !!document.querySelector('[data-act=nextRound]')")
-                  if rnd == 0: pg.screenshot(path=str(out / f'champ-hub-{diff}.png'))
-                  click('[data-act=nextRound]'); W("() => __game.state === 'race' || __game.state === 'intro'"); pg.evaluate("() => { if (__game.state === 'intro') __game.endIntro(); }")
+              if last and last.get('completion'): break
+              click('[data-act=champHub]'); W("() => !!document.querySelector('[data-act=nextRound]')")
+              if rnd == 0: pg.screenshot(path=str(out / f'champ-hub-{diff}.png'))
+              click('[data-act=nextRound]'); W("() => __game.state === 'race' || __game.state === 'intro'"); pg.evaluate("() => { if (__game.state === 'intro') __game.endIntro(); }")
+          rounds[diff] = rnd + 1
           before = wallet(); click('[data-act=champHub]'); W("() => __game.state === 'champ'"); time.sleep(1); pg.screenshot(path=str(out / f'champ-final-{diff}.png'))
           txt = pg.inner_text('#ui').lower()
           pg.evaluate("() => { __game.showChampHub(); __game.showChampHub(); __game.progress.completeRun(__game.champ.runId); }")
           same = wallet() == before
           return last, txt, same
-      pg_diff = {}
+      pg_diff = {}; rounds = {}
       for diff, unlock in [('rookie', 'pro'), ('pro', 'ace'), ('ace', None)]:
           last, txt, same = run_champ(diff); c = last['completion'] or {}
-          check(f'{diff.title()} championship: four rounds, completion bonus paid once', last['ok'] and c.get('ok') and same, json.dumps(c))
+          check(f'{diff.title()} championship: six rounds (V9 calendar), completion bonus paid once', last['ok'] and c.get('ok') and same and rounds[diff] == 6, json.dumps({'rounds': rounds[diff], **c}))
           if unlock: check(f'completing {diff.title()} unlocks {unlock.title()} and the results say so', c.get('newly') == unlock and f'{unlock} championship unlocked' in txt.lower(), txt[:160].replace('\n', ' '))
           else: check('Ace is the highest championship difficulty', c.get('newly') is None and c.get('highest') and 'highest' in txt.lower())
           check(f'{diff.title()} results show standing, per-race credits, bonus, total and balance', all(k in txt for k in ['final standing', 'completion bonus', 'final-standing bonus', 'total from this championship', 'balance now', 'career (all runs)', 'race rewards']))

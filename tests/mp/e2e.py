@@ -66,6 +66,7 @@ try:
     # the time of every game frame (the game loop calls __game.frame on each animation frame), for the timing checks
     FRAMES = '() => { const g = __game, f = g.frame; window.__gf = []; g.frame = function (t) { const a = window.__gf; a.push(performance.now()); if (a.length > 8000) a.splice(0, 4000); return f.call(this, t); }; }'
     for pg in P.values(): norender(pg); ev(pg, FRAMES)
+    healthy()  # V9: every game settled at a normal frame rate (draw off) before the first check; loading six courses in software takes a while
     log('three games loaded')
 
     # ---------- title and online home ----------

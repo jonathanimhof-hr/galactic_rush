@@ -3,6 +3,8 @@ import { Vec3, Quat, clamp, makeRng, wrapDelta } from '../math.js';
 import { createShipState, stepFlight, shipAxes } from './flight.js';
 import { AIPilot } from './ai.js';
 import { shipById } from '../config.js';
+// V10: Orbital Nexus only (a course with a gravity field)
+import { gravityStep } from './gravity.js';
 
 // Handling profiles. 'classic' is V1's model untouched (V1 ghosts and records stay valid there).
 // 'relaxed' slows the whole field, steers the player's nose along the course when not steering,
@@ -80,6 +82,7 @@ export class Race {
       if (ev) this.emit(ev, r);
       if (this.H && r.isPlayer && !r.ai) this.guide(r, dt);
       this.collideTrack(r);
+      if (t.grav) gravityStep(t, r, dt); // V10: gravity plating; no other course has a field (track.grav is undefined there)
       this.updateProgress(r, dt);
       this.pickups(r);
       this.weapons(r, c, dt);

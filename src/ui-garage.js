@@ -186,8 +186,9 @@ export function champHubHTML(v) {
   const st = v.standings, done = v.final, run = v.run;
   const table = `<div class="tablewrap panel"><table class="res"><tr><th>POS</th><th>PILOT</th><th>WINS</th><th>POINTS</th></tr>
     ${st.map((e, k) => `<tr class="${e.name === 'YOU' ? 'me' : ''}"><td class="p">${k + 1}</td><td>${esc(e.name)}</td><td class="n">${e.wins}</td><td class="n"><b>${e.points}</b></td></tr>`).join('')}</table></div>`;
-  if (!done) return `<div class="col center" style="width:min(900px,100%)"><div class="row between"><h3>${DIFF_LABEL[run.diff]} Championship · after round ${run.round} of ${CHAMPIONSHIP.length} · ${run.laps} lap${run.laps > 1 ? 's' : ''}</h3>${walletHTML(v.wallet)}</div>
-    <h2>Standings</h2><div class="split2">${table}<div class="panel"><h3>This run so far</h3>${runTable(run.results, run.credits.races)}<p class="lede small">Finish all ${CHAMPIONSHIP.length} rounds for the completion bonus of ${fmtCR(v.bonus)} plus a final-standing bonus.</p></div></div>
+  const cal = (run && run.tracks) || CHAMPIONSHIP; // V10: the run's own six courses
+  if (!done) return `<div class="col center" style="width:min(900px,100%)"><div class="row between"><h3>${DIFF_LABEL[run.diff]} Championship · after round ${run.round} of ${cal.length} · ${run.laps} lap${run.laps > 1 ? 's' : ''}</h3>${walletHTML(v.wallet)}</div>
+    <h2>Standings</h2><div class="split2">${table}<div class="panel"><h3>This run so far</h3>${runTable(run.results, run.credits.races)}<p class="lede small">Calendar: ${cal.map((id, k) => `${k + 1}. ${k < run.round ? '✓ ' : ''}${esc(trackName(id))}`).join(' · ')}</p><p class="lede small">Finish all ${cal.length} rounds for the completion bonus of ${fmtCR(v.bonus)} plus a final-standing bonus.</p></div></div>
     <div class="actbar"><div class="row">${v.next ? `<button class="btn primary" data-act="nextRound">Round ${run.round + 1}: ${esc(trackName(v.next))}</button>` : ''}<button class="btn" data-act="menu">Save and exit</button>
       ${v.armedAbandon ? '<button class="btn danger" data-act="champAbandon" data-arg="confirm">Confirm: abandon this run</button>' : '<button class="btn" data-act="champAbandon">Abandon run</button>'}</div></div>
     <p class="lede small">Your progress in this championship is saved after every round; you can leave and continue it later from the main menu.</p></div>`;

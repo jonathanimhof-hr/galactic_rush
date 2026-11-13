@@ -34,8 +34,8 @@ export const SINGLE_RACE = {
 // Time trial: no rivals, so no difficulty or placement factor; a practice wage per run.
 export const TIME_TRIAL = { base: 60 };
 
-// Championships: four rounds. Each round pays its own (slightly smaller) race reward; finishing all four rounds pays a
-// completion bonus once per run, plus a final-standing bonus. Both bonuses scale with difficulty and lap count.
+// Championships: one round per course of the calendar (config.js: six since V9, four before). Each round pays its own
+// (slightly smaller) race reward; finishing every round pays a completion bonus once per run, plus a final-standing bonus. Both bonuses scale with difficulty and lap count.
 export const CHAMPIONSHIP_REWARDS = {
   race: { base: 140, difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6 }, placement: [1.25, 1.15, 1.08, 1.0, 0.95, 0.9] },
   completion: { rookie: 500, pro: 800, ace: 1200 }, // x lap multiplier

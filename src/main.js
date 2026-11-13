@@ -1,7 +1,7 @@
 // GALACTIC RUSH — game controller: loading, settings and presets, scenes, flow, camera, bench.
 // V7 adds the career: race rewards, championship runs, upgrades and paint jobs (src/progress, src/garage.js).
 import { Vec3, Quat, clamp, wrapDelta, makeRng } from './math.js';
-import { SHIPS, AI_ROSTER, DIFFICULTY, CHAMPIONSHIP, SIM_DT, shipById } from './config.js';
+import { SHIPS, AI_ROSTER, DIFFICULTY, CHAMPIONSHIP, CHAMPIONSHIP_ROUNDS, SIM_DT, shipById } from './config.js';
 import { getTrack, TRACK_DEFS } from './sim/tracks.js';
 import { Race } from './sim/race.js';
 import { Championship } from './sim/championship.js';
@@ -22,10 +22,12 @@ import { UI, fmt } from './ui.js';
 import { HUD } from './hud.js';
 import { RaceFX } from './racefx.js';
 import { Progression, standingsOf } from './progress/index.js';
+// V10: every championship run has its own six-course calendar
+import { calendarOf } from './progress/profile.js';
 import { CHAMPIONSHIP_REWARDS, DIFF_ORDER, lapMult } from './progress/economy.js';
 import { Garage } from './garage.js';
-import { champHubHTML, careerHTML } from './ui-garage.js';
 // V8: online multiplayer tournament mode (src/mp)
+import { champHubHTML, careerHTML } from './ui-garage.js';
 import { Multiplayer } from './mp/controller.js';
 
 const $ = s => document.querySelector(s);
@@ -158,14 +160,14 @@ class Game {
     this.hangar.setShow([sv], 'showcase');
   }
   // V7 championship runs live in the career profile; the in-race standings table is rebuilt from the saved finishing orders
-  champFromRun(run) { return { round: run.round, c: standingsOf(run.orders), runId: run.runId, diff: run.diff, laps: run.laps, ship: run.ship }; }
+  champFromRun(run) { return { round: run.round, c: standingsOf(run.orders), runId: run.runId, diff: run.diff, laps: run.laps, ship: run.ship, tracks: calendarOf(run) }; }
   topDiff() { const u = this.progress.profile.championships.unlocked; return DIFF_ORDER.filter(d => u.includes(d)).pop() || 'rookie'; }
   showChampHub(armed = false) {
     const P = this.progress, c = this.champDone;
     this.state = 'champ'; this.input.capture = false; this.hud.show(false);
     if (c && c.ok) { this.ui.show(champHubHTML({ final: true, completion: c, standings: c.standings, wallet: P.wallet(), champs: P.profile.championships, earned: P.profile.earned }), 'full'); return; }
     const run = P.activeRun(); if (!run) { this.toMenu(); return; }
-    this.ui.show(champHubHTML({ final: false, run, standings: standingsOf(run.orders).standings(), wallet: P.wallet(), next: CHAMPIONSHIP[run.round], bonus: Math.round(CHAMPIONSHIP_REWARDS.completion[run.diff] * lapMult(run.laps)), armedAbandon: armed }), 'full');
+    this.ui.show(champHubHTML({ final: false, run, standings: standingsOf(run.orders).standings(), wallet: P.wallet(), next: calendarOf(run)[run.round], bonus: Math.round(CHAMPIONSHIP_REWARDS.completion[run.diff] * lapMult(run.laps)), armedAbandon: armed }), 'full');
   }
   resumeChamp() {
     const run = this.progress.activeRun(); if (!run) return false;
@@ -176,12 +178,12 @@ class Game {
     const o = this.opts;
     if (o.mode === 'champ' && !this.champ) { // V7: start (or pick up) a championship run; locked difficulties fall back to the highest unlocked one
       let run = this.progress.activeRun();
-      if (!run) { if (!this.progress.champUnlocked(o.diff)) o.diff = this.topDiff(); const r = this.progress.startRun({ diff: o.diff, laps: o.laps, ship: SHIPS[o.ship].id }); if (!r.ok) { console.warn(r.message); this.toMenu(); return; } run = r.run; }
+      if (!run) { if (!this.progress.champUnlocked(o.diff)) o.diff = this.topDiff(); const r = this.progress.startRun({ diff: o.diff, laps: o.laps, ship: SHIPS[o.ship].id, tracks: o.champTracks }); if (!r.ok) { console.warn(r.message); this.toMenu(); return; } run = r.run; } // V10: tracks = the six courses picked on the course screen
       this.champ = this.champFromRun(run); this.champDone = null;
     }
     if (o.mode === 'champ') { o.diff = this.champ.diff; o.laps = this.champ.laps; o.ship = Math.max(0, SHIPS.findIndex(s => s.id === this.champ.ship)); }
     this.raceId = this.progress.newRaceId(); // every started race is a new reward event, even on the same course and settings
-    const id = o.mode === 'champ' ? CHAMPIONSHIP[this.champ.round] : o.track, track = getTrack(id);
+    const id = o.mode === 'champ' ? this.champ.tracks[this.champ.round] : o.track, track = getTrack(id);
     const race = new Race({ track, laps: o.laps, racers: this.makeRacers(o.mode), mode: o.mode, seed: (Math.random() * 1e6) | 0, handling: this.settings.handling, assist: +this.settings.assist, sens: +this.settings.sens, autopilot: this.autotest });
     this.courseScene(id, race, false);
     this.ghost = o.mode === 'trial' ? this.save.ghosts[this.recKey(id)] || null : null; this.rec = []; this.recT = 0; this.ghostTi = 0; this.bestSplits = []; this.curSplits = [];
@@ -190,7 +192,7 @@ class Game {
     this.result = null; this.slowmo = 0; this.hud.setupMinimap(track); this.ui.clearMessages();
     this.camMode = this.settings.cam; this.input.capture = true; this.audio.music('race');
     if (this.autotest || params.has('nointro')) this.endIntro();
-    else { this.state = 'intro'; this.introT = 0; this.hud.show(false); this.ui.preRace(track.name, o.mode === 'champ' ? `Championship · round ${this.champ.round + 1} of ${CHAMPIONSHIP.length}` : o.mode === 'trial' ? 'Time trial' : 'Quick race'); }
+    else { this.state = 'intro'; this.introT = 0; this.hud.show(false); this.ui.preRace(track.name, o.mode === 'champ' ? `Championship · round ${this.champ.round + 1} of ${this.champ.tracks.length}` : o.mode === 'trial' ? 'Time trial' : 'Quick race'); }
   }
   endIntro() { this.state = 'race'; this.ui.hide(); this.hud.show(true); this.rig.snap = this.autotest; }
   toMenu() { this.champ = null; this.champDone = null; this.state = 'title'; this.input.capture = false; this.ui.clearMessages(); this.startAttract(); this.ui.title(this.touch); }
@@ -204,7 +206,8 @@ class Game {
         if (arg === 'champ' && !this.progress.champUnlocked(o.diff)) o.diff = this.topDiff();
         this.toShipSelect(); break;
       case 'ship': this.garage.switchShip(+arg); break;
-      case 'shipOk': this.garage.leave(() => { this.state = 'track'; this.startAttract(o.mode === 'champ' ? CHAMPIONSHIP[0] : o.track); this.ui.trackSelect(o, this.save, id => this.maps.get(id)); this.audio.music('menu'); }); break;
+      case 'shipOk': if (o.mode === 'champ' && !o.champTracks) o.champTracks = []; // V10: the player picks the championship's six courses next
+        this.garage.leave(() => { this.state = 'track'; this.startAttract(o.mode === 'champ' ? o.champTracks[0] || CHAMPIONSHIP[0] : o.track); this.ui.trackSelect(o, this.save, id => this.maps.get(id)); this.audio.music('menu'); }); break;
       case 'g': this.garage.act(arg); break;
       case 'garage': this.champ = null; this.champDone = null; this.garage.open(false); break;
       case 'career': this.state = 'career'; this.ui.show(careerHTML(this.progress.career()), 'full'); break;
@@ -214,7 +217,13 @@ class Game {
       case 'hoverTrack': this.previewCourse(arg); break;
       case 'laps': o.laps = +arg; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
       case 'diff': if (o.mode === 'champ' && !this.progress.champUnlocked(arg)) break; o.diff = arg; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
-      case 'start': if (o.mode === 'champ' && !this.progress.champUnlocked(o.diff)) break; this.startRace(); break;
+      case 'start': if (o.mode === 'champ' && (!this.progress.champUnlocked(o.diff) || (o.champTracks && o.champTracks.length !== CHAMPIONSHIP_ROUNDS))) break; this.startRace(); break;
+      // V10: picking the championship calendar (the order of the picks is the order of the rounds)
+      case 'champPick': { const L = o.champTracks || (o.champTracks = []), k = L.indexOf(arg); this.ui.focusArg = arg; if (k >= 0) L.splice(k, 1); else if (L.length < CHAMPIONSHIP_ROUNDS && TRACK_DEFS.some(d => d.id === arg)) L.push(arg);
+        this.ui.trackSelect(o, this.save, id => this.maps.get(id)); if (k < 0) this.previewCourse(arg, true); break; }
+      case 'champRandom': { const ids = TRACK_DEFS.map(d => d.id); for (let k = ids.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [ids[k], ids[j]] = [ids[j], ids[k]]; }
+        o.champTracks = ids.slice(0, CHAMPIONSHIP_ROUNDS); this.ui.trackSelect(o, this.save, id => this.maps.get(id)); this.previewCourse(o.champTracks[0], true); break; }
+      case 'champClear': o.champTracks = []; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
       case 'skip': if (this.state === 'intro') this.endIntro(); break;
       case 'mp': this.mp.act(arg); break; // V8: online screens
       case 'back':
@@ -289,7 +298,7 @@ class Game {
     { const po = this.gfx.post, want = this.state === 'intro' || this.state === 'finishing' || this.state === 'title' ? 0.105 : 0; po.bars += (want - po.bars) * Math.min(1, raw * 2.5); } // cinematic letterbox
     this.fx.update(this.state === 'paused' ? 0 : raw);
     this.gfx.post.flash = Math.max(0, this.gfx.post.flash - raw * 3);
-    if (this.shotCam) { const c = this.rig.cam, s = this.shotCam; c.pos.set(...s.pos); c.fwd.set(s.at[0] - s.pos[0], s.at[1] - s.pos[1], s.at[2] - s.pos[2]).normalize(); c.up.set(0, 1, 0); c.fov = s.fov || 60; } // test hook: matched screenshots
+    if (this.shotCam) { const c = this.rig.cam, s = this.shotCam; c.pos.set(...s.pos); c.fwd.set(s.at[0] - s.pos[0], s.at[1] - s.pos[1], s.at[2] - s.pos[2]).normalize(); c.up.set(...(s.up || [0, 1, 0])); c.fov = s.fov || 60; } // test hook: matched screenshots (V10: optional up, for views of rolled decks)
     this.gfx.resize(innerWidth, innerHeight);
     VIS.reset(); if (r && this.scene.course.cull) this.scene.course.cull(this.rig.cam, raw); // culling and LOD with the frame's final camera
     if (this.shotCam && this.shotShadow) shadowCenter = new Vec3(...this.shotCam.at); // test hook: sun shadows around what a test view looks at

@@ -95,13 +95,15 @@ test('championship races use the championship reward table; completion bonus sca
   for (const diff of DIFF_ORDER) for (let p = 1; p <= 6; p++) assert.equal(champRaceReward({ diff, laps: 3, place: p }).credits, Math.round(CHAMPIONSHIP_REWARDS.race.base * CHAMPIONSHIP_REWARDS.race.difficulty[diff] * CHAMPIONSHIP_REWARDS.race.placement[p - 1]));
   const b = DIFF_ORDER.map(diff => champCompletionReward({ diff, laps: 3, standing: 4 }).completion); assert.ok(b[0] < b[1] && b[1] < b[2], `completion ${b}`);
   const { P } = fresh(); const { last } = runChamp(P, 'rookie', 3, 2), run = last.completion.run;
-  assert.equal(run.credits.races, 4 * champRaceReward({ diff: 'rookie', laps: 3, place: 2 }).credits);
+  assert.equal(run.credits.races, CHAMPIONSHIP.length * champRaceReward({ diff: 'rookie', laps: 3, place: 2 }).credits); // V9: one race reward per round (six rounds)
   assert.equal(run.credits.completion, CHAMPIONSHIP_REWARDS.completion.rookie); assert.equal(run.credits.standing, Math.round(CHAMPIONSHIP_REWARDS.completion.rookie * CHAMPIONSHIP_REWARDS.standing[1]));
   assert.equal(P.wallet().CR, run.credits.total, 'the wallet holds exactly the run total');
 });
 test('a championship is worth more than the same number of single races, at every difficulty and length', () => {
-  for (const r of economyTable()) assert.ok(r.champTotalP3 > r.fourSingles * 1.5, `${r.diff} ${r.laps} laps: ${r.champTotalP3} vs ${r.fourSingles}`);
-  for (const r of economyTable()) assert.ok(r.champTotalP3 < r.fourSingles * 3, `${r.diff} ${r.laps} laps stays balanced against its time: ${r.champTotalP3} vs ${r.fourSingles}`);
+  // V9: six rounds share the unchanged completion bonus, so a run pays 1.5-1.8x the same singles (four rounds: 1.8-2.2x)
+  for (const r of economyTable()) assert.equal(r.rounds, CHAMPIONSHIP.length);
+  for (const r of economyTable()) assert.ok(r.champTotalP3 > r.sameSingles * 1.45, `${r.diff} ${r.laps} laps: ${r.champTotalP3} vs ${r.sameSingles}`);
+  for (const r of economyTable()) assert.ok(r.champTotalP3 < r.sameSingles * 3, `${r.diff} ${r.laps} laps stays balanced against its time: ${r.champTotalP3} vs ${r.sameSingles}`);
 });
 test('a championship race pays once, from the championship table only (never also as a single race)', () => {
   const { P } = fresh(); const s = P.startRun({ diff: 'rookie', laps: 3, ship: 'kestrel' }), id = P.newRaceId();
@@ -126,7 +128,7 @@ test('championship progress survives a reload, including a run in progress', () 
 });
 test('a run interrupted between its last round and its bonus is completed once on the next load', () => {
   const { P, storage } = fresh(); const s = P.startRun({ diff: 'rookie', laps: 1, ship: 'kestrel' });
-  const raw = JSON.parse(storage.getItem(KEYS.main)), a = raw.championships.active; a.round = 4; a.orders = [0, 1, 2, 3].map(() => order(1)); a.results = [0, 1, 2, 3].map(k => ({ round: k, track: CHAMPIONSHIP[k], place: 1, points: 10, credits: 0 }));
+  const raw = JSON.parse(storage.getItem(KEYS.main)), a = raw.championships.active; const R = CHAMPIONSHIP.length; a.round = R; a.orders = Array.from({ length: R }, () => order(1)); a.results = Array.from({ length: R }, (_, k) => ({ round: k, track: CHAMPIONSHIP[k], place: 1, points: 10, credits: 0 }));
   storage.setItem(KEYS.main, JSON.stringify(raw));
   const P2 = new Progression(storage, { now }); assert.equal(P2.activeRun(), null); assert.equal(P2.profile.championships.completed.rookie, 1); const cr = P2.wallet().CR; assert.ok(cr > 0);
   const P3 = new Progression(storage, { now }); assert.equal(P3.wallet().CR, cr, 'not paid twice'); void s;
@@ -283,14 +285,16 @@ test('committed state is read-only to the UI', () => {
 });
 
 // ---------------- regression: V6 gameplay data and ship meshes ----------------
-test('tracks, handling modes, ships, difficulty, championship and AI roster are exactly V6', () => {
+test('tracks, handling modes, ships, difficulty, championship and AI roster are exactly V6 (V9 and V10 only add two courses each after them)', () => {
   const v6 = JSON.parse(readFileSync(new URL('specs/v6-gameplay.json', import.meta.url)));
   const h = s => createHash('sha256').update(s).digest('hex').slice(0, 16);
-  for (const d of TRACK_DEFS) { const t = getTrack(d.id), e = v6.tracks[d.id];
+  assert.deepEqual(TRACK_DEFS.slice(0, 4).map(d => d.id), Object.keys(v6.tracks), 'the four original courses come first, in their order');
+  assert.deepEqual(TRACK_DEFS.slice(4).map(d => d.id), ['pelagos', 'ignara', 'canopy', 'nexus'], 'V9 added Pelagos and Ignara, V10 Verdant Canopy and Orbital Nexus');
+  for (const d of TRACK_DEFS.slice(0, 4)) { const t = getTrack(d.id), e = v6.tracks[d.id];
     assert.equal(t.N, e.N); assert.equal(+t.length.toFixed(6), e.length); assert.equal(h(t.pos.map(p => [p.x, p.y, p.z].map(v => v.toFixed(4)).join(',')).join(';')), e.pos, `${d.id} centreline`);
     assert.equal(h(t.w.join(',')), e.w); assert.equal(h(t.h.join(',')), e.h); assert.equal(t.cpS.join(','), e.cp); assert.equal(t.obstacles.length, e.obstacles); }
   assert.deepEqual(JSON.parse(JSON.stringify(HANDLING)), v6.handling); assert.deepEqual(JSON.parse(JSON.stringify(SHIPS)), v6.ships); assert.deepEqual(DIFFICULTY, v6.difficulty);
-  assert.deepEqual(CHAMPIONSHIP, v6.championship); assert.deepEqual(POINTS, v6.points); assert.deepEqual(AI_ROSTER, v6.ai);
+  assert.deepEqual(CHAMPIONSHIP.slice(0, 4), v6.championship); assert.deepEqual(CHAMPIONSHIP.slice(4), ['pelagos', 'ignara'], 'V9: the new courses are rounds 5 and 6'); assert.deepEqual(POINTS, v6.points); assert.deepEqual(AI_ROSTER, v6.ai);
 });
 test('ship meshes are exactly V6 (silhouettes, normals, colours, control surfaces); only paint-region tags were added', () => {
   const v6 = JSON.parse(readFileSync(new URL('specs/ships-geometry-v6.json', import.meta.url))).ships;

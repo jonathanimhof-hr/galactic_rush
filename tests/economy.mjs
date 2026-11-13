@@ -3,7 +3,7 @@
 // upgrades take to earn. Run: node tests/economy.mjs
 import { getTrack, TRACK_DEFS } from '../src/sim/tracks.js';
 import { Race } from '../src/sim/race.js';
-import { AI_ROSTER, SIM_DT, DIFFICULTY } from '../src/config.js';
+import { AI_ROSTER, SIM_DT, DIFFICULTY, CHAMPIONSHIP } from '../src/config.js';
 import { singleRaceReward, champRaceReward, champCompletionReward } from '../src/progress/rewards.js';
 import { UPGRADES, DIFF_ORDER, lapMult } from '../src/progress/economy.js';
 
@@ -21,7 +21,7 @@ const lap = lapSum / lapN; console.log(`average lap ${lap.toFixed(1)} s (autopil
 const table = [];
 for (const diff of DIFF_ORDER) for (const laps of [1, 2, 3, 5]) {
   const min = (laps * lap + OVERHEAD) / 60, s = singleRaceReward({ diff, laps, place: 3 }).credits, c = champRaceReward({ diff, laps, place: 3 }).credits, b = champCompletionReward({ diff, laps, standing: 3 });
-  const champ = 4 * c + b.completion + b.standing, cmin = 4 * min + 0.5;
+  const R = CHAMPIONSHIP.length, champ = R * c + b.completion + b.standing, cmin = R * min + 0.5; // V9: six rounds
   table.push({ diff, laps, 'single P3': s, 'single CR/min': Math.round(s / min), 'champ total P3': champ, 'champ CR/min': Math.round(champ / cmin), 'champ vs singles': +(champ / cmin / (s / min)).toFixed(2) });
 }
 console.table(table);

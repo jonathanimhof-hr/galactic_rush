@@ -120,6 +120,7 @@ export class RaceFX {
     const g = this.g, sc = g.scene, race = sc.race, me = race.player, hud = g.hud, gfx = g.gfx; if (!me) return;
     this.ghost(dt);
     hud.update(dt, race, me, this.ghostDelta);
+    if (this.course.notice) { const m = this.course.notice(me, race); if (m) g.ui.message(m.text, m.style || '', m.dur || 1.4); } // V10: a course may announce its own features (Orbital Nexus: gravity fields)
     const W = innerWidth, H = innerHeight, m = gfx.vp;
     const project = p => { const x = m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12], y = m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13], w = m[3] * p.x + m[7] * p.y + m[11] * p.z + m[15];
       if (w <= 0.1) return { behind: true }; return { x: (x / w * 0.5 + 0.5) * W, y: (1 - (y / w * 0.5 + 0.5)) * H }; };

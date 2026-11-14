@@ -10,7 +10,7 @@
 //   * Cloud Firestore's REST API (/v1/projects/.../documents: get, list, commit with preconditions), which only
 //     accepts the access tokens /oauth issued
 // Every key is generated when the stand-in starts; nothing here is a real credential. CI also runs the account tests
-// against Firebase's own emulators (.github/workflows/accounts.yml).
+// against Firebase's own emulators (.github/workflows/v12-checks.yml).
 import http from 'node:http';
 import { generateKeyPairSync, createSign, createVerify, randomBytes, scryptSync, timingSafeEqual, createPublicKey } from 'node:crypto';
 import { execFileSync } from 'node:child_process';

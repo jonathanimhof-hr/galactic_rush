@@ -1,5 +1,5 @@
 // GALACTIC RUSH V12 — the account system against Firebase's own emulators (Authentication and Cloud Firestore),
-// run in CI by .github/workflows/accounts.yml:
+// run in CI by .github/workflows/v12-checks.yml:
 //   firebase emulators:exec --only auth,firestore --project demo-galactic-rush "node --test tests/account/emulator.test.mjs"
 // The game's sign-in client and the account server talk to the emulators exactly as they talk to Firebase (same REST
 // API; the emulators accept the project's demo id and issue unsigned tokens, which the server accepts only in

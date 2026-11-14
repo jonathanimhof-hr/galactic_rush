@@ -6,5 +6,5 @@
 //                      Project settings -> General). Public identifiers: Firebase sends them to every browser.
 window.GALACTIC_RUSH_CONFIG = {
   multiplayerServer: "wss://galactic-rush.onrender.com",
-  firebase: { apiKey: "", projectId: "galactic-rush-d2186" },
+  firebase: { apiKey: "AIzaSyDZqNC6ttDA_JWA3t3TcBmSSkRjKGzLbX8", projectId: "galactic-rush-d2186" },
 };

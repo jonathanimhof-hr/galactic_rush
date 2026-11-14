@@ -2,7 +2,7 @@
 // Every message is a JSON object { t: type, ...fields }. Ship states travel as compact arrays (packState / unpackState).
 // This file has no browser or Node dependencies so both sides validate messages with the same rules.
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 3; // V10: the course list grew again (Verdant Canopy, Orbital Nexus); a game and a server must have the same courses (V9: 2)
 export const MP = Object.freeze({
   MAX_PLAYERS: 6,          // the starting grid has six slots
   MIN_PLAYERS: 2,

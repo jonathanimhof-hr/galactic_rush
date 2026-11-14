@@ -6,7 +6,7 @@ import { TRACK_DEFS } from '../sim/tracks.js';
 import { Championship } from '../sim/championship.js';
 import { CURRENCIES, DIFF_ORDER, MODES, MAX_BALANCE, MAX_REWARD, UPGRADES, UPGRADE_IDS } from './economy.js';
 import { ITEM, ITEMS, RARITIES, SLOTS, SLOT_DEFAULT, PREMIUM_LABEL, isPurchasable, isPremium, defaultCustom } from './catalog.js';
-import { createProfile, sanitizeCustom, derivedChampUnlocks, conditionMet, LIMITS, RUN_ID, EVENT_ID, CHAMP_NAMES } from './profile.js';
+import { createProfile, sanitizeCustom, derivedChampUnlocks, conditionMet, LIMITS, RUN_ID, EVENT_ID, CHAMP_NAMES, validCalendar, calendarOf } from './profile.js';
 import { ProfileStore, browserStorage, MemoryStorage } from './store.js';
 import { singleRaceReward, trialReward, champRaceReward, champCompletionReward, nextDifficulty, tokenLines, milestonesReached } from './rewards.js';
 import { effectiveDef, preview, CATEGORY } from './upgrades.js';
@@ -31,7 +31,7 @@ export class Progression {
     this.now = now; this.store = new ProfileStore(storage, now); this.subs = new Set(); this.counter = 0; this.saveT = null;
     const r = this.store.load(); this.loadStatus = r.status; this.loadIssues = r.issues;
     this.p = freeze(r.profile);
-    if (this.p.championships.active && this.p.championships.active.round >= CHAMPIONSHIP.length) this.completeRun(this.p.championships.active.runId); // finish a run interrupted between its last round and its bonus
+    if (this.p.championships.active && this.p.championships.active.round >= calendarOf(this.p.championships.active).length) this.completeRun(this.p.championships.active.runId); // finish a run interrupted between its last round and its bonus
   }
   get profile() { return this.p; }
   wallet() { return { CR: this.p.wallet.CR, ST: this.p.wallet.ST }; }
@@ -171,7 +171,8 @@ export class Progression {
       if (mode === 'champ') {
         run = d.championships.active;
         if (!run || run.runId !== c.runId) fail('bad-run', 'No matching championship run.');
-        if (run.round >= CHAMPIONSHIP.length || CHAMPIONSHIP[run.round] !== c.track || run.diff !== diff || run.laps !== laps) fail('bad-run', 'Race does not match the championship run.');
+        const cal = calendarOf(run); // V10: the run's own calendar
+        if (run.round >= cal.length || cal[run.round] !== c.track || run.diff !== diff || run.laps !== laps) fail('bad-run', 'Race does not match the championship run.');
         if (!Array.isArray(c.order) || c.order.length !== CHAMP_NAMES.length || !CHAMP_NAMES.every(n => c.order.includes(n)) || c.order.indexOf('YOU') + 1 !== place) fail('bad-run', 'Finishing order invalid.');
       }
       const lines = [{ id: 'race', name: mode === 'champ' ? `Round ${run.round + 1} reward` : mode === 'trial' ? 'Time trial reward' : 'Race reward', CR: r.credits }];
@@ -195,7 +196,7 @@ export class Progression {
         const pts = standingsOf([c.order]).points.YOU;
         run.results.push({ round: run.round, track: c.track, place, points: pts, credits: r.credits, eventId }); run.orders.push([...c.order]);
         run.round++; run.credits.races += r.credits; run.tokens += tokens;
-        champ = { runId: run.runId, round: run.round, rounds: CHAMPIONSHIP.length, runCredits: run.credits.races, done: run.round >= CHAMPIONSHIP.length };
+        const n = calendarOf(run).length; champ = { runId: run.runId, round: run.round, rounds: n, runCredits: run.credits.races, done: run.round >= n };
       }
       return { mode, credits: r.credits, tokens, parts: r.parts, lines, unlocks, champ };
     }, { events: [eventId] });
@@ -207,14 +208,16 @@ export class Progression {
   champUnlocked(diff) { return this.p.championships.unlocked.includes(diff); }
   activeRun() { return this.p.championships.active; }
   runStandings(run) { return standingsOf((run || this.activeRun() || { orders: [] }).orders || []); }
-  startRun({ diff, laps, ship }) {
+  startRun({ diff, laps, ship, tracks }) { // V10: tracks = the six courses the player picked, in race order (default: the V9 calendar)
     if (!DIFF_ORDER.includes(diff)) return { ok: false, code: 'bad-diff', message: 'Unknown difficulty.' };
     if (!this.champUnlocked(diff)) return { ok: false, code: 'locked', message: `${label(diff)} Championship is locked: ${unlockText({ type: 'championship', diff: DIFF_ORDER[DIFF_ORDER.indexOf(diff) - 1] })}` };
     if (!Number.isInteger(laps) || laps < 1 || laps > 9 || !this.shipOk(ship)) return { ok: false, code: 'bad-run', message: 'Invalid championship settings.' };
     if (this.activeRun()) return { ok: false, code: 'active-run', message: 'A championship is already in progress. Continue or abandon it first.' };
+    const cal = tracks === undefined ? CHAMPIONSHIP.slice() : validCalendar(tracks);
+    if (!cal) return { ok: false, code: 'bad-run', message: 'Pick six different courses for the championship.' };
     let runId; do runId = `champ-${this.now().toString(36)}-${rand36(6)}`; while (this.p.championships.runs.some(r => r.runId === runId));
     return this.transact('run', `start ${diff}`, d => {
-      d.championships.active = { runId, diff, laps, ship, startedAt: this.now(), round: 0, results: [], orders: [], credits: { races: 0, completion: 0, standing: 0, total: 0 }, tokens: 0 };
+      d.championships.active = { runId, diff, laps, ship, tracks: cal, startedAt: this.now(), round: 0, results: [], orders: [], credits: { races: 0, completion: 0, standing: 0, total: 0 }, tokens: 0 };
       return { run: d.championships.active };
     });
   }
@@ -230,7 +233,7 @@ export class Progression {
     return this.transact('champ', `complete ${runId}`, (d, T) => {
       const a = d.championships.active;
       if (!a || a.runId !== runId) fail('bad-run', 'No such championship in progress.');
-      if (a.round < CHAMPIONSHIP.length) fail('incomplete', 'The championship is not finished yet.');
+      if (a.round < calendarOf(a).length) fail('incomplete', 'The championship is not finished yet.');
       const st = standingsOf(a.orders).standings(), standing = st.findIndex(e => e.name === 'YOU') + 1;
       const b = champCompletionReward({ diff: a.diff, laps: a.laps, standing });
       T.credit('CR', b.completion, 'Championship completion bonus'); if (b.standing > 0) T.credit('CR', b.standing, `Final standing P${standing}`); if (b.tokens > 0) T.credit('ST', b.tokens, 'Championship tokens');
@@ -257,7 +260,7 @@ export class Progression {
 
 function summary(a, status, standing, now) {
   const cr = a.credits, completion = cr.completion || 0, stand = cr.standing || 0;
-  return { runId: a.runId, diff: a.diff, laps: a.laps, ship: a.ship, startedAt: a.startedAt, endedAt: now, status, standing, points: standingsOf(a.orders).points.YOU || 0,
+  return { runId: a.runId, diff: a.diff, laps: a.laps, ship: a.ship, tracks: calendarOf(a).slice(), startedAt: a.startedAt, endedAt: now, status, standing, points: standingsOf(a.orders).points.YOU || 0,
     results: a.results.map(r => ({ ...r })), credits: { races: cr.races, completion, standing: stand, total: cr.races + completion + stand }, tokens: a.tokens, unlocked: null };
 }
 function trimRuns(d) { const r = d.championships.runs; if (r.length > LIMITS.runs) r.splice(0, r.length - LIMITS.runs); }

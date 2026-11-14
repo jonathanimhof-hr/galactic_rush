@@ -1,6 +1,6 @@
 // GALACTIC RUSH V7 — the player profile: a versioned data model, its migrations, and validation that repairs or rejects
 // anything inconsistent. Loaded data is never trusted: every field is checked, clamped or reset before the game uses it.
-import { SHIPS, CHAMPIONSHIP, AI_ROSTER } from '../config.js';
+import { SHIPS, CHAMPIONSHIP, CHAMPIONSHIP_ROUNDS, AI_ROSTER } from '../config.js';
 import { TRACK_DEFS } from '../sim/tracks.js';
 import { DIFF_ORDER, MODES, MAX_BALANCE, MILESTONES, UPGRADES, UPGRADE_IDS } from './economy.js';
 import { ITEM, DEFAULT_ITEMS, SLOTS, SLOT_DEFAULT, defaultCustom } from './catalog.js';
@@ -9,6 +9,9 @@ export const PROFILE_VERSION = 1;
 export const LIMITS = { history: 30, runs: 30, seen: 400, tx: 60 };
 const SHIP_IDS = SHIPS.map(s => s.id), TRACK_IDS = TRACK_DEFS.map(d => d.id);
 export const CHAMP_NAMES = [...AI_ROSTER.map(a => a.name), 'YOU'];
+// V10: a run's calendar, the six courses the player picked in order; runs without one (saved by V9) keep the V9 calendar
+export function validCalendar(x) { return Array.isArray(x) && x.length === CHAMPIONSHIP_ROUNDS && x.every(id => TRACK_IDS.includes(id)) && new Set(x).size === x.length ? x.slice() : null; }
+export const calendarOf = run => (run && run.tracks) || CHAMPIONSHIP;
 export const RUN_ID = /^champ-[a-z0-9]{4,12}-[a-z0-9]{4,12}$/;
 export const EVENT_ID = /^[a-z]{2,12}:[a-z0-9:-]{4,80}$/;
 export const HEX = /^#[0-9a-f]{6}$/;
@@ -70,11 +73,11 @@ export function sanitizeCustom(raw, shipId, unlocked, issues = [], tag = '') {
 function sanitizeRun(r, issues, active) {
   if (!isObj(r) || typeof r.runId !== 'string' || !RUN_ID.test(r.runId)) { issues.push('championship run: bad id, dropped'); return null; }
   if (!DIFF_ORDER.includes(r.diff) || !SHIP_IDS.includes(r.ship)) { issues.push(`championship run ${r.runId}: bad difficulty or ship, dropped`); return null; }
-  const rounds = CHAMPIONSHIP.length, out = { runId: r.runId, diff: r.diff, laps: int(r.laps, 1, 9, 3), ship: r.ship, startedAt: int(r.startedAt, 0, 9e15, 0), round: int(r.round, 0, rounds, 0),
+  const cal = validCalendar(r.tracks) || CHAMPIONSHIP.slice(), rounds = cal.length, out = { runId: r.runId, diff: r.diff, laps: int(r.laps, 1, 9, 3), ship: r.ship, tracks: cal, startedAt: int(r.startedAt, 0, 9e15, 0), round: int(r.round, 0, rounds, 0),
     results: [], credits: { races: int(r.credits && r.credits.races, 0, MAX_BALANCE, 0), completion: 0, standing: 0, total: 0 }, tokens: int(r.tokens, 0, MAX_BALANCE, 0) };
   const res = Array.isArray(r.results) ? r.results : [];
   for (const x of res) { if (!isObj(x)) continue; const round = int(x.round, 0, rounds - 1, -1); if (round < 0 || out.results.some(e => e.round === round)) continue;
-    out.results.push({ round, track: TRACK_IDS.includes(x.track) ? x.track : CHAMPIONSHIP[round], place: int(x.place, 1, 6, 6), points: int(x.points, 0, 99, 0), credits: int(x.credits, 0, MAX_BALANCE, 0), eventId: typeof x.eventId === 'string' && EVENT_ID.test(x.eventId) ? x.eventId : null }); }
+    out.results.push({ round, track: TRACK_IDS.includes(x.track) ? x.track : cal[round], place: int(x.place, 1, 6, 6), points: int(x.points, 0, 99, 0), credits: int(x.credits, 0, MAX_BALANCE, 0), eventId: typeof x.eventId === 'string' && EVENT_ID.test(x.eventId) ? x.eventId : null }); }
   out.results.sort((a, b) => a.round - b.round);
   if (active) {
     if (out.results.length !== out.round || out.results.some((e, k) => e.round !== k)) { issues.push(`championship run ${r.runId}: results do not match its round counter, dropped`); return null; }

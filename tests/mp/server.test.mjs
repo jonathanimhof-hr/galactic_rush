@@ -14,6 +14,8 @@ import { HUB_RULES } from '../../server/hub.mjs';
 import { tournamentRewards } from '../../src/mp/rewards.js';
 import { C, S, MP, PROTOCOL } from '../../src/mp/protocol.js';
 import { Bot, sleep } from './bot.mjs';
+import { getTrack } from '../../src/sim/tracks.js';
+import { Quat, Vec3 } from '../../src/math.js';
 
 const WS = createRequire(new URL('../../server/package.json', import.meta.url))('ws'); // the server's own dependency
 const SCALE = 16;
@@ -59,7 +61,7 @@ test('health check and the WebSocket endpoint', async () => {
   const { srv, port } = await server();
   try {
     const h = await (await fetch(`http://127.0.0.1:${port}/health`)).json();
-    assert.equal(h.ok, true); assert.equal(h.protocol, PROTOCOL); assert.equal(h.version, '8.0.0'); assert.equal(h.lobbies, 0);
+    assert.equal(h.ok, true); assert.equal(h.protocol, PROTOCOL); assert.equal(h.version, '10.0.0'); assert.equal(h.lobbies, 0);
     assert.equal((await fetch(`http://127.0.0.1:${port}/nope`)).status, 404);
     await assert.rejects(raw(`ws://127.0.0.1:${port}/other`), e => e.status === 404);
   } finally { await srv.close(); }
@@ -172,6 +174,69 @@ test('tournament: three real clients race the qualifier and the final; the serve
     assert.notEqual(done2.tid, done.tid);
     console.log(`    two tournaments in ${((Date.now() - t0) / 1000).toFixed(0)} s; first: ${p1.track} then ${p2.track}, winner ${done.winnerName}`);
     assert.equal(srv.hub.stats.rejected, 0, 'no valid state was rejected');
+    for (const x of list) assert.deepEqual(x.errors, [], x.name);
+  } finally { await srv.close(); }
+});
+
+test('V9 courses: three real clients race a whole tournament on Pelagos and Ignara (ELIGIBLE_TRACKS), and a V8 game is turned away', async () => {
+  const { srv, url } = await server({ ELIGIBLE_TRACKS: 'pelagos,ignara' });
+  try {
+    const old = await raw(url); old.send({ t: C.HELLO, v: 1, name: 'V8 GAME' });
+    await until(() => old.msgs.length > 0, 3000, 'answer to a V8 hello'); assert.equal(old.msgs[0].code, 'version', 'a game with the V8 course list gets the version message'); old.ws.close();
+    const { list } = await lobbyOf(url, ['ALPHA', 'BRAVO', 'CHARLIE']);
+    const [a] = list;
+    const p1 = await startTournament(list);
+    assert.ok(['pelagos', 'ignara'].includes(p1.track), `qualifier on ${p1.track}`); assert.equal(p1.laps, 5);
+    await until(() => list.every(x => x.prepares.some(p => p.rid === p1.rid && p.track === p1.track)), 5000, 'every pilot gets the same course');
+    const r1 = await a.waitFor(S.RESULTS, m => m.stage === 1, 120000);
+    const fins = r1.rows.filter(r => r.status === 'finished'); assert.ok(fins.length >= 2, JSON.stringify(r1.rows));
+    const p2 = await a.waitFor(S.PREPARE, m => m.stage === 2, 20000);
+    assert.ok(['pelagos', 'ignara'].includes(p2.track) && p2.track !== p1.track, `final on ${p2.track}`);
+    const done = await a.waitFor(S.COMPLETE, () => true, 120000);
+    await until(() => list.every(x => x.completes.some(m => m.tid === done.tid)), 5000, 'everyone gets the tournament result');
+    const fin = done.stages.find(x => x.stage === 2); assert.equal(done.outcome, 'raced'); assert.equal(fin.track, p2.track); assert.equal(fin.rows[0].status, 'finished');
+    const expected = tournamentRewards(done);
+    for (const x of list) { const rw = x.complete.reward, want = expected[x.pid]; if (want) { assert.equal(rw.CR, want.CR); assert.equal(rw.ST, want.ST); } else assert.equal(rw, null); }
+    console.log(`    V9 tournament: qualifier on ${p1.track} (${fins.map(r => r.name + ' ' + r.time.toFixed(1) + 's').join(', ')}), final on ${p2.track}, winner ${done.winnerName}`);
+    assert.equal(srv.hub.stats.rejected, 1, 'only the V8 hello was rejected: no valid state was refused on the new courses');
+    for (const x of list) assert.deepEqual(x.errors, [], x.name);
+  } finally { await srv.close(); }
+});
+
+test('V10 courses: three real clients race a whole tournament on Verdant Canopy and Orbital Nexus (gravity deck), and a V9 game is turned away', async () => {
+  const { srv, url } = await server({ ELIGIBLE_TRACKS: 'canopy,nexus' });
+  try {
+    const old = await raw(url); old.send({ t: C.HELLO, v: 2, name: 'V9 GAME' });
+    await until(() => old.msgs.length > 0, 3000, 'answer to a V9 hello'); assert.equal(old.msgs[0].code, 'version', 'a game with the V9 course list (protocol 2) gets the version message'); old.ws.close();
+    const { list } = await lobbyOf(url, ['ALPHA', 'BRAVO', 'CHARLIE']);
+    const [a] = list;
+    // every ship state the server relays to ALPHA during the Orbital Nexus race (the other two pilots' ships)
+    const relayed = [], onMsg = a.onMsg.bind(a);
+    a.onMsg = (type, m) => { if (type === S.SNAP && a.prepares.length && a.prepares.at(-1).track === 'nexus') for (const x of m.s) if (x[0] !== a.pid) relayed.push(x.slice(2)); return onMsg(type, m); };
+    const p1 = await startTournament(list);
+    assert.ok(['canopy', 'nexus'].includes(p1.track), `qualifier on ${p1.track}`); assert.equal(p1.laps, 5);
+    await until(() => list.every(x => x.prepares.some(p => p.rid === p1.rid && p.track === p1.track)), 5000, 'every pilot gets the same course');
+    const r1 = await a.waitFor(S.RESULTS, m => m.stage === 1, 180000);
+    const fins = r1.rows.filter(r => r.status === 'finished'); assert.ok(fins.length >= 2, JSON.stringify(r1.rows));
+    const p2 = await a.waitFor(S.PREPARE, m => m.stage === 2, 20000);
+    assert.ok(['canopy', 'nexus'].includes(p2.track) && p2.track !== p1.track, `final on ${p2.track}`);
+    const done = await a.waitFor(S.COMPLETE, () => true, 180000);
+    await until(() => list.every(x => x.completes.some(m => m.tid === done.tid)), 5000, 'everyone gets the tournament result');
+    const fin = done.stages.find(x => x.stage === 2); assert.equal(done.outcome, 'raced'); assert.equal(fin.track, p2.track); assert.equal(fin.rows[0].status, 'finished');
+    const expected = tournamentRewards(done);
+    for (const x of list) { const rw = x.complete.reward, want = expected[x.pid]; if (want) { assert.equal(rw.CR, want.CR); assert.equal(rw.ST, want.ST); } else assert.equal(rw, null); }
+    console.log(`    V10 tournament: qualifier on ${p1.track} (${fins.map(r => r.name + ' ' + r.time.toFixed(1) + 's').join(', ')}), final on ${p2.track} (${fin.rows.filter(r => r.status === 'finished').map(r => r.name + ' ' + r.time.toFixed(1) + 's').join(', ')}), winner ${done.winnerName}`);
+    assert.equal(srv.hub.stats.rejected, 1, 'only the V9 hello was rejected: no valid state was refused on the new courses (Nexus ships ride walls and ceilings)');
+    // gravity is in sync: in the gravity sections the relayed ships stand on the deck (their up along the deck's up) and
+    // ride it, on the walls of the energy core and the ceilings of the glass corridors as on the upright cargo deck
+    const T = getTrack('nexus'), up = new Vec3(), q = new Quat(), byRoll = { upright: [], wall: [], ceiling: [] }; let n = 0, onDeck = 0;
+    for (const st of relayed) { const [, px, py, pz, qx, qy, qz, qw] = st; if (st[12] & 32) continue; // flags & FLAG.WRECK: a wrecked ship tumbles
+      let bi = 0, bd = 1e18; for (let i = 0; i < T.N; i++) { const P = T.pos[i], d = (P.x - px) ** 2 + (P.y - py) ** 2 + (P.z - pz) ** 2; if (d < bd) { bd = d; bi = i; } }
+      if (!(T.grav[bi] > 0.99)) continue; n++; q.set(qx, qy, qz, qw); up.set(0, 1, 0).applyQuat(q); const N = T.nrm[bi], dot = up.x * N.x + up.y * N.y + up.z * N.z; if (dot > 0.7) onDeck++;
+      const roll = Math.abs(((T.roll[bi] * 180 / Math.PI) % 360 + 360) % 360); byRoll[roll > 135 && roll < 225 ? 'ceiling' : roll > 45 && roll < 315 ? 'wall' : 'upright'].push(dot); }
+    const med = a => a.length ? a.slice().sort((x, y) => x - y)[a.length >> 1].toFixed(2) : '-';
+    console.log(`    Nexus gravity sync: ${n} relayed states in gravity sections, ${onDeck} with the ship's up within 45° of the deck's (median up·deck: upright ${med(byRoll.upright)} (${byRoll.upright.length}), wall ${med(byRoll.wall)} (${byRoll.wall.length}), ceiling ${med(byRoll.ceiling)} (${byRoll.ceiling.length}))`);
+    assert.ok(n > 50 && byRoll.wall.length > 10 && byRoll.ceiling.length > 10, `states seen on the walls and ceilings: ${n}`); assert.ok(onDeck / n > 0.9, `${onDeck} of ${n} relayed states stand on the deck`);
     for (const x of list) assert.deepEqual(x.errors, [], x.name);
   } finally { await srv.close(); }
 });

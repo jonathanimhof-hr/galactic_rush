@@ -3,7 +3,7 @@
 //   HOST              interface (default 0.0.0.0)
 //   TOKEN_SECRET      secret for signing session tokens; required when NODE_ENV=production (32+ random characters)
 //   ALLOWED_ORIGINS   comma-separated origins allowed to connect, e.g. https://you.github.io; required in production
-//   ELIGIBLE_TRACKS   comma-separated course ids the server may pick (default: all four)
+//   ELIGIBLE_TRACKS   comma-separated course ids the server may pick (default: all eight)
 //   MAX_LOBBIES       default 200; MAX_CONNECTIONS default 1000
 //   LOG_LEVEL         error | warn | info | debug (default info)
 //   GR_TIME_SCALE     TESTING ONLY: lets automated test clients run races faster than real time (default 1)

@@ -116,8 +116,9 @@ test('maps: the server picks each stage at random and avoids repeating a course 
   const pick = createMapPicker({ rng: k => seq[n++ % seq.length] % k });
   const a = pick.pick([]); const b = pick.pick([a]); assert.notEqual(a, b);
   const real = createMapPicker(); const counts = Object.fromEntries(ALL_TRACKS.map(t => [t, 0]));
-  for (let k = 0; k < 4000; k++) counts[real.pick([])]++;
-  for (const t of ALL_TRACKS) assert.ok(counts[t] > 800 && counts[t] < 1200, `${t} picked ${counts[t]} of 4000`);
+  const M = 1000 * ALL_TRACKS.length; assert.ok(ALL_TRACKS.includes('pelagos') && ALL_TRACKS.includes('ignara'), 'V9: both new courses are in the pool');
+  for (let k = 0; k < M; k++) counts[real.pick([])]++;
+  for (const t of ALL_TRACKS) assert.ok(counts[t] > 800 && counts[t] < 1200, `${t} picked ${counts[t]} of ${M}`);
   for (let k = 0; k < 200; k++) { const s1 = real.pick([]), s2 = real.pick([s1]); assert.notEqual(s1, s2); }
   const one = createMapPicker({ eligible: ['ring'] }); assert.equal(one.pick(['ring']), 'ring', 'a single eligible course may repeat');
   assert.throws(() => createMapPicker({ eligible: ['nowhere'] }));
@@ -183,6 +184,35 @@ test('race: legitimate states are accepted and the finish is official only after
   assert.ok(r.ok, r.reason); assert.equal(r.adjusted, false); assert.ok(Math.abs(r.time - P.finishT) < 0.01);
   assert.equal(rs.finish('a', { time: P.finishT }, wall(rs, P.finishT + 0.1)).reason, 'already-finished');
   assert.ok(n > 600); void t0;
+});
+
+test('race (V9): a legitimate five-lap run on Pelagos (through both loops) and on Ignara is accepted; skipping ahead is refused', () => {
+  for (const id of ['pelagos', 'ignara']) {
+    const rs = session({ track: id }), P = pilot(id, { v: 140 }); started(rs);
+    assert.equal(rs.track.L, getTrack(id).length); assert.deepEqual(rs.track.cpS, getTrack(id).cpS);
+    for (let t = 0.05; t < P.finishT + 0.05; t += 0.05) { const r = rs.state('a', P.at(t), wall(rs, t)); assert.ok(r.ok, `${id} t=${t.toFixed(2)} ${r.reason}`); }
+    assert.equal(rs.part('a').cp, rs.finishCp + 1);
+    const r = rs.finish('a', { time: P.finishT }, wall(rs, P.finishT + 0.05), 60);
+    assert.ok(r.ok, r.reason); assert.ok(Math.abs(r.time - P.finishT) < 0.01);
+    const rs2 = session({ track: id }); started(rs2);
+    for (let t = 0.05; t < 10; t += 0.05) assert.ok(rs2.state('a', P.at(t), wall(rs2, t)).ok);
+    assert.equal(rs2.state('a', P.at(10 + 1500 / 140), wall(rs2, 10.05)).ok, false, `${id}: a 1.5 km jump is refused`);
+  }
+});
+
+test('race (V10): a legitimate five-lap run on Verdant Canopy and on Orbital Nexus (walls, ceiling and zero-g) is accepted; skipping ahead is refused', () => {
+  assert.ok(ALL_TRACKS.includes('canopy') && ALL_TRACKS.includes('nexus') && ALL_TRACKS.length === 8, 'V10: both new courses are in the server pool of eight');
+  for (const id of ['canopy', 'nexus']) {
+    const rs = session({ track: id }), P = pilot(id, { v: 140 }); started(rs);
+    assert.equal(rs.track.L, getTrack(id).length); assert.deepEqual(rs.track.cpS, getTrack(id).cpS);
+    for (let t = 0.05; t < P.finishT + 0.05; t += 0.05) { const r = rs.state('a', P.at(t), wall(rs, t)); assert.ok(r.ok, `${id} t=${t.toFixed(2)} ${r.reason}`); }
+    assert.equal(rs.part('a').cp, rs.finishCp + 1);
+    const r = rs.finish('a', { time: P.finishT }, wall(rs, P.finishT + 0.05), 60);
+    assert.ok(r.ok, r.reason); assert.ok(Math.abs(r.time - P.finishT) < 0.01);
+    const rs2 = session({ track: id }); started(rs2);
+    for (let t = 0.05; t < 10; t += 0.05) assert.ok(rs2.state('a', P.at(t), wall(rs2, t)).ok);
+    assert.equal(rs2.state('a', P.at(10 + 1500 / 140), wall(rs2, 10.05)).ok, false, `${id}: a 1.5 km jump is refused`);
+  }
 });
 
 test('race: a finish without all laps, at the wrong place or time, or faster than the ship can fly is refused', () => {

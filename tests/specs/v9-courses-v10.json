@@ -1,0 +1,35 @@
+{
+ "title": "V9 courses: the same views in the V9 and V10 builds (world-up cameras, race frozen on the grid)",
+ "views": [
+  {
+   "label": "pelagos skim (#400)",
+   "query": "skipmenu=1&autotest=1&track=pelagos&nointro=1&quality=high",
+   "js": "() => { const t = __game.scene.track, D = t.D, I = 400, P = (s, x, y) => { const i = Math.floor(s), u = s - i, a = t.pointAt(((i % t.N) + t.N) % t.N, x, y), b = t.pointAt((((i + 1) % t.N) + t.N) % t.N, x, y); return [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u]; }; return { pos: P(I - 12.000000 / D, 0.000000, 4.000000), at: P(I + 18.000000 / D, 0.000000 * 0.3, 4.000000 * 0.3), fov: 70.000000 }; }"
+  },
+  {
+   "label": "pelagos loop (#900)",
+   "query": "skipmenu=1&autotest=1&track=pelagos&nointro=1&quality=high",
+   "js": "() => { const t = __game.scene.track, D = t.D, I = 900, P = (s, x, y) => { const i = Math.floor(s), u = s - i, a = t.pointAt(((i % t.N) + t.N) % t.N, x, y), b = t.pointAt((((i + 1) % t.N) + t.N) % t.N, x, y); return [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u]; }; return { pos: P(I - 30.000000 / D, 0.000000, 10.000000), at: P(I + 60.000000 / D, 0.000000 * 0.3, 10.000000 * 0.3), fov: 70.000000 }; }"
+  },
+  {
+   "label": "pelagos narrows (#1300)",
+   "query": "skipmenu=1&autotest=1&track=pelagos&nointro=1&quality=high",
+   "js": "() => { const t = __game.scene.track, D = t.D, I = 1300, P = (s, x, y) => { const i = Math.floor(s), u = s - i, a = t.pointAt(((i % t.N) + t.N) % t.N, x, y), b = t.pointAt((((i + 1) % t.N) + t.N) % t.N, x, y); return [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u]; }; return { pos: P(I - 12.000000 / D, 0.000000, 4.000000), at: P(I + 18.000000 / D, 0.000000 * 0.3, 4.000000 * 0.3), fov: 70.000000 }; }"
+  },
+  {
+   "label": "ignara canyon (#300)",
+   "query": "skipmenu=1&autotest=1&track=ignara&nointro=1&quality=high",
+   "js": "() => { const t = __game.scene.track, D = t.D, I = 300, P = (s, x, y) => { const i = Math.floor(s), u = s - i, a = t.pointAt(((i % t.N) + t.N) % t.N, x, y), b = t.pointAt((((i + 1) % t.N) + t.N) % t.N, x, y); return [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u]; }; return { pos: P(I - 12.000000 / D, 0.000000, 4.000000), at: P(I + 18.000000 / D, 0.000000 * 0.3, 4.000000 * 0.3), fov: 70.000000 }; }"
+  },
+  {
+   "label": "ignara tunnel (#900)",
+   "query": "skipmenu=1&autotest=1&track=ignara&nointro=1&quality=high",
+   "js": "() => { const t = __game.scene.track, D = t.D, I = 900, P = (s, x, y) => { const i = Math.floor(s), u = s - i, a = t.pointAt(((i % t.N) + t.N) % t.N, x, y), b = t.pointAt((((i + 1) % t.N) + t.N) % t.N, x, y); return [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u]; }; return { pos: P(I - 12.000000 / D, 0.000000, 4.000000), at: P(I + 18.000000 / D, 0.000000 * 0.3, 4.000000 * 0.3), fov: 70.000000 }; }"
+  },
+  {
+   "label": "ignara ridge (#1100)",
+   "query": "skipmenu=1&autotest=1&track=ignara&nointro=1&quality=high",
+   "js": "() => { const t = __game.scene.track, D = t.D, I = 1100, P = (s, x, y) => { const i = Math.floor(s), u = s - i, a = t.pointAt(((i % t.N) + t.N) % t.N, x, y), b = t.pointAt((((i + 1) % t.N) + t.N) % t.N, x, y); return [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u]; }; return { pos: P(I - 20.000000 / D, 0.000000, 8.000000), at: P(I + 80.000000 / D, 0.000000 * 0.3, 8.000000 * 0.3), fov: 70.000000 }; }"
+  }
+ ]
+}

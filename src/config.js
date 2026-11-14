@@ -41,5 +41,8 @@ export const AI_ROSTER = [
 ];
 
 export const POINTS = [10, 8, 6, 5, 4, 3];
-export const CHAMPIONSHIP = ['foundry', 'belt', 'spire', 'ring'];
+export const CHAMPIONSHIP = ['foundry', 'belt', 'spire', 'ring', 'pelagos', 'ignara']; // V9: Pelagos and Ignara are rounds 5 and 6
+// V10: a championship still has six rounds, but the player picks its six courses (and their order) from all eight before
+// it starts; CHAMPIONSHIP above stays the calendar of runs that do not carry their own (runs saved by V9).
+export const CHAMPIONSHIP_ROUNDS = 6;
 export const SIM_DT = 1 / 120;

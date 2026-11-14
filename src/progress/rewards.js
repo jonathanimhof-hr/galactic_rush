@@ -1,6 +1,7 @@
 // GALACTIC RUSH V7 — reward calculation (pure functions, no state): single races, time trials, championship rounds and
 // completion. Results carry their own breakdown so the results screens can show exactly how a number was made.
 import { SINGLE_RACE, TIME_TRIAL, CHAMPIONSHIP_REWARDS as CR_, DIFF_ORDER, lapMult, TOKEN_SOURCES, MILESTONES } from './economy.js';
+import { CHAMPIONSHIP } from '../config.js';
 
 const pick = (arr, place) => arr[Math.min(arr.length - 1, Math.max(0, place - 1))];
 const DLAB = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace' };
@@ -33,12 +34,13 @@ export const nextDifficulty = diff => DIFF_ORDER[DIFF_ORDER.indexOf(diff) + 1] |
 export function tokenLines(ctx) { return TOKEN_SOURCES.filter(s => s.when(ctx)).map(s => ({ id: s.id, name: s.name, ST: s.ST })); }
 export function milestonesReached(stats, claimed) { return MILESTONES.filter(m => !claimed.includes(m.id) && (stats[m.stat] || 0) >= m.at); }
 
-// Economy table for documentation and tests: credits for an average finish (P3) per race type
+// Economy table for documentation and tests: credits for an average finish (P3) per race type; a championship run is
+// compared with the same number of single races (V9: six rounds)
 export function economyTable() {
-  const rows = [];
+  const rows = [], n = CHAMPIONSHIP.length;
   for (const diff of DIFF_ORDER) for (const laps of [1, 3, 5]) {
     const s = singleRaceReward({ diff, laps, place: 3 }).credits, c = champRaceReward({ diff, laps, place: 3 }).credits, b = champCompletionReward({ diff, laps, standing: 3 });
-    rows.push({ diff, laps, single: s, champRound: c, champTotalP3: c * 4 + b.completion + b.standing, fourSingles: s * 4 });
+    rows.push({ diff, laps, rounds: n, single: s, champRound: c, champTotalP3: c * n + b.completion + b.standing, sameSingles: s * n });
   }
   return rows;
 }

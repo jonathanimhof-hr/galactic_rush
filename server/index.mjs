@@ -11,7 +11,7 @@ import { createIdentity } from './identity.mjs';
 import { Hub } from './hub.mjs';
 import { MP, PROTOCOL } from '../src/mp/protocol.js';
 
-export const VERSION = '8.0.0';
+export const VERSION = '10.0.0'; // V10: Verdant Canopy and Orbital Nexus (protocol 3)
 
 export function startServer(env = process.env, opts = {}) {
   const { cfg, warnings } = loadConfig(env);

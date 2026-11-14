@@ -1,6 +1,10 @@
 // Course definitions (all original). Each course: filleted polygon + hazards placed by populate().
 import { Track } from './track.js';
 import { makeRng, Vec3 } from '../math.js';
+import { buildPathTrack } from './pathtrack.js';
+import { V9_TRACKS } from './tracks-v9.js';
+import { V10_TRACKS } from './tracks-v10.js';
+import { buildPathTrack10 } from './pathtrack10.js';
 
 const TOP = 18; // trench rim height for Foundry Trench
 const tv = (x, z, floor, r, w) => ({ x, z, r, w, y: (TOP + floor) / 2, h: (TOP - floor) / 2 });
@@ -118,13 +122,15 @@ export const TRACK_DEFS = [
     },
   },
 ];
+TRACK_DEFS.push(...V9_TRACKS); // V9: Pelagos and Ignara, built as 3D paths (pathtrack.js)
+TRACK_DEFS.push(...V10_TRACKS); // V10: Verdant Canopy and Orbital Nexus (3D paths; Nexus adds gravity sections, gravity.js)
 
 const cache = new Map();
 export function getTrack(id) {
   if (!cache.has(id)) {
     const def = TRACK_DEFS.find(d => d.id === id);
     if (!def) throw new Error('unknown track ' + id);
-    const t = new Track(def);
+    const t = def.build === 'path10' ? buildPathTrack10(def) : def.path ? buildPathTrack(def) : new Track(def); // V10: the two V10 courses use their own path builder
     def.populate(t, makeRng(def.seed));
     t.updateObstacles(0);
     cache.set(id, t);

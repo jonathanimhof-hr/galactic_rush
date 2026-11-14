@@ -26,11 +26,12 @@ await visit(join(root, 'src/main.js'));
 const missing = importsOf.flatMap(({ file, dep, names }) => names.filter(n => !exportsOf.get(dep).has(n)).map(n => `${n} (imported by ${file.replace(root + '/', '')} from ${dep.replace(root + '/', '')})`));
 if (missing.length) { console.error('bundle error, not exported: ' + missing.join('; ')); process.exit(1); }
 const bundle = '"use strict";\n' + order.map(f => mods.get(f)).join('\n').replace(/<\/script/gi, '<\\/script');
-const html = (await readFile(join(root, 'index.html'), 'utf8')).replace(/<title>Galactic Rush V7<\/title>/, '<title>Galactic Rush V8</title>');
+const html = (await readFile(join(root, 'index.html'), 'utf8')).replace(/<title>Galactic Rush V7<\/title>/, '<title>Galactic Rush V11</title>');
 // V8: the multiplayer server's public address (wss://…) is not a secret. It comes from GR_MP_SERVER at build time or,
 // when that is not set, from the multiplayerServer entry of the config.js committed in the repository root, so editing
 // that file on GitHub is enough. Without either, the online screens explain that no server is set. The claude.ai
 // artifact never gets it (the viewer blocks network connections), and earlier versions' files in dist/ are never written.
+// (The fallback to the root config.js is the change made to build.mjs in the GitHub repository on 4 Nov 2026, kept.)
 let MP_SERVER = (process.env.GR_MP_SERVER || '').trim(), MP_FROM = MP_SERVER ? 'GR_MP_SERVER' : '';
 if (!MP_SERVER) {
   const m = /multiplayerServer\s*:\s*(["'])(.*?)\1/.exec(await readFile(join(root, 'config.js'), 'utf8').catch(() => ''));
@@ -43,13 +44,13 @@ const page = (extraHead = '') => html.replace(/(<meta name="viewport"[^>]*>)/i, 
 const meta = MP_SERVER ? `\n<meta name="galactic-rush:mp-server" content="${MP_SERVER}">` : '';
 const full = page(meta);
 await mkdir(join(root, 'dist/site'), { recursive: true });
-await writeFile(join(root, 'dist/galactic-rush-v8.html'), full);
+await writeFile(join(root, 'dist/galactic-rush-v11.html'), full); // V11: the visual pass over the four newer worlds; the V5-V10 files in dist/ are never rewritten (V10's site page is kept in dist/site-v10)
 // Artifact variant: page content only (the host supplies doctype/head/body)
 const art = page().replace(/<!doctype html>\s*<html[^>]*>\s*<head>\s*/i, '').replace(/<meta charset[^>]*>\s*<meta name="viewport"[^>]*>\s*/i, '')
   .replace(/<\/head>\s*<body>\s*/i, '').replace(/<\/body>\s*<\/html>\s*$/i, '');
-await writeFile(join(root, 'dist/galactic-rush-v8-artifact.html'), art);
+await writeFile(join(root, 'dist/galactic-rush-v11-artifact.html'), art);
 // GitHub Pages site: the same page plus config.js, which the build writes from GR_MP_SERVER (the Pages workflow passes the
 // repository variable of that name) or, when that is empty, from the config.js in the repository root
 await writeFile(join(root, 'dist/site/index.html'), page(meta + '\n<script src="config.js"></script>'));
-await writeFile(join(root, 'dist/site/config.js'), `// Galactic Rush V8 site settings (public). multiplayerServer: the multiplayer server's wss:// address.\nwindow.GALACTIC_RUSH_CONFIG = { multiplayerServer: ${JSON.stringify(MP_SERVER)} };\n`);
-console.log(`built dist/galactic-rush-v8.html (${(full.length / 1024).toFixed(0)} KB), ${order.length} modules, multiplayer server: ${MP_SERVER ? `${MP_SERVER} (from ${MP_FROM})` : 'not set'}`);
+await writeFile(join(root, 'dist/site/config.js'), `// Galactic Rush V11 site settings (public). multiplayerServer: the multiplayer server's wss:// address.\nwindow.GALACTIC_RUSH_CONFIG = { multiplayerServer: ${JSON.stringify(MP_SERVER)} };\n`);
+console.log(`built dist/galactic-rush-v11.html (${(full.length / 1024).toFixed(0)} KB), ${order.length} modules, multiplayer server: ${MP_SERVER ? `${MP_SERVER} (from ${MP_FROM})` : 'not set'}`);

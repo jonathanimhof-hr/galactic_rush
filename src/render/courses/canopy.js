@@ -211,6 +211,16 @@ export function buildCanopy(gfx, t) {
       // a lower crown on a side limb (about half of the trees): foliage at mid height, so the forest has layers
       let mid = null; { const u = 0.42 + 0.3 * R2(), a = R2() * 6.283, r = cr * (0.38 + 0.2 * R2()), y = fy + (topY - fy) * u, off = tr + r * 0.55, mc = v3(bx + (px - bx) * u + Math.cos(a) * off, y, bz + (pz - bz) * u + Math.sin(a) * off);
         if (R2() < 0.55 && y - fy > r + 20 && okS(mc, r, 3)) mid = { c: mc, r, v: R2() < 0.5 ? 0 : 1 }; }
+      // V12: the whole trunk is checked, every 4 m from its foot to its top, against the corridor. The three points above
+      // let a few trunks (about twenty in the whole forest) stand right through the corridor, where nothing collides
+      // with them and ships flew through them. Such a trunk now stands upright if that clears it and is left out
+      // otherwise, as that check always meant. Decided after all of the tree's random draws, so every other tree of the
+      // forest stays exactly as it was.
+      const clearAll = (x0, z0) => { const f0 = floorY(x0, z0) - 3, L = Math.hypot(px - x0, topY - f0, pz - z0), n = Math.ceil(L / 4);
+        for (let k = 0; k <= n; k++) { const u = k / n, rr = tr * Math.max(1 - 0.45 * u + (u < 0.1 ? 0.5 * (1 - u / 0.1) : 0), u < 0.06 ? 3.2 * (1 - u / 0.06) : 0);
+          if (!okS(v3(x0 + (px - x0) * u, f0 + (topY - f0) * u, z0 + (pz - z0) * u), rr, 1.5)) return false; }
+        return true; };
+      if (!clearAll(bx, bz)) { if (bx !== px || bz !== pz) { if (!clearAll(px, pz)) continue; bx = px; bz = pz; } else continue; }
       forest.push({ px, pz, bx, bz, fy: floorY(bx, bz), topY, tr, c, cr, rot, bk: bk.map(k => k * shade), gk, v, tint, mid, near: dxz < t.w[i] + 300 });
     } }
   const trunkMesh = [], crownMesh = [[], []], fsets = [];

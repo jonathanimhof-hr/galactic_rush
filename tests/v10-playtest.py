@@ -48,7 +48,7 @@ with sync_playwright() as pw:
     if scenario == 'menus':
         page = ctx.new_page(); watch(page, 'menus'); page.set_default_timeout(300000); page.goto(BUILD + '?quality=low'); ready(page)
         W = lambda cond, t=300000: page.wait_for_function(cond, timeout=t)
-        W("() => __game.state === 'title'"); check('Galactic Rush V10' in page.title() or 'Galactic Rush V11' in page.title(), f'page title: {page.title()}')  # V11: the same flows on the V11 build (GR_BUILD)
+        W("() => __game.state === 'title'"); check(any(f'Galactic Rush V{v}' in page.title() for v in (10, 11, 12)), f'page title: {page.title()}')  # V11, V12: the same flows on their builds (GR_BUILD)
         page.keyboard.press('Enter'); W("() => __game.state === 'ship'"); page.keyboard.press('Enter'); W("() => __game.state === 'track'")
         ids = page.evaluate("() => [...document.querySelectorAll('[data-act=track]')].map(e => e.dataset.arg)")
         check(ids == ALL8, f'course select lists eight courses in order: {ids}')

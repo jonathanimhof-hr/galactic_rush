@@ -14,7 +14,7 @@ export const devPage = (loc = typeof location !== 'undefined' ? location : null)
 export function mpServer(loc = typeof location !== 'undefined' ? location : null, doc = typeof document !== 'undefined' ? document : null, win = typeof window !== 'undefined' ? window : {}) {
   let url = '', source = 'none';
   const cfg = win.GALACTIC_RUSH_CONFIG;
-  if (cfg && typeof cfg.multiplayerServer === 'string' && cfg.multiplayerServer.trim()) { url = toWsUrl(cfg.multiplayerServer); source = 'config'; }
+  if (cfg && typeof cfg.multiplayerServer === 'string' && cfg.multiplayerServer.trim()) { url = cfg.multiplayerServer.trim() === 'same-origin' && loc ? toWsUrl(loc.origin) : toWsUrl(cfg.multiplayerServer); source = 'config'; } // V12: same-origin = the server that serves the page
   if (!url && doc) { const m = doc.querySelector('meta[name="galactic-rush:mp-server"]'); if (m && m.content.trim()) { url = toWsUrl(m.content); source = 'build'; } }
   if (devPage(loc)) { const p = new URLSearchParams(loc.search).get('mp'); if (p) { url = toWsUrl(p); source = 'dev'; } }
   const insecure = !!(url && loc && loc.protocol === 'https:' && url.startsWith('ws://'));

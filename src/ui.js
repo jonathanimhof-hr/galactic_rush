@@ -1,5 +1,5 @@
 // Menus, banners and messages (DOM). The in-race HUD lives in hud.js.
-import { SHIPS, STAT_BARS, DIFFICULTY, CHAMPIONSHIP, CHAMPIONSHIP_ROUNDS } from './config.js';
+import { SHIPS, STAT_BARS, DIFFICULTY, DIFF_NOTE, CHAMPIONSHIP, CHAMPIONSHIP_ROUNDS } from './config.js';
 const ROUNDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'][CHAMPIONSHIP.length] || String(CHAMPIONSHIP.length); // V9: the calendar has six rounds
 import { TRACK_DEFS } from './sim/tracks.js';
 import { walletHTML, rewardHTML, ladderHTML, DIFF_LABEL } from './ui-garage.js';
@@ -54,26 +54,29 @@ export class UI {
   }
   activate() { const a = document.activeElement; if (a && a.matches && a.matches('button')) a.click(); }
 
-  title(touch) {
-    const P = this.g.progress, run = P && P.activeRun();
+  title(touch, keep = false) { // V12: keep = a re-render while the player is on the menu (focus and scroll stay)
+    const P = this.g.progress, run = P && P.activeRun(), A = this.g.account, as = A ? A.status() : null; // V12: where the career is saved
+    const chip = A && A.state !== 'off' ? `<span class="acct-chip ${A.state === 'ready' ? (A.sync === 'offline' ? 'offline' : 'ready') : A.state === 'guest' ? '' : 'attention'}" title="${as.line.replace(/"/g, '&quot;')}">${as.short}</span>` : '';
+    if (A) A.ui.style();
     this.show(`<div class="col">
-      <div class="row between"><div class="kicker">Starlane Grand Prix · Season 5</div>${P ? walletHTML(P.wallet()) : ''}</div>
+      <div class="row between"><div class="kicker">Starlane Grand Prix · Season 5</div><div class="row" style="gap:10px;align-items:center">${chip}${P ? walletHTML(P.wallet()) : ''}</div></div>
       <h1 class="logo"><span class="a">Galactic</span><span class="b">Rush</span></h1>
       <p class="lede">Thread an orbital foundry trench, a drifting asteroid belt, a neon megacity and the ring plane of a gas giant at six hundred kilometres an hour.</p>
       ${touch ? '<p class="touchnote">Needs a keyboard or a gamepad to fly.</p>' : ''}
       <div class="menu">
         ${run ? `<button class="btn primary" data-act="champContinue">Continue championship<small>${DIFF_LABEL[run.diff]} · round ${run.round + 1} of ${CHAMPIONSHIP.length}</small></button>` : ''}
         <button class="btn${run ? '' : ' primary'}" data-act="mode" data-arg="quick">Quick race<small>One course, five rivals · earn credits every race</small></button>
-        <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : `${ROUNDS} rounds · Rookie → Pro → Ace`}</small></button>
+        <button class="btn" data-act="mode" data-arg="champ">Championship<small>${run ? 'A run is in progress' : `${ROUNDS} rounds · Rookie → Legend`}</small></button>
         <button class="btn" data-act="mode" data-arg="trial">Time trial<small>Race your ghost for the course record</small></button>
         <button class="btn" data-act="mp" data-arg="open">Online multiplayer<small>Tournament against real pilots · qualifier and final</small></button>
         <button class="btn" data-act="garage">Garage<small>Upgrades, paint shop, inventory and cosmetic shop</small></button>
         <button class="btn" data-act="career">Career<small>Your record, championships and earnings</small></button>
+        ${A && A.state !== 'off' ? `<button class="btn" data-act="acct" data-arg="open:title">Account<small>${as.line.replace(/</g, '&lt;')}</small></button>` : ''}
         <button class="btn" data-act="settings" data-arg="title">Settings</button>
         <button class="btn" data-act="controls" data-arg="title">Controls</button>
       </div>
       <div class="foot">All ships, circuits, pilots, brands and music are original. Arrow keys or d-pad to move, Enter or A to select.</div>
-    </div>`);
+    </div>`, 'scrim', !keep, keep);
   }
 
   shipSelect(idx) {
@@ -102,8 +105,9 @@ export class UI {
           <span class="chip">${champ ? (k >= 0 ? 'Round ' + (k + 1) : d.short) : d.short}</span><span class="t">${d.name}</span><span class="d">${d.tagline}</span>
           <span class="m"><span>LENGTH <b>${(this.g.trackLen(d.id) / 1000).toFixed(1)} KM</b></span><span>BEST <b>${b ? fmt(b.lap) : '--'}</b></span></span></button>`; }).join('')}</div>
       <div class="row" style="gap:22px"><div class="row"><h3>Laps</h3>${seg('laps', [[1, '1'], [2, '2'], [3, '3'], [5, '5']], o.laps)}</div>
-        ${trial || champ ? '' : `<div class="row"><h3>Rivals</h3>${seg('diff', Object.entries(DIFFICULTY).map(([k, v]) => [k, v.label]), o.diff)}</div>`}</div>
-      ${champ ? `<div class="panel"><h3>Championship difficulty · Rookie → Pro → Ace</h3>${ladderHTML(this.g.progress.profile.championships, o.diff, o.laps)}</div>` : ''}
+        ${trial || champ ? '' : `<div class="row"><h3>Rivals</h3>${seg('diff', Object.entries(DIFFICULTY).map(([k, v]) => [k, v.label]), o.diff).replace('class="seg"', 'class="seg wrap"')}</div>`}</div>
+      ${trial ? '' : `<p class="diffnote">${DIFF_NOTE[o.diff] || ''}</p>`}
+      ${champ ? `<div class="panel"><h3>Championship difficulty · Rookie → Pro → Ace → Elite → Master → Legend</h3>${ladderHTML(this.g.progress.profile.championships, o.diff, o.laps)}</div>` : ''}
       <div class="actbar"><div class="row"><button class="btn primary" data-act="start"${champ && (!this.g.progress.champUnlocked(o.diff) || !full) ? ' disabled' : ''}>${champ ? (full ? `Start ${DIFF_LABEL[o.diff] || ''} championship` : `Pick ${CHAMPIONSHIP_ROUNDS - picks.length} more course${CHAMPIONSHIP_ROUNDS - picks.length > 1 ? 's' : ''}`) : 'Launch'}</button><button class="btn" data-act="back">Back</button></div></div>
     </div>`, 'scrim', false);
     this.root.querySelectorAll('canvas[data-map]').forEach(c => { const m = maps(c.dataset.map); if (m) c.getContext('2d').drawImage(m, 0, 0); });
@@ -170,8 +174,11 @@ export class UI {
     else if (this.tab === 'audio') body = opt('sound', 'Sound', [['on', 'On'], ['off', 'Off']]) + range('master', 0, 1, 0.05, 'Master volume') + range('music', 0, 1, 0.05, 'Music volume') + range('sfx', 0, 1, 0.05, 'Effects volume');
     else if (this.tab === 'controls') body = range('sens', 0.6, 1.4, 0.05, 'Steering sensitivity') + range('padSens', 0.6, 1.6, 0.05, 'Gamepad sensitivity') + opt('invert', 'Pitch', [['false', 'Normal'], ['true', 'Inverted']])
       + opt('handling', 'Handling', [['relaxed', 'Relaxed'], ['classic', 'Classic (V1)']]) + opt('assist', 'Steering assist', [['0', 'Off'], ['0.3', 'Low'], ['0.6', 'High']]) + opt('rumble', 'Gamepad rumble', [['on', 'On'], ['off', 'Off']]);
-    else body = `<p class="lede" style="margin:6px 0 10px">Best laps and ghosts are stored in this browser. Copy them out, or paste a save from Galactic Rush V1 or another browser. Pasting keeps whichever lap is faster.
-      Your career (credits, Style Tokens, upgrades, cosmetics and championships) is also saved in this browser, separately, and is not part of this copy: there is no cloud sync.</p>
+    else body = this.g.progress && this.g.progress.cloud
+      ? `<p class="lede" style="margin:6px 0 10px">You are signed in: your career, best laps, ghosts and gameplay settings are saved to your account and follow you to other devices (Account in the main menu). Copy your best laps and ghosts out below; pasting a save goes into this device's guest career, so log out first.</p>`
+      : `<p class="lede" style="margin:6px 0 10px">Best laps and ghosts are stored in this browser. Copy them out, or paste a save from Galactic Rush V1 or another browser. Pasting keeps whichever lap is faster.
+      Your career (credits, Style Tokens, upgrades, cosmetics and championships) is also saved in this browser, separately, and is not part of this copy. To keep it on a server and use it on other devices, sign in under Account in the main menu.</p>`;
+    if (this.tab === 'data') body += `
       <textarea class="save" id="saveText" placeholder="Paste a save here"></textarea>
       <div class="row" style="margin-top:10px"><button class="btn" data-act="saveExport">Copy my save</button><button class="btn" data-act="saveImport">Import pasted save</button></div><p class="lede" id="saveMsg" style="margin-top:6px"></p>`;
     this.show(`<div class="col center" style="width:min(680px,100%)"><h3>Settings</h3><h2>Tune the cockpit</h2>

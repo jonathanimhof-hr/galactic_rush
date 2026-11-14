@@ -4,7 +4,7 @@ import { SINGLE_RACE, TIME_TRIAL, CHAMPIONSHIP_REWARDS as CR_, DIFF_ORDER, lapMu
 import { CHAMPIONSHIP } from '../config.js';
 
 const pick = (arr, place) => arr[Math.min(arr.length - 1, Math.max(0, place - 1))];
-const DLAB = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace' };
+const DLAB = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace', elite: 'Elite', master: 'Master', legend: 'Legend' };
 
 // Base x Difficulty x Laps x Placement, rounded to whole credits
 export function singleRaceReward({ diff, laps, place }) {

@@ -29,6 +29,26 @@ export const DIFFICULTY = {
   rookie: { label: 'ROOKIE', skill: [0.45, 0.68] },
   pro: { label: 'PRO', skill: [0.68, 0.86] },
   ace: { label: 'ACE', skill: [0.86, 1.0] },
+  // V12: three harder levels. Rookie, Pro and Ace above are unchanged. These rivals drive with a profile (ai.js
+  // update12), and Master and Legend fly upgraded ships (the garage's own upgrades, levels a player can buy too):
+  //   corner: share of the corner speed the planner allows (Ace: 0.84-0.98 by skill), less spread x (1 - skill) for the
+  //   slower pilots of a field; brake: share of the ship's braking it plans with (Ace: 0.7); slack: m/s over the
+  //   planned speed before it brakes; look: steering look-ahead [base m, s, min m, max m]; gain / damp: steering gain
+  //   and damping (Ace: 2.6 / 0.18; higher = more precise, fewer wall scrapes); pad: metres it keeps from obstacles and
+  //   rivals (Ace: 6.0-6.2); wallT: metres its aim keeps from the walls (Ace: 4); wobble: steering unsteadiness (Ace:
+  //   up to 0.03); burst: boosts in full bursts that start once the tank holds this share of its capacity (Ace boosts
+  //   whenever it has 20 units); boostFit: how close to a corner it still boosts (as Ace: 1.15)
+  // The numbers come from measured races (README, "Difficulty"): each level's rivals lap faster than the level below.
+  elite: { label: 'ELITE', skill: [0.9, 1.0], drive: { corner: 0.98, spread: 0.06, brake: 0.72, slack: 6, look: [24, 0.4, 30, 110], gain: 3.5, damp: 0.3, pad: 6.5, wallT: 5, wobble: 0.02, burst: 0.6, boostFit: 1.15 } },
+  master: { label: 'MASTER', skill: [0.93, 1.0], drive: { corner: 0.98, spread: 0.04, brake: 0.75, slack: 6, look: [24, 0.4, 30, 110], gain: 4.5, damp: 0.4, pad: 7, wallT: 6, wobble: 0.01, burst: 0.6, boostFit: 1.15 }, upgrades: { engine: 1, accel: 1, handling: 1, boost: 1, stability: 1 } },
+  legend: { label: 'LEGEND', skill: [0.96, 1.0], drive: { corner: 1.0, spread: 0.02, brake: 0.8, slack: 6, look: [24, 0.4, 30, 110], gain: 8, damp: 0.5, pad: 7, wallT: 6, wobble: 0, burst: 0.5, boostFit: 1.15 }, upgrades: { engine: 3, accel: 3, handling: 3, boost: 3, stability: 3 } },
+};
+
+// V12: what each level means, shown under the difficulty choice
+export const DIFF_NOTE = {
+  rookie: 'Relaxed rivals who brake early and make mistakes.', pro: 'Solid rivals.', ace: 'Quick, committed rivals.',
+  elite: 'Precise rivals: clean lines, full boost bursts, few mistakes.', master: 'Near-flawless rivals in ships upgraded one level.',
+  legend: 'Flawless rivals in ships upgraded three levels. Only clean, boosted laps win.',
 };
 
 // AI pilots: invented call signs. bias spreads skill inside the difficulty band.

@@ -63,12 +63,21 @@ export class Input {
   }
 }
 
-const KEY = 'galactic-rush.v1';
+// V12: records, ghosts and settings under V12's own key, so the V11 build (same site, same browser) keeps its own and
+// is never written to by V12. On V12's first start the V1-V11 save is copied over once; the original stays untouched.
+// A signed-in player's records, ghosts and settings are kept under their account's own key instead (useSaveSlot).
+const KEY = 'galactic-rush.v12', LEGACY_KEY = 'galactic-rush.v1';
+let slot = null; // null: the guest save
+export function useSaveSlot(key) { const prev = slot; slot = key || null; return prev; }
 export function loadSave() {
-  try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); return { settings: {}, best: {}, ghosts: {}, ...s }; }
+  try {
+    let text = localStorage.getItem(slot || KEY);
+    if (text == null && !slot) { text = localStorage.getItem(LEGACY_KEY); if (text != null) try { localStorage.setItem(KEY, text); } catch (e) { /* storage full: use it for this session */ } }
+    const s = JSON.parse(text || '{}'); return { settings: {}, best: {}, ghosts: {}, ...(s && typeof s === 'object' ? s : {}) };
+  }
   catch (e) { return { settings: {}, best: {}, ghosts: {} }; }
 }
-export function storeSave(save) { try { localStorage.setItem(KEY, JSON.stringify(save)); return true; } catch (e) { return false; } }
+export function storeSave(save) { try { localStorage.setItem(slot || KEY, JSON.stringify(save)); return true; } catch (e) { return false; } }
 // Merge a pasted save (V1 or V2): keeps the better best lap and ghost per course
 export function mergeSave(save, text) {
   const inc = JSON.parse(text); let n = 0;

@@ -61,7 +61,7 @@ test('health check and the WebSocket endpoint', async () => {
   const { srv, port } = await server();
   try {
     const h = await (await fetch(`http://127.0.0.1:${port}/health`)).json();
-    assert.equal(h.ok, true); assert.equal(h.protocol, PROTOCOL); assert.equal(h.version, '10.0.0'); assert.equal(h.lobbies, 0);
+    assert.equal(h.ok, true); assert.equal(h.protocol, PROTOCOL); assert.equal(h.version, '12.0.0'); assert.equal(h.lobbies, 0);
     assert.equal((await fetch(`http://127.0.0.1:${port}/nope`)).status, 404);
     await assert.rejects(raw(`ws://127.0.0.1:${port}/other`), e => e.status === 404);
   } finally { await srv.close(); }

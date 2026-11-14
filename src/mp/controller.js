@@ -38,6 +38,7 @@ export class Multiplayer {
     const g = this.g;
     if (this.view == null) { this.prevMode = g.opts.mode; this.baseTimeScale = g.timeScale; }
     this.view = 'home'; this.error = null; this.notice = null; this.exiting = false;
+    if (g.account && g.account.cloud) g.account.idToken().catch(() => {}); // V12: a valid token for the hello that links this pilot to the account
     this.toAttract(); this.render();
     if (this.server.url && !this.server.insecure) this.connect();
   }
@@ -55,12 +56,12 @@ export class Multiplayer {
     if (this.conn && ['connecting', 'online', 'reconnecting'].includes(this.conn.state)) return;
     this.dropConn();
     const url = this.server.url;
-    const conn = this.conn = new Connection({ url, hello: () => { const s = loadSession(url); return { name: this.helloName(), token: s ? s.token : undefined, rid: this.netrace && !this.netrace.over ? this.netrace.rid : undefined }; } });
+    const conn = this.conn = new Connection({ url, hello: () => { const s = loadSession(url); return { name: this.helloName(), token: s ? s.token : undefined, rid: this.netrace && !this.netrace.over ? this.netrace.rid : undefined, auth: this.g.account ? this.g.account.helloAuth() : undefined }; } }); // V12: auth ties a signed-in pilot to their account
     const on = (type, fn) => conn.on(type, m => { if (this.conn === conn) fn.call(this, m); });
     on('conn', this.onConn); on(S.WELCOME, this.onWelcome); on(S.ERROR, this.onError); on(S.LOBBY, this.onLobby); on(S.LOBBIES, this.onLobbies); on(S.LEFT, this.onLeft);
     on(S.PREPARE, this.onPrepare); on(S.START, m => { if (this.netrace) this.netrace.onStart(m); }); on(S.SNAP, m => { if (this.netrace) this.netrace.onSnap(m); });
     on(S.FINISHED, m => { if (this.netrace) this.netrace.onFin(m); }); on(S.STATUS, m => { if (this.netrace) this.netrace.onStatus(m); });
-    on(S.RESULTS, this.onResults); on(S.COMPLETE, this.onComplete); on(S.NOTICE, this.onNotice);
+    on(S.RESULTS, this.onResults); on(S.COMPLETE, this.onComplete); on(S.NOTICE, this.onNotice); on(S.ACCOUNT, this.onAccount);
     conn.connect();
   }
   dropConn() { const c = this.conn; this.conn = null; if (c) c.close(); }
@@ -181,8 +182,11 @@ export class Multiplayer {
   // Paid once per tournament through the career's transaction system (event id mp:<tid>), and only if the reward is
   // exactly what the published results give this pilot.
   credit(m) {
-    this.reward = m.reward || null; this.paid = null; this.payNote = '';
+    this.reward = m.reward || null; this.paid = null; this.payNote = ''; this.rewardTid = m.tid;
     if (!this.reward) return;
+    // V12: a signed-in pilot's reward is paid into the account by the server itself (from its own results)
+    if (m.paidTo === 'account') { this.paid = 'account-pending'; this.payNote = 'Being added to your account…'; return; }
+    if (this.g.progress.cloud) { this.paid = false; this.payNote = 'Not added: the server did not link this game to your account. Open Account in the main menu, check you are signed in, then reconnect.'; return; }
     const chk = checkReward(m, this.pid, this.reward);
     if (!chk.ok) { this.paid = false; this.payNote = 'This reward did not match the published results, so it was not added.'; console.warn('multiplayer: reward refused:', chk.why); return; }
     const rw = chk.reward;
@@ -190,6 +194,14 @@ export class Multiplayer {
     this.paid = res.ok ? true : res.duplicate ? 'dup' : false;
     if (!res.ok && !res.duplicate) this.payNote = res.message || 'The reward could not be added.';
     else if (res.ok && res.saved === false) this.payNote = 'Added, but this browser could not save your career.';
+  }
+
+  // V12: the server linked (or could not link) this pilot to their account, or paid a tournament reward into it
+  onAccount(m) {
+    if (m.tid) {
+      if (m.tid === this.rewardTid) { this.paid = m.paid ? 'account' : false; this.payNote = m.paid ? 'Added to your account.' : 'The server could not add this reward to your account.'; this.render(); }
+      if (m.paid && this.g.account) this.g.account.refresh();
+    } else if (m.linked === false && this.g.account && this.g.account.cloud) this.g.account.toast(m.why === 'expired' ? 'Online: your sign-in had expired, so rewards cannot reach your account. Reconnect to fix it.' : 'Online: this game could not be linked to your account, so tournament rewards cannot be paid into it.', 'bad');
   }
 
   // ---------- player actions (data-act="mp") ----------

@@ -7,7 +7,7 @@ export const CURRENCIES = {
   CR: { id: 'CR', name: 'Credits', short: 'CR', desc: 'Earned by racing. Spent on upgrades and on some cosmetics.' },
   ST: { id: 'ST', name: 'Style Tokens', short: 'ST', desc: 'Earned through wins, course records, championships and milestones. Spent on cosmetics only.' },
 };
-export const DIFF_ORDER = ['rookie', 'pro', 'ace'];
+export const DIFF_ORDER = ['rookie', 'pro', 'ace', 'elite', 'master', 'legend']; // V12: Elite, Master and Legend after Ace
 export const MODES = ['quick', 'champ', 'trial'];
 export const MAX_BALANCE = 999999999;
 export const MAX_REWARD = 100000; // a single reward line above this is treated as invalid data
@@ -26,9 +26,11 @@ export function lapMult(laps) {
 }
 
 // Single races (Quick race): Base x Difficulty x Laps x Placement, rounded. Every finisher is paid, on every replay.
+// V12: the three new levels continue each series (difficulty factor +0.3 a level, completion bonus +400, Style Tokens
+// as below); every Rookie, Pro and Ace value is unchanged.
 export const SINGLE_RACE = {
   base: 150,
-  difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6 },
+  difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6, elite: 1.9, master: 2.2, legend: 2.5 },
   placement: [1.25, 1.15, 1.08, 1.0, 0.95, 0.9], // P1..P6: a modest bonus at the front, a fair wage at the back
 };
 // Time trial: no rivals, so no difficulty or placement factor; a practice wage per run.
@@ -37,10 +39,10 @@ export const TIME_TRIAL = { base: 60 };
 // Championships: one round per course of the calendar (config.js: six since V9, four before). Each round pays its own
 // (slightly smaller) race reward; finishing every round pays a completion bonus once per run, plus a final-standing bonus. Both bonuses scale with difficulty and lap count.
 export const CHAMPIONSHIP_REWARDS = {
-  race: { base: 140, difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6 }, placement: [1.25, 1.15, 1.08, 1.0, 0.95, 0.9] },
-  completion: { rookie: 500, pro: 800, ace: 1200 }, // x lap multiplier
+  race: { base: 140, difficulty: { rookie: 1.0, pro: 1.3, ace: 1.6, elite: 1.9, master: 2.2, legend: 2.5 }, placement: [1.25, 1.15, 1.08, 1.0, 0.95, 0.9] },
+  completion: { rookie: 500, pro: 800, ace: 1200, elite: 1600, master: 2000, legend: 2400 }, // x lap multiplier
   standing: [0.4, 0.25, 0.1, 0, 0, 0], // final standing P1..P6, as a fraction of the completion bonus
-  tokens: { completion: { rookie: 2, pro: 3, ace: 5 }, title: { rookie: 1, pro: 2, ace: 3 } },
+  tokens: { completion: { rookie: 2, pro: 3, ace: 5, elite: 7, master: 9, legend: 11 }, title: { rookie: 1, pro: 2, ace: 3, elite: 4, master: 5, legend: 6 } },
 };
 
 // Style Token sources that hook into systems the game already has (race results, course records, championships).

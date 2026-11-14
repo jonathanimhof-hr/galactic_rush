@@ -105,7 +105,7 @@ export function finalHTML(v) {
   const rw = v.reward, paid = v.paid;
   const reward = rw ? `<div class="panel rewards"><div class="rw-top"><span>Your tournament reward</span><b class="cr">+${rw.CR.toLocaleString('en-US')} CR${rw.ST ? ` · +${rw.ST} ST` : ''}</b></div>
       ${rw.lines.map(l => `<div class="rw-line"><span>${esc(l.name)}</span><b class="${l.CR ? 'cr' : 'st'}">${l.CR ? '+' + l.CR.toLocaleString('en-US') + ' CR' : ''}${l.CR && l.ST ? ' · ' : ''}${l.ST ? '+' + l.ST + ' ST' : ''}</b></div>`).join('')}
-      <div class="rw-bal"><span>${paid === false ? 'Not added' : paid === 'dup' ? 'Already added' : 'Balance'}</span>${walletHTML(v.wallet)}</div>${v.payNote ? `<p class="reason">${esc(v.payNote)}</p>` : ''}</div>`
+      <div class="rw-bal"><span>${paid === false ? 'Not added' : paid === 'dup' ? 'Already added' : paid === 'account' ? 'Added to your account' : paid === 'account-pending' ? 'Adding to your account…' : 'Balance'}</span>${walletHTML(v.wallet)}</div>${v.payNote ? `<p class="reason">${esc(v.payNote)}</p>` : ''}</div>`
     : `<div class="panel"><p class="lede small" style="margin:0">${C.stages.length ? 'No reward this time: rewards are paid for races you finish.' : ''}</p></div>`;
   return `<div class="col mpcol center" style="width:min(980px,100%)">
     <div class="row between"><div class="kicker">Online tournament · complete</div>${walletHTML(v.wallet)}</div>

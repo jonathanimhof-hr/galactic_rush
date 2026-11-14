@@ -6,7 +6,7 @@ import { TRACK_DEFS } from '../sim/tracks.js';
 import { Championship } from '../sim/championship.js';
 import { CURRENCIES, DIFF_ORDER, MODES, MAX_BALANCE, MAX_REWARD, UPGRADES, UPGRADE_IDS } from './economy.js';
 import { ITEM, ITEMS, RARITIES, SLOTS, SLOT_DEFAULT, PREMIUM_LABEL, isPurchasable, isPremium, defaultCustom } from './catalog.js';
-import { createProfile, sanitizeCustom, derivedChampUnlocks, conditionMet, LIMITS, RUN_ID, EVENT_ID, CHAMP_NAMES, validCalendar, calendarOf } from './profile.js';
+import { createProfile, sanitizeCustom, derivedChampUnlocks, conditionMet, LIMITS, RUN_ID, EVENT_ID, CHAMP_NAMES, validCalendar, calendarOf, migrate, sanitize } from './profile.js';
 import { ProfileStore, browserStorage, MemoryStorage } from './store.js';
 import { singleRaceReward, trialReward, champRaceReward, champCompletionReward, nextDifficulty, tokenLines, milestonesReached } from './rewards.js';
 import { effectiveDef, preview, CATEGORY } from './upgrades.js';
@@ -38,6 +38,12 @@ export class Progression {
   onChange(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
   emit(kind) { for (const f of this.subs) try { f(kind, this.p); } catch (e) { console.error(e); } }
   get saveOk() { return !this.store.lastError && !this.store.readOnly; }
+  // V12: an account's career is the account server's; the game shows the server's copy, replacing its own whole
+  adopt(raw) {
+    const m = migrate(raw); if (!m.data || m.future) return false;
+    this.flush(); this.p = freeze(sanitize(m.data, this.now()).profile); this.store.save(this.p); this.emit('adopt');
+    return true;
+  }
 
   // ---------- transaction core ----------
   // mutate(draft, T) applies the change to a copy; T.credit / T.debit are the only way a balance moves.
@@ -151,6 +157,7 @@ export class Progression {
 
   // ---------- races ----------
   newRaceId() { return `${this.now().toString(36)}-${rand36(6)}-${(++this.counter).toString(36)}`; }
+  newRunId() { let id; do id = `champ-${this.now().toString(36)}-${rand36(6)}`; while (this.p.championships.runs.some(r => r.runId === id)); return id; } // V12
   // ctx comes from the race simulation once the player has crossed the line: { raceId, mode, track, diff, laps, ship, place,
   // field, time, record, runId (championship), order (finishing order by name, championship) }
   completeRace(ctx) {
@@ -208,14 +215,16 @@ export class Progression {
   champUnlocked(diff) { return this.p.championships.unlocked.includes(diff); }
   activeRun() { return this.p.championships.active; }
   runStandings(run) { return standingsOf((run || this.activeRun() || { orders: [] }).orders || []); }
-  startRun({ diff, laps, ship, tracks }) { // V10: tracks = the six courses the player picked, in race order (default: the V9 calendar)
+  startRun({ diff, laps, ship, tracks, runId: wanted }) { // V10: tracks = the six courses the player picked, in race order (default: the V9 calendar)
     if (!DIFF_ORDER.includes(diff)) return { ok: false, code: 'bad-diff', message: 'Unknown difficulty.' };
     if (!this.champUnlocked(diff)) return { ok: false, code: 'locked', message: `${label(diff)} Championship is locked: ${unlockText({ type: 'championship', diff: DIFF_ORDER[DIFF_ORDER.indexOf(diff) - 1] })}` };
     if (!Number.isInteger(laps) || laps < 1 || laps > 9 || !this.shipOk(ship)) return { ok: false, code: 'bad-run', message: 'Invalid championship settings.' };
     if (this.activeRun()) return { ok: false, code: 'active-run', message: 'A championship is already in progress. Continue or abandon it first.' };
     const cal = tracks === undefined ? CHAMPIONSHIP.slice() : validCalendar(tracks);
     if (!cal) return { ok: false, code: 'bad-run', message: 'Pick six different courses for the championship.' };
-    let runId; do runId = `champ-${this.now().toString(36)}-${rand36(6)}`; while (this.p.championships.runs.some(r => r.runId === runId));
+    // V12: an account's run gets its id from the game, so the game's copy and the account server's copy agree
+    if (wanted !== undefined && (typeof wanted !== 'string' || !RUN_ID.test(wanted) || this.p.championships.runs.some(r => r.runId === wanted))) return { ok: false, code: 'bad-run', message: 'Invalid championship id.' };
+    let runId = wanted; if (!runId) do runId = `champ-${this.now().toString(36)}-${rand36(6)}`; while (this.p.championships.runs.some(r => r.runId === runId));
     return this.transact('run', `start ${diff}`, d => {
       d.championships.active = { runId, diff, laps, ship, tracks: cal, startedAt: this.now(), round: 0, results: [], orders: [], credits: { races: 0, completion: 0, standing: 0, total: 0 }, tokens: 0 };
       return { run: d.championships.active };
@@ -270,7 +279,7 @@ function unlockSpecials(d, now) {
   for (const it of ITEMS) if (it.class === 'special' && !d.inventory.unlocked.includes(it.id) && conditionMet(d, it.unlock)) { d.inventory.unlocked.push(it.id); d.inventory.acquired[it.id] = { at: now, via: 'earned' }; out.push(it.id); }
   return out;
 }
-const label = d => ({ rookie: 'Rookie', pro: 'Pro', ace: 'Ace' })[d] || d;
+const label = d => ({ rookie: 'Rookie', pro: 'Pro', ace: 'Ace', elite: 'Elite', master: 'Master', legend: 'Legend' })[d] || d;
 export function unlockText(u) {
   if (!u) return '';
   switch (u.type) {

@@ -4,6 +4,7 @@
 // five laps, respawns inside a loop, the chase camera through the loops, and identical course data on every build (every
 // client and the server compute the same corridor, checkpoints and laps). Run with `npm test`.
 import test from 'node:test';
+import { V12_KINDS } from './v12-obstacles.test.js';
 import assert from 'node:assert/strict';
 import { getTrack, TRACK_DEFS } from '../src/sim/tracks.js';
 import { buildPathTrack } from '../src/sim/pathtrack.js';
@@ -61,8 +62,10 @@ test('V9 courses: closed and continuous, with smooth frames everywhere, through 
     assert.equal(t.cpIdx[0], 0); for (let k = 1; k < t.cpS.length; k++) assert.ok(t.cpS[k] > t.cpS[k - 1], `${id}: checkpoint ${k} after ${k - 1}`);
     for (const i of t.cpIdx) assert.ok(!t.loopId || t.loopId[i] < 0, `${id}: checkpoint ${i} outside the loops`);
     assert.ok(t.pads.length >= 6 && t.cells.length >= 16, `${id} has boost rings and energy cells`);
-    // hazards stand off the racing line (the AI's line and the natural line through the section)
+    // hazards stand off the racing line (the AI's line and the natural line through the section). V12's added structures
+    // (risers, buoys, the crane load, the pipe rack) are checked by tests/v12-obstacles.test.js
     for (const o of t.obstacles) {
+      if (V12_KINDS.has(o.kind)) continue;
       const clear = o.type === 'vbeam' ? Math.abs(o.x - t.lineX[o.i]) : Math.abs(o.y - t.lineY[o.i]);
       assert.ok(clear > o.r + 3, `${id}: ${o.type} at ${o.i} is ${clear.toFixed(1)} m from the racing line`);
       assert.ok(o.type === 'vbeam' ? Math.abs(o.x) + o.r < t.w[o.i] : Math.abs(o.y) + o.r < t.h[o.i], `${id}: ${o.type} at ${o.i} inside the corridor`);

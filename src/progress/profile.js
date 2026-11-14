@@ -5,7 +5,7 @@ import { TRACK_DEFS } from '../sim/tracks.js';
 import { DIFF_ORDER, MODES, MAX_BALANCE, MILESTONES, UPGRADES, UPGRADE_IDS } from './economy.js';
 import { ITEM, DEFAULT_ITEMS, SLOTS, SLOT_DEFAULT, defaultCustom } from './catalog.js';
 
-export const PROFILE_VERSION = 1;
+export const PROFILE_VERSION = 2; // V12: six difficulty levels (v1: three)
 export const LIMITS = { history: 30, runs: 30, seen: 400, tx: 60 };
 const SHIP_IDS = SHIPS.map(s => s.id), TRACK_IDS = TRACK_DEFS.map(d => d.id);
 export const CHAMP_NAMES = [...AI_ROSTER.map(a => a.name), 'YOU'];
@@ -20,6 +20,7 @@ const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const int = (v, lo, hi, d = lo) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d; };
 const zeroUp = () => Object.fromEntries(UPGRADE_IDS.map(k => [k, 0]));
 const tally = () => ({ races: 0, wins: 0, podiums: 0, credits: 0 });
+const byDiff = v => Object.fromEntries(DIFF_ORDER.map(d => [d, v]));
 
 export function createProfile(now = Date.now()) {
   return {
@@ -28,15 +29,16 @@ export function createProfile(now = Date.now()) {
     selectedShip: SHIP_IDS[0],
     ships: Object.fromEntries(SHIP_IDS.map(id => [id, { unlocked: true, upgrades: zeroUp(), custom: defaultCustom(id) }])),
     inventory: { unlocked: [...DEFAULT_ITEMS], acquired: {} },
-    championships: { unlocked: ['rookie'], completed: { rookie: 0, pro: 0, ace: 0 }, titles: { rookie: 0, pro: 0, ace: 0 }, best: { rookie: null, pro: null, ace: null }, active: null, runs: [] },
+    championships: { unlocked: ['rookie'], completed: byDiff(0), titles: byDiff(0), best: byDiff(null), active: null, runs: [] },
     stats: { races: 0, wins: 0, podiums: 0, byMode: Object.fromEntries(MODES.map(m => [m, tally()])), byTrack: Object.fromEntries(TRACK_IDS.map(t => [t, { ...tally(), best: null }])), byDiff: Object.fromEntries(DIFF_ORDER.map(d => [d, tally()])) },
     history: [], milestones: [],
     ledger: { seen: [], tx: [], seq: 0 },
   };
 }
 
-// Championship difficulty unlocks follow from completion records: Rookie always, Pro after a completed Rookie run, Ace after Pro.
-export function derivedChampUnlocks(ch) { const u = ['rookie']; if ((ch.completed.rookie || 0) > 0) u.push('pro'); if ((ch.completed.pro || 0) > 0) u.push('ace'); return u; }
+// Championship difficulty unlocks follow from completion records: Rookie always, each next level after a completed run of
+// the level before it (Pro after Rookie, Ace after Pro; V12: Elite after Ace, Master after Elite, Legend after Master).
+export function derivedChampUnlocks(ch) { const u = ['rookie']; for (let k = 1; k < DIFF_ORDER.length; k++) if ((ch.completed[DIFF_ORDER[k - 1]] || 0) > 0) u.push(DIFF_ORDER[k]); return u; }
 
 // numbers the unlock conditions of special items and milestones refer to
 export function statValue(p, path) {
@@ -171,13 +173,15 @@ export const MIGRATIONS = {
       const c = isObj(s.customization) ? s.customization : isObj(s.custom) ? s.custom : {};
       out.ships[id] = { upgrades: up, custom: { primary: c.primaryColor ?? c.primary, secondary: c.secondaryColor ?? c.secondary, accent: c.accentColor ?? c.accent } }; }
     if (isObj(raw.inventory)) out.inventory = { unlocked: raw.inventory.unlockedCosmetics || raw.inventory.unlocked || [] };
-    if (isObj(raw.championships)) { const c = raw.championships, completed = { rookie: 0, pro: 0, ace: 0 };
+    if (isObj(raw.championships)) { const c = raw.championships, completed = byDiff(0);
       for (const r of Array.isArray(c.completedRuns) ? c.completedRuns : []) if (isObj(r) && DIFF_ORDER.includes(r.difficulty || r.diff)) completed[r.difficulty || r.diff]++;
       out.championships = { completed }; }
     if (isObj(raw.statistics)) out.stats = { races: raw.statistics.racesCompleted, wins: raw.statistics.racesWon, podiums: raw.statistics.podiums };
     return out;
   },
 };
+// v1 -> v2 (V12): three more difficulty levels; their records start empty (sanitize adds them), nothing else changes
+MIGRATIONS[1] = raw => ({ ...raw, version: 2 });
 export function migrate(raw) {
   if (!isObj(raw)) return { data: raw, from: null };
   let v = Number.isInteger(raw.version) ? raw.version : 0, data = raw; const from = v;

@@ -6,6 +6,8 @@
 // the visible wood, so every solid branch inside the corridor collides and nothing else does.
 import { Vec3 } from '../math.js';
 import { GRAVITY } from './gravity.js';
+// V12: Orbital Nexus's new obstacles (nexus12 below)
+import { part, arm } from './solids.js';
 
 const frac = (t, f) => Math.floor(f * t.N) % t.N;
 const tagged = (t, tag) => t.tags.get(tag) || [];
@@ -78,6 +80,33 @@ function arch(t, i, xy, r, kind = 'root', lean = 0) {
 function column(t, i, x, r, kind) { t.addObstacle({ type: 'vbeam', kind, i: t.wrapIdx(i), x, r }); }
 // soft vegetation inside the corridor (hanging vines, leaf curtains, moss): drawn, flown through, never collides
 function soft(t, i, x0, x1, y0, y1, kind) { t.soft.push({ i: t.wrapIdx(i), x0, x1, y0, y1, kind }); }
+
+// V12: eight more obstacles on Orbital Nexus, all station machinery, none within 40 m of a checkpoint or a boost ring.
+// They sit in the course's own frame, so in the gravity sections they stand on whichever wall is the deck:
+//   the hangar's servicing arm, hanging from the ceiling gantry and swinging across the top of the corridor;
+//   the bulkhead's blast door, its two leaves half open;
+//   a coolant conduit from the energy core to the chamber wall, across the corridor; the airlock's service main;
+//   in the Spindle, a maintenance arm on a ring turning round the shaft, sweeping through it as the ring turns;
+//   outside, a docking arm reaching across the hull and a radiator truss over it.
+// Every motion follows the race clock (solids.js), so all pilots see and meet the same thing.
+function nexus12(t, I, S, W, H) {
+  // servicing arm: pivot on the gantry 20 m over the corridor, the arm reaching down through the upper half of it
+  { const i = I('hangar', 0.32), py = H(i) + 20; arm(t, i, W(i) * 0.2, py, 20, 20 + H(i), 2.4, 2.0, { th0: -Math.PI / 2, amp: 0.42, w: 0.75, ph: 1.1 }, 'servo'); }
+  // blast door leaves: from each wall, the left one standing further in
+  { const i = I('bulkhead', 0.82); t.addObstacle({ type: 'vbeam', kind: 'door', i, x: -(W(i) - 4.5), r: 3.0 }); t.addObstacle({ type: 'vbeam', kind: 'door', i: t.wrapIdx(i + 2), x: W(i) - 2.5, r: 3.0 }); }
+  // a coolant conduit from the energy core to the chamber wall, across the corridor high over the deck
+  { const i = I('core', 0.63); t.addObstacle({ type: 'hbeam', kind: 'conduit', i, y: 0.45 * H(i), r: 1.9 }); }
+  // the airlock's service main: from the left wall to just past the middle, low, then down into the deck (no gravity
+  // here: over it, or round it on the right)
+  { const i = I('airlock', 0.5); part(t, [t.pointAt(i, -W(i) - 6, -0.42 * H(i)), t.pointAt(i, 0.12 * W(i), -0.36 * H(i)), t.pointAt(i, 0.12 * W(i) + 3, -H(i) - 6)], [2.0, 2.0, 2.0], 'main', i); }
+  // the Spindle's maintenance arm: carried by a ring turning round the shaft (once every 7 s), reaching in through a
+  // slot in the shaft to 7 m from its axis; it sweeps one side of the corridor at a time
+  { const i = I('spindle', 0.42); arm(t, i, 0, 0, 7, Math.hypot(W(i), H(i)) + 3, 2.2, 2.4, { th0: 0, w: 2 * Math.PI / 7, ph: 0 }, 'sweeper'); }
+  // outside: a docking arm from the hull reaching across, then a radiator truss spanning the corridor high up
+  { const i = S('exterior', 1, 0.85), a = t.pointAt(i - 10, W(i) * 1.15, -H(i) * 1.1), b = t.pointAt(i, -W(i) * 0.15, H(i) * 0.15), c = t.pointAt(i + 6, -W(i) * 0.55, H(i) * 0.25);
+    part(t, [a, b, c], [3.0, 2.6, 2.2], 'dockarm', i); }
+  { const i = S('exterior', 3, 0.25); t.addObstacle({ type: 'hbeam', kind: 'radiator', i, y: H(i) * 0.5, r: 2.4 }); }
+}
 
 export const V10_TRACKS = [
   {
@@ -210,6 +239,7 @@ export const V10_TRACKS = [
           t.traffic.push({ i: j, y: t.lineY[j], dir: 1, speed: 24, spacing: span / 2, phase: rng.range(0, span), n: 2, r: 3.2, seed: Math.floor(rng() * 1e6), kind: 'pod' }); } }
       pads(t, [I('start', 0.45), S('hangar', 2, 0.2), I('glass', 0.85), S('exterior', 0, 0.3), S('exterior', 2, 0.5), I('aperture', 0.5), I('ramp', 0.5)]);
       cells(t, [I('bulkhead', 0.3), I('core', 0.35), I('glass', 0.45), S('exterior', 1, 0.3), S('cargo', 0, 0.2)], rng);
+      nexus12(t, I, S, W, H);
     },
   },
 ];

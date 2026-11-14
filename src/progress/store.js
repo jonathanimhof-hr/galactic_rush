@@ -4,7 +4,11 @@
 // from the last good load; storage failures never stop the game. Data stays in this browser: there is no cloud sync.
 import { PROFILE_VERSION, createProfile, sanitize, migrate } from './profile.js';
 
-export const KEYS = { main: 'galactic-rush.profile', backup: 'galactic-rush.profile.bak', damaged: 'galactic-rush.profile.damaged' };
+// V12 keeps its career under keys of its own, so the earlier version that may share this browser keeps its own career,
+// untouched and working: on V12's first start the V7-V11 career (LEGACY) is copied over once (and migrated); after
+// that the two never read or write each other's data.
+export const KEYS = { main: 'galactic-rush.profile.v12', backup: 'galactic-rush.profile.v12.bak', damaged: 'galactic-rush.profile.v12.damaged' };
+export const LEGACY = { main: 'galactic-rush.profile', backup: 'galactic-rush.profile.bak' };
 
 export function browserStorage() { try { return window.localStorage; } catch (e) { return null; } }
 // an in-memory stand-in with the localStorage interface (tests, or when the browser blocks storage)
@@ -30,15 +34,20 @@ export class ProfileStore {
   }
   // -> { profile, status: new | loaded | recovered | reset | readonly, issues }
   load() {
-    const main = this.read(KEYS.main), a = this.parse(main);
+    let main = this.read(KEYS.main), imported = null;
+    if (main == null) { // V12's first start in this browser: the earlier career, if there is a readable one, is copied over
+      for (const k of [LEGACY.main, LEGACY.backup]) { const text = this.read(k); if (text != null && this.parse(text).profile) { main = text; imported = k; break; } }
+    }
+    const a = this.parse(main);
     if (a.future) { // written by a newer version of the game: leave it untouched and do not save over it
       this.readOnly = true; this.status = 'readonly'; this.issues = [`career data was saved by a newer version (v${a.version}); it is left untouched and this session is not saved`];
       return { profile: createProfile(this.now()), status: this.status, issues: this.issues };
     }
     if (a.profile) {
       this.status = a.migratedFrom != null ? 'migrated' : 'loaded'; this.issues = a.issues; if (a.migratedFrom != null) this.issues.unshift(`migrated career data from v${a.migratedFrom} to v${PROFILE_VERSION}`);
-      if (main) this.write(KEYS.backup, main); // last good copy, refreshed once per session
-      if (a.migratedFrom != null || a.issues.length) this.save(a.profile);
+      if (imported) { this.status = 'imported'; this.issues.unshift(`copied the career saved by the earlier version (${imported}); that copy is left as it was`); }
+      if (main && !imported) this.write(KEYS.backup, main); // last good copy, refreshed once per session
+      if (imported || a.migratedFrom != null || a.issues.length) this.save(a.profile);
       return { profile: a.profile, status: this.status, issues: this.issues };
     }
     const b = this.parse(this.read(KEYS.backup));

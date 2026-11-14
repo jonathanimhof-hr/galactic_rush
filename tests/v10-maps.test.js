@@ -7,6 +7,7 @@
 // camera through them, no gravity anywhere else), full fields over five laps in both handling modes, every ship, every
 // lap count, and identical course data on every build. Run with `npm test`.
 import test from 'node:test';
+import { V12_KINDS } from './v12-obstacles.test.js';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { getTrack, TRACK_DEFS } from '../src/sim/tracks.js';
@@ -31,7 +32,7 @@ function fingerprint(t) {
   mix(t.N); mix(t.length); mix(t.D);
   for (let i = 0; i < t.N; i++) { for (const v of [t.pos[i], t.tan[i], t.nrm[i], t.bin[i]]) { mix(v.x); mix(v.y); mix(v.z); } mix(t.w[i]); mix(t.h[i]); mix(t.bank[i]); mix(t.lineX[i]); mix(t.lineY[i]); mix(t.tunnel[i] ? 1 : 0); }
   for (const s of t.cpS) mix(s);
-  for (const o of t.obstacles) { mix(o.i); mix(o.x || 0); mix(o.y || 0); mix(o.r || 0); }
+  for (const o of t.obstacles) { if (V12_KINDS.has(o.kind)) continue; mix(o.i); mix(o.x || 0); mix(o.y || 0); mix(o.r || 0); } // V12: without the obstacles V12 adds
   for (const p of t.pads) { mix(p.i); mix(p.x); mix(p.y); }
   for (const c of t.cells) { mix(c.i); mix(c.x); mix(c.y); mix(c.ion ? 1 : 0); }
   mix(t.lasers.length); mix(t.traffic.length);
@@ -69,8 +70,11 @@ test('V10: eight courses, the six V9 courses first and unchanged (course data), 
   for (const id of NEW) { const d = TRACK_DEFS.find(x => x.id === id); assert.ok(d.name && d.short && d.tagline && d.theme, `${id} has its menu texts`); }
 });
 
+// V12 added obstacles to Pelagos, so whole Pelagos races no longer replay as in V9 (the ships meet the new structures);
+// its course data without them still matches V9 (the fingerprint above), and the other V9 courses replay bit for bit
 test('V9 courses: whole races replay bit for bit as in the V9 build (flight model, AI, collisions, handling, weapons)', () => {
-  for (const [key, want] of Object.entries(V9_REPLAYS)) { const [id, hand] = key.split('/'); assert.equal(replay(id, hand), want, `${key} differs from V9`); }
+  for (const [key, want] of Object.entries(V9_REPLAYS)) { const [id, hand] = key.split('/'); if (id === 'pelagos') continue; assert.equal(replay(id, hand), want, `${key} differs from V9`); }
+  assert.notEqual(replay('pelagos', 'relaxed'), V9_REPLAYS['pelagos/relaxed'], 'Pelagos races meet the V12 obstacles');
 });
 
 test('no gravity outside Orbital Nexus: no other course has a gravity field or a roll, and the race loop leaves them alone', () => {

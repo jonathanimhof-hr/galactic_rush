@@ -2,7 +2,7 @@
 // Every message is a JSON object { t: type, ...fields }. Ship states travel as compact arrays (packState / unpackState).
 // This file has no browser or Node dependencies so both sides validate messages with the same rules.
 
-export const PROTOCOL = 3; // V10: the course list grew again (Verdant Canopy, Orbital Nexus); a game and a server must have the same courses (V9: 2)
+export const PROTOCOL = 4; // V12: Pelagos and Orbital Nexus have new obstacles, and pilots may sign in with their account (V10: 3, V9: 2)
 export const MP = Object.freeze({
   MAX_PLAYERS: 6,          // the starting grid has six slots
   MIN_PLAYERS: 2,
@@ -30,6 +30,7 @@ export const C = Object.freeze({
 export const S = Object.freeze({
   WELCOME: 'welcome', ERROR: 'error', LOBBY: 'lobby', LOBBIES: 'lobbies', LEFT: 'left', PREPARE: 'prepare', START: 'start',
   SNAP: 'snap', FINISHED: 'fin', STATUS: 'pstat', RESULTS: 'results', COMPLETE: 'complete', PONG: 'pong', NOTICE: 'notice',
+  ACCOUNT: 'account', // V12: whether the pilot's account is linked, and tournament rewards paid into it
 });
 
 // error codes the server sends, with the text the game shows
@@ -109,7 +110,7 @@ export function parseMessage(text) {
 // Field checks for client messages; the server rejects anything that does not match.
 export function checkClientMessage(m) {
   switch (m.t) {
-    case C.HELLO: return m.v === PROTOCOL && (m.token == null || str(m.token, 200)) && (m.rid == null || str(m.rid, 40)) && str(m.name, 64);
+    case C.HELLO: return m.v === PROTOCOL && (m.token == null || str(m.token, 200)) && (m.rid == null || str(m.rid, 40)) && str(m.name, 64) && (m.auth == null || str(m.auth, 3000)); // V12: auth = the account's ID token
     case C.CREATE: return (m.visibility == null || VISIBILITY.includes(m.visibility)) && (m.handling == null || HANDLINGS.includes(m.handling)) && validShip(m.ship) && (m.paint == null || isObj(m.paint)) && (m.name == null || str(m.name, 64));
     case C.JOIN: return str(m.code, 16) && validShip(m.ship) && (m.paint == null || isObj(m.paint)) && (m.name == null || str(m.name, 64));
     case C.LEAVE: case C.LIST: return true;

@@ -19,8 +19,9 @@ export const HUB_RULES = Object.freeze({
 
 export class Hub {
   // the *Rules options exist for automated tests (shorter waits); the server itself always runs with the defaults
-  constructor({ cfg, identity, log, now = () => Date.now(), mapRng = cryptoRng, rand = n => randomInt(n), rules = HUB_RULES, lobbyRules = LOBBY_RULES, tournamentRules = TOURNAMENT_RULES, raceRules = RACE_RULES }) {
+  constructor({ cfg, identity, log, now = () => Date.now(), mapRng = cryptoRng, rand = n => randomInt(n), rules = HUB_RULES, lobbyRules = LOBBY_RULES, tournamentRules = TOURNAMENT_RULES, raceRules = RACE_RULES, accounts = null }) {
     this.cfg = cfg; this.ident = identity; this.log = log; this.now = now; this.rand = rand; this.rules = rules;
+    this.accounts = accounts; // V12: { verify, players } when player accounts are on
     this.lobbyRules = lobbyRules; this.tournamentRules = tournamentRules; this.raceRules = raceRules;
     this.sessions = new Map(); this.conns = new Set(); this.lobbies = new LobbyRegistry({ max: cfg.maxLobbies });
     this.maps = createMapPicker({ eligible: cfg.eligibleTracks, rng: mapRng });
@@ -92,6 +93,16 @@ export class Hub {
       if (l.last && l.last.forPids.has(pid) && now - l.last.at < this.rules.lastResultMs && !l.tournament) this.sendComplete(l, l.last.summary, [pid]);
     }
     this.log.info('hello', { pid, resumed: !!l });
+    if (m.auth) this.linkAccount(s, m.auth);
+  }
+  // V12: a signed-in pilot's session is tied to their account (verified ID token, verified email); their tournament
+  // rewards are then paid into the account by this server, from its own results. Other pilots never see the account.
+  linkAccount(s, idToken) {
+    if (!this.accounts) { this.sendTo(s.pid, { t: S.ACCOUNT, linked: false, why: 'accounts-off' }); return; }
+    this.accounts.verify(idToken).then(who => {
+      if (!who.emailVerified) { this.sendTo(s.pid, { t: S.ACCOUNT, linked: false, why: 'verify-email' }); return; }
+      s.uid = who.uid; this.sendTo(s.pid, { t: S.ACCOUNT, linked: true }); this.log.info('account linked', { pid: s.pid });
+    }, e => { this.sendTo(s.pid, { t: S.ACCOUNT, linked: false, why: e.code === 'expired' ? 'expired' : 'auth' }); });
   }
   // a pilot who reconnects during a tournament gets the race as it stands, so their game can carry on or watch
   resendRace(l, s, rid) {
@@ -188,7 +199,7 @@ export class Hub {
       case 'complete': {
         l.phase = 'open'; l.tournament = null; l.rematchUntil = now + this.lobbyRules.rematchMs;
         l.last = { tid: p.tid, outcome: p.outcome, winnerName: p.winnerName, summary: p, at: now, forPids: new Set(t.entrants.keys()) };
-        this.sendComplete(l, p, [...l.members.keys()]);
+        this.sendComplete(l, p, [...l.members.keys()]); this.payAccounts(p, [...t.entrants.keys()]);
         this.log.info('tournament complete', { code: l.code, tid: p.tid, outcome: p.outcome, winner: p.winner });
         this.pushLobby(l); break;
       }
@@ -197,7 +208,18 @@ export class Hub {
   // each pilot gets the full result but only their own reward
   sendComplete(l, p, pids) {
     const { rewards, ...rest } = p;
-    for (const pid of pids) this.sendTo(pid, { t: S.COMPLETE, ...rest, reward: rewards && rewards[pid] ? { tid: p.tid, ...rewards[pid] } : null });
+    for (const pid of pids) { const s = this.sessions.get(pid), toAccount = !!(s && s.uid && this.accounts);
+      this.sendTo(pid, { t: S.COMPLETE, ...rest, reward: rewards && rewards[pid] ? { tid: p.tid, ...rewards[pid] } : null, paidTo: toAccount ? 'account' : null }); }
+  }
+  // V12: pay each signed-in entrant's reward into their account once (the account keeps the tournament id)
+  payAccounts(p, entrants) {
+    if (!this.accounts || !p.rewards) return;
+    for (const pid of entrants) { const s = this.sessions.get(pid), rw = p.rewards[pid]; if (!s || !s.uid || !rw) continue;
+      const uid = s.uid, attempt = k => this.accounts.players.creditTournament(uid, p.tid, rw).then(r => this.sendTo(pid, { t: S.ACCOUNT, tid: p.tid, paid: !!r.ok || r.code === 'duplicate', rev: r.view ? r.view.rev : null }),
+        e => { // the database could not be reached: try again (paying is idempotent: the account keeps the tournament id)
+          this.log.error('account reward failed', { pid, tid: p.tid, attempt: k, err: String(e.message || e).slice(0, 120) });
+          if (k < 4) setTimeout(() => attempt(k + 1), [2e3, 10e3, 30e3, 120e3][k]); else this.sendTo(pid, { t: S.ACCOUNT, tid: p.tid, paid: false }); });
+      attempt(0); }
   }
 
   // ---------- clocks ----------

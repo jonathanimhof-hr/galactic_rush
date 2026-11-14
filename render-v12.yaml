@@ -13,6 +13,7 @@ services:
     name: galactic-rush-v12
     runtime: node
     plan: free
+    region: frankfurt   # near the players in Europe and a European Firestore location
     branch: v12-dev
     buildCommand: npm install --prefix server --omit=dev --no-audit --no-fund && GR_MP_SERVER=same-origin node build.mjs
     startCommand: node server/index.mjs

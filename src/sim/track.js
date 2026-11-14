@@ -162,11 +162,22 @@ export class Track {
   updateObstacles(t) {
     for (const o of this.obstacles) {
       if (!o.move) continue;
+      if (o.move.rot) { this.rotMove(o, t); continue; } // V12
       const m = o.move, a = t * m.w + m.ph, B = this.bin[o.i], N = this.nrm[o.i];
       const dx = Math.sin(a) * m.ax, dy = Math.cos(a * 0.8) * m.ay;
       o.p.set(o.base.x + B.x * dx + N.x * dy, o.base.y + B.y * dx + N.y * dy, o.base.z + B.z * dx + N.z * dy);
       o.ox = o.x + dx; o.oy = o.y + dy;
     }
+  }
+
+  // V12: a sphere carried round a pivot in the cross-section: (px, py) the pivot, L the distance, the angle
+  // th0 + amp * sin(w t + ph) when amp is given (a swing), else th0 + w t (a turn); x = px + L cos, y = py + L sin.
+  // A function of the race clock only, so every client and the server have it in the same place.
+  rotAt(m, t) { const th = m.amp != null ? m.th0 + m.amp * Math.sin(t * m.w + m.ph) : m.th0 + t * m.w; return [m.px + m.L * Math.cos(th), m.py + m.L * Math.sin(th)]; }
+  rotMove(o, t) {
+    const [x, y] = this.rotAt(o.move, t), dx = x - o.x, dy = y - o.y, B = this.bin[o.i], N = this.nrm[o.i];
+    o.p.set(o.base.x + B.x * dx + N.x * dy, o.base.y + B.y * dx + N.y * dy, o.base.z + B.z * dx + N.z * dy);
+    o.ox = x; o.oy = y;
   }
 
   obstaclesNear(i, out, range = 1) {

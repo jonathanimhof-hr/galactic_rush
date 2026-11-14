@@ -7,6 +7,12 @@
 //   MAX_LOBBIES       default 200; MAX_CONNECTIONS default 1000
 //   LOG_LEVEL         error | warn | info | debug (default info)
 //   GR_TIME_SCALE     TESTING ONLY: lets automated test clients run races faster than real time (default 1)
+// V12 player accounts (Firebase Authentication for sign-in, Cloud Firestore for the accounts' data):
+//   FIREBASE_PROJECT_ID        the Firebase project's id (public; the game has it too). Unset: accounts are off
+//   FIREBASE_SERVICE_ACCOUNT   SECRET: the service account key file's JSON (or its base64), for Firestore. Required
+//                              with FIREBASE_PROJECT_ID. Set it in the host's dashboard only, never in the repository
+//   ACCOUNTS_DB                firestore (default) | memory (local development only: forgets everything on restart)
+//   FIREBASE_AUTH_EMULATOR_HOST, FIRESTORE_EMULATOR_HOST   local/CI testing against Firebase's emulators only
 import { randomBytes } from 'node:crypto';
 import { ALL_TRACKS } from './maps.mjs';
 
@@ -24,16 +30,26 @@ export function loadConfig(env = process.env) {
     maxLobbies: int(env.MAX_LOBBIES, 200, 1, 100000), maxConnections: int(env.MAX_CONNECTIONS, 1000, 1, 1000000),
     logLevel: ['error', 'warn', 'info', 'debug'].includes(env.LOG_LEVEL) ? env.LOG_LEVEL : 'info',
     timeScale: Math.min(16, Math.max(1, Number(env.GR_TIME_SCALE) || 1)),
+    // V12 accounts
+    firebaseProject: (env.FIREBASE_PROJECT_ID || '').trim(), serviceAccount: env.FIREBASE_SERVICE_ACCOUNT || '',
+    accountsDb: env.ACCOUNTS_DB === 'memory' ? 'memory' : 'firestore',
+    authEmulator: env.FIREBASE_AUTH_EMULATOR_HOST || '', firestoreEmulator: env.FIRESTORE_EMULATOR_HOST || '',
+    serveSite: env.GR_SERVE_SITE === '1', // V12: serve the built game page too (a test deployment on one address)
   };
   if (!cfg.eligibleTracks.length) cfg.eligibleTracks = ALL_TRACKS.slice();
   if (production) {
     if (cfg.tokenSecret.length < 32) throw new Error('TOKEN_SECRET must be set to at least 32 random characters in production');
     if (!cfg.allowedOrigins.length) throw new Error('ALLOWED_ORIGINS must list the website origin(s) in production, e.g. https://you.github.io');
     if (cfg.timeScale !== 1) throw new Error('GR_TIME_SCALE is for automated tests only and must not be set in production');
+    if (cfg.accountsDb === 'memory' || cfg.authEmulator || cfg.firestoreEmulator) throw new Error('ACCOUNTS_DB=memory and the Firebase emulators are for local testing only, not production');
+    if (cfg.firebaseProject && !cfg.serviceAccount) throw new Error('FIREBASE_SERVICE_ACCOUNT must be set when FIREBASE_PROJECT_ID is (accounts need the database)');
   } else {
     if (!cfg.tokenSecret) { cfg.tokenSecret = randomBytes(24).toString('hex'); warnings.push('TOKEN_SECRET not set: using a random one, so sessions do not survive a restart'); }
     if (!cfg.allowedOrigins.length) warnings.push('ALLOWED_ORIGINS not set: any website may connect (fine for local testing only)');
     if (cfg.timeScale !== 1) warnings.push(`GR_TIME_SCALE=${cfg.timeScale}: race clocks run ${cfg.timeScale}x for automated tests`);
+    for (const h of [cfg.authEmulator, cfg.firestoreEmulator]) if (h && !/^(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(h)) throw new Error('Firebase emulator hosts must be on this machine (localhost:port)');
+    if (cfg.accountsDb === 'memory') warnings.push('ACCOUNTS_DB=memory: accounts live in this process only and are lost on restart (local testing)');
   }
+  if (!cfg.firebaseProject) warnings.push('FIREBASE_PROJECT_ID not set: player accounts are off');
   return { cfg, warnings };
 }

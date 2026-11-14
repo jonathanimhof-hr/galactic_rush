@@ -11,7 +11,7 @@ import { fmtCR, fmtST, fmtCur, unlockText } from './progress/index.js';
 export const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const n0 = n => Math.round(n).toLocaleString('en-US');
 const num = v => (typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(Math.abs(v) < 10 ? 2 : 1) : typeof v === 'number' ? n0(v) : String(v)); // stat values keep their decimals
-export const DIFF_LABEL = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace' };
+export const DIFF_LABEL = { rookie: 'Rookie', pro: 'Pro', ace: 'Ace', elite: 'Elite', master: 'Master', legend: 'Legend' };
 const RAR = Object.fromEntries(RARITIES.map(r => [r.id, r]));
 const trackName = id => (TRACK_DEFS.find(d => d.id === id) || { name: id }).name;
 const g = (arg, label, o = {}) => `<button class="${o.cls || 'btn sm'}" data-act="g" data-arg="${esc(arg)}"${o.pressed != null ? ` aria-pressed="${o.pressed}"` : ''}${o.disabled ? ' disabled' : ''}${o.title ? ` title="${esc(o.title)}"` : ''}${o.label ? ` aria-label="${esc(o.label)}"` : ''}>${label}</button>`;
@@ -167,7 +167,7 @@ export function rewardHTML(r, wallet) {
     <div class="rw-parts">${r.parts.map(([l, x], k) => `${k ? '<i>×</i>' : ''}<span>${esc(l)} <b>${typeof x === 'number' && x < 10 ? x.toFixed(2) : n0(x)}</b></span>`).join('')}</div>
     ${st.map(l => `<div class="rw-line"><span>${esc(l.name)}</span><b class="st">+${fmtST(l.ST)}</b></div>`).join('')}
     ${(r.unlocks || []).map(id => `<div class="rw-line"><span>Unlocked: ${esc(ITEM[id].name)}</span><b class="good">NEW</b></div>`).join('')}
-    <div class="rw-bal"><span>Balance</span>${walletHTML(wallet)}</div>${r.saved === false ? '<p class="reason">This browser would not let the game save: your career lasts until the page is closed.</p>' : ''}</div>`;
+    <div class="rw-bal"><span>Balance</span>${walletHTML(wallet)}</div>${r.saved === false ? '<p class="reason">This browser would not let the game save: your career lasts until the page is closed.</p>' : ''}${r.pending ? '<p class="rw-acct">Saving to your account…</p>' : ''}</div>`;
 }
 
 // ---------------- championship ----------------
@@ -196,7 +196,7 @@ export function champHubHTML(v) {
   const head = c.standing === 1 ? 'You are champion' : `${esc(st[0].name)} takes the title`;
   return `<div class="col center" style="width:min(980px,100%)"><div class="row between"><h3>${DIFF_LABEL[s.diff]} Championship · complete · ${s.laps} lap${s.laps > 1 ? 's' : ''} per round</h3>${walletHTML(v.wallet)}</div>
     <h2>${head}</h2>
-    ${c.newlyUnlocked ? `<div class="unlockbar"><b>${DIFF_LABEL[c.newlyUnlocked]} Championship unlocked</b><span>${c.newlyUnlocked === 'ace' ? 'Ace is the highest difficulty.' : 'The next step on the ladder is open.'}</span></div>` : c.isHighest ? '<div class="unlockbar ace"><b>Ace completed</b><span>Ace is the highest championship difficulty. Replay any championship to earn its rewards again.</span></div>' : ''}
+    ${c.newlyUnlocked ? `<div class="unlockbar"><b>${DIFF_LABEL[c.newlyUnlocked]} Championship unlocked</b><span>${c.newlyUnlocked === DIFF_ORDER[DIFF_ORDER.length - 1] ? `${DIFF_LABEL[c.newlyUnlocked]} is the highest difficulty.` : 'The next step on the ladder is open.'}</span></div>` : c.isHighest ? `<div class="unlockbar ace"><b>${DIFF_LABEL[s.diff]} completed</b><span>${DIFF_LABEL[s.diff]} is the highest championship difficulty. Replay any championship to earn its rewards again.</span></div>` : ''}
     <div class="split2">${table}
       <div class="panel"><h3>This run</h3><div class="kv"><div><span>Completion</span><b class="good">Completed</b></div><div><span>Final standing</span><b>P${c.standing} of ${st.length} · ${s.points} pts</b></div></div>
         ${runTable(s.results, credits.races)}
@@ -206,7 +206,7 @@ export function champHubHTML(v) {
         ${(c.unlocks || []).map(id => `<div class="rw-line"><span>Unlocked: ${esc(ITEM[id].name)}</span><b class="good">NEW</b></div>`).join('')}
         <div class="rw-top"><span>Total from this championship</span><b class="cr">${fmtCR(credits.total)}</b></div>
         <div class="rw-bal"><span>Balance now</span>${walletHTML(v.wallet)}</div></div></div>
-    <div class="panel career-line"><h3>Career (all runs)</h3><span>Rookie ×${v.champs.completed.rookie} · Pro ×${v.champs.completed.pro} · Ace ×${v.champs.completed.ace} completed</span><span>Titles: ${v.champs.titles.rookie + v.champs.titles.pro + v.champs.titles.ace}</span><span>Lifetime credits earned ${fmtCR(v.earned.CR)}</span></div>
+    <div class="panel career-line"><h3>Career (all runs)</h3><span>${DIFF_ORDER.filter((d, k) => k < 3 || v.champs.completed[d]).map(d => `${DIFF_LABEL[d]} ×${v.champs.completed[d] || 0}`).join(' · ')} completed</span><span>Titles: ${DIFF_ORDER.reduce((n, d) => n + (v.champs.titles[d] || 0), 0)}</span><span>Lifetime credits earned ${fmtCR(v.earned.CR)}</span></div>
     <div class="actbar"><div class="row"><button class="btn primary" data-act="menu">Main menu</button><button class="btn" data-act="garage">Garage</button></div></div></div>`;
 }
 

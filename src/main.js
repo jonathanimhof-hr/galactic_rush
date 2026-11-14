@@ -18,18 +18,24 @@ import { makeInstruments, courseMap } from './render/textures.js';
 import { CameraRig } from './camera.js';
 import { Audio } from './audio.js';
 import { Input, loadSave, storeSave, mergeSave } from './input.js';
+// V12: player accounts (sign-in, the account's career kept on the server)
+import { Account, accountConfig } from './account/controller.js';
+import { mpServer } from './mp/config.js';
 import { UI, fmt } from './ui.js';
 import { HUD } from './hud.js';
 import { RaceFX } from './racefx.js';
-import { Progression, standingsOf } from './progress/index.js';
 // V10: every championship run has its own six-course calendar
+import { Progression, standingsOf } from './progress/index.js';
 import { calendarOf } from './progress/profile.js';
 import { CHAMPIONSHIP_REWARDS, DIFF_ORDER, lapMult } from './progress/economy.js';
-import { Garage } from './garage.js';
+// V12: the upgraded ships of Master and Legend rivals
+import { effectiveDef } from './progress/upgrades.js';
 // V8: online multiplayer tournament mode (src/mp)
+import { Garage } from './garage.js';
 import { champHubHTML, careerHTML } from './ui-garage.js';
 import { Multiplayer } from './mp/controller.js';
 
+const COURSES_V12 = new Set(['pelagos', 'nexus']); // courses whose layout V12 changed (new obstacles)
 const $ = s => document.querySelector(s);
 const DEFAULTS = { handling: 'relaxed', sound: 'on', master: 0.8, music: 0.55, sfx: 0.9, sens: 1, padSens: 1, invert: 'false', assist: '0.3', cam: 'chase', preset: '',
   shadows: 'on', ao: 'on', volumetrics: 'on', motionBlur: 'on', grain: 'on', ca: 'on', flare: 'on', resScale: 1, dynRes: 'on', fov: 72, shake: 1, hudScale: 1,
@@ -58,6 +64,7 @@ class Game {
     this.garage = new Garage(this); this.benchMode = params.has('bench');
     this.racefx = new RaceFX(this);
     this.mp = new Multiplayer(this); // V8
+    this.account = new Account(this, { config: accountConfig(window, location, mpServer().url) }); this.account.boot().catch(e => console.warn('account:', e)); // V12
     this.opts = { mode: params.get('mode') || 'quick', track: params.get('track') || 'foundry', laps: +(params.get('laps') || 3), diff: params.get('diff') || 'pro', ship: params.has('ship') ? +params.get('ship') : Math.max(0, SHIPS.findIndex(s => s.id === this.progress.profile.selectedShip)) };
     this.timeScale = +(params.get('ts') || 1); this.autotest = params.has('autotest'); this.camMode = this.settings.cam;
     this.state = 'loading'; this.acc = 0; this.t = 0; this.fps = 60; this.frames = 0; this.fpsT = 0; this.res = 1; this.ftAcc = 0; this.ftN = 0; this.slowmo = 0;
@@ -102,7 +109,21 @@ class Game {
     $('#fps').hidden = !on('fpsCounter');
     this.audio.configure(s);
     this.fx.max = s.preset === 'low' ? 2500 : 5000; this.fx.scale = s.preset === 'low' ? 0.6 : 1;
-    if (persist) { this.save.settings = s; storeSave(this.save); }
+    if (persist) { this.save.settings = s; storeSave(this.save); if (this.account) this.account.settingsChanged(s); }
+  }
+  // V12: the account switched the game between the guest career and the account's (sign-in, log-out)
+  accountSwitched() {
+    this.settings = { ...DEFAULTS, ...this.save.settings }; if (!this.settings.preset) this.settings.preset = 'high'; this.camMode = this.settings.cam; if (this.gfx) this.applySettings(false);
+    if (this.state === 'title') this.ui.title(this.touch, true);
+  }
+  // V12: something about the account changed: menus that show it follow
+  accountChanged(kind, detail) {
+    if (this.state === 'title') this.ui.title(this.touch, true);
+    else if (this.state === 'ship' && kind === 'adopt' && this.garage.render) this.garage.render(true);
+    else if (this.state === 'results' && kind === 'race' && this.result && this.result.extra.reward && detail && detail.raceId === this.raceId) {
+      const el = document.querySelector('#ui .rw-acct'); this.result.extra.reward.pending = false;
+      if (el) { el.className = 'rw-acct ' + (detail.ok ? 'good' : 'bad'); el.textContent = detail.ok ? 'Saved to your account.' : 'Not credited by the account server.'; }
+    }
   }
   trackLen(id) { return getTrack(id).length; }
   prepCourse(id) {
@@ -129,7 +150,8 @@ class Game {
   // ---------- scenes ----------
   makeRacers(mode) {
     const diff = DIFFICULTY[this.opts.diff] || DIFFICULTY.pro, rng = makeRng((Math.random() * 1e9) | 0);
-    const ai = mode === 'trial' ? [] : AI_ROSTER.map(a => ({ name: a.name, shipId: a.ship, paint: a.paint, skill: clamp(diff.skill[0] + (diff.skill[1] - diff.skill[0]) * a.bias + rng.range(-0.03, 0.03), 0.3, 1) }));
+    const ai = mode === 'trial' ? [] : AI_ROSTER.map(a => ({ name: a.name, shipId: a.ship, paint: a.paint, skill: clamp(diff.skill[0] + (diff.skill[1] - diff.skill[0]) * a.bias + rng.range(-0.03, 0.03), 0.3, 1),
+      ...(diff.drive ? { drive: diff.drive } : {}), ...(diff.upgrades ? { def: effectiveDef(shipById(a.ship), diff.upgrades) } : {}) })); // V12: Elite and up drive with a profile; Master and Legend fly upgraded ships
     ai.sort((a, b) => a.skill - b.skill);
     if (mode === 'attract') return ai.concat([{ name: 'RIO KADE', shipId: SHIPS[this.opts.ship].id, skill: 0.9, paint: [0.85, 0.85, 0.88] }]);
     const id = SHIPS[this.opts.ship].id; // V7: upgrades (effective stats rebuilt from base stats) and the saved paint job
@@ -185,6 +207,8 @@ class Game {
     this.raceId = this.progress.newRaceId(); // every started race is a new reward event, even on the same course and settings
     const id = o.mode === 'champ' ? this.champ.tracks[this.champ.round] : o.track, track = getTrack(id);
     const race = new Race({ track, laps: o.laps, racers: this.makeRacers(o.mode), mode: o.mode, seed: (Math.random() * 1e6) | 0, handling: this.settings.handling, assist: +this.settings.assist, sens: +this.settings.sens, autopilot: this.autotest });
+    // V12: a signed-in player's race is paid by the account server against a ticket asked for now
+    if (this.progress.cloud && !this.benchMode) this.account.raceStarting(this.raceId, { mode: o.mode, track: id, diff: o.mode === 'trial' ? null : o.diff, laps: o.laps, ship: SHIPS[o.ship].id, field: race.racers.length, runId: this.champ ? this.champ.runId : undefined, handling: this.settings.handling === 'classic' ? 'classic' : 'relaxed' });
     this.courseScene(id, race, false);
     this.ghost = o.mode === 'trial' ? this.save.ghosts[this.recKey(id)] || null : null; this.rec = []; this.recT = 0; this.ghostTi = 0; this.bestSplits = []; this.curSplits = [];
     if (this.ghost) this.scene.view.setGhostShip(shipById(this.ghost.ship));
@@ -226,12 +250,13 @@ class Game {
       case 'champClear': o.champTracks = []; this.ui.trackSelect(o, this.save, id => this.maps.get(id)); break;
       case 'skip': if (this.state === 'intro') this.endIntro(); break;
       case 'mp': this.mp.act(arg); break; // V8: online screens
+      case 'acct': if (arg && arg.startsWith('open')) { this.state = 'account'; } this.account.act(arg); break; // V12: account screens
       case 'back':
         if (arg === 'mp') this.mp.act('back'); // V8: leaving the online screens closes the server connection
         else if (arg === 'pause') { this.ui.pause(); this.state = 'paused'; }
         else if (arg === 'results') this.showResults();
         else if (this.state === 'ship') this.garage.leave(() => { this.state = 'title'; this.startAttract(); this.ui.title(this.touch); });
-        else if (arg === 'title') { this.state = 'title'; if (this.scene.kind !== 'course') this.startAttract(); this.ui.title(this.touch); }
+        else if (arg === 'title') { if (this.account) this.account.ui.close(); this.state = 'title'; if (this.scene.kind !== 'course') this.startAttract(); this.ui.title(this.touch); }
         else if (this.state === 'track') this.toShipSelect();
         else { this.state = 'title'; this.ui.title(this.touch); }
         break;
@@ -243,7 +268,7 @@ class Game {
       case 'saveExport': { const txt = JSON.stringify({ best: this.save.best, ghosts: this.save.ghosts }), ta = $('#saveText'); ta.value = txt; ta.select();
         const done = () => { $('#saveMsg').textContent = 'Copied. Paste it into another copy of the game to bring your laps along.'; };
         try { navigator.clipboard.writeText(txt).then(done, () => { $('#saveMsg').textContent = 'Selected. Press Ctrl+C (or Cmd+C) to copy.'; }); } catch (e) { $('#saveMsg').textContent = 'Selected. Press Ctrl+C (or Cmd+C) to copy.'; } break; }
-      case 'saveImport': { try { const n = mergeSave(this.save, $('#saveText').value); storeSave(this.save); $('#saveMsg').textContent = n ? `Imported ${n} record${n > 1 ? 's' : ''}.` : 'Nothing faster than your current records in that save.'; }
+      case 'saveImport': { if (this.progress.cloud) { $('#saveMsg').textContent = 'Signed in: records come from your account. Log out to import into this device\'s guest career.'; break; } try { const n = mergeSave(this.save, $('#saveText').value); storeSave(this.save); $('#saveMsg').textContent = n ? `Imported ${n} record${n > 1 ? 's' : ''}.` : 'Nothing faster than your current records in that save.'; }
         catch (e) { $('#saveMsg').textContent = 'That text is not a Galactic Rush save. Copy the whole save and paste it again.'; } break; }
       case 'resume': this.state = 'race'; this.ui.hide(); this.input.capture = true; this.hud.show(true); break;
       case 'restart': if (o.mode === 'champ' && this.result) break; this.startRace(); break; // V7: a finished championship round is recorded and paid; it is not re-run
@@ -256,8 +281,9 @@ class Game {
   previewCourse(id, now) { if (this.state !== 'track' || (this.scene.kind === 'course' && this.scene.id === id)) return; clearTimeout(this.pvT); this.pvT = setTimeout(() => { if (this.state === 'track') this.startAttract(id); }, now ? 0 : 280); }
   undoChampPoints() { const last = this.champ.c.rounds.pop(); if (last) { for (const a of last) this.champ.c.points[a.name] -= a.pts; this.champ.c.wins[last[0].name]--; } }
 
-  // records and ghosts are kept per handling profile; Classic uses V1's plain keys so V1 ghosts still load
-  recKey(id) { return this.settings.handling === 'classic' ? id : id + '~relaxed'; }
+  // records and ghosts are kept per handling profile; Classic uses V1's plain keys so V1 ghosts still load. V12: Pelagos
+  // and Orbital Nexus have new obstacles, so their V12 records and ghosts are kept apart from the earlier layouts'.
+  recKey(id) { const k = COURSES_V12.has(id) ? id + '@12' : id; return this.settings.handling === 'classic' ? k : k + '~relaxed'; }
   // ---------- race end ----------
   endRace() {
     const sc = this.scene, race = sc.race, me = race.player; if (!me || this.result) return;
@@ -269,7 +295,7 @@ class Game {
     // V7: the race simulation confirmed the finish; pay for it once (the race id is new for every started race)
     if (!this.benchMode && me.finished) {
       extra.reward = this.progress.completeRace({ finished: true, raceId: this.raceId, mode: this.opts.mode, track: sc.id, diff: this.opts.diff, laps: race.laps, ship: SHIPS[this.opts.ship].id, place: me.place,
-        field: race.racers.length, time: me.finishTime, record: record != null, runId: this.champ ? this.champ.runId : null, order: race.order.map(r => r.name) });
+        field: race.racers.length, time: me.finishTime, record: record != null, runId: this.champ ? this.champ.runId : null, order: race.order.map(r => r.name), bestLap: me.bestLap });
       if (extra.reward.completion) this.champDone = extra.reward.completion;
     }
     this.result = { race, extra }; this.showResults();

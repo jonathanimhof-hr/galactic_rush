@@ -352,6 +352,93 @@ export function buildPelagos(gfx, t) {
       lights: [{ x: 9, y: 0, z: -40, s: 5, c: [4, 0.5, 0.3], blink: 1.1, ph: k }] }))]);
   items.push(...mv.items);
 
+  // ---------------------------------------------------------------- V12: the extraction field's new obstacles
+  // Each is drawn exactly where the simulation has it solid (tracks-v9.js pelagos12, solids.js): the parts inside the
+  // corridor in hazard bands, as the course has always marked what a ship can hit; the rest in the platforms' marine
+  // steel, with splash collars and foam where it meets the sea. The buoys and the crane's load move every frame with
+  // the race clock, the same motion the simulation gives them.
+  const v12moving = [];
+  { const HZB = [[0.95, 0.68, 0.08, 0], [0.07, 0.07, 0.08, 0]];
+    const frameQ = i => new Quat().fromBasis(t.bin[i], t.nrm[i], t.tan[i]);
+    // a vertical tube from y0 to y1 at (x, z): hazard bands between the corridor's floor and roof at sample i, steel
+    // outside them, clamp rings, a splash collar and foam at the sea
+    const column = (g, gl, i, x, z, y0, y1, r, steel, inCorridor = true) => {
+      const lo = inCorridor ? t.pos[i].y - t.h[i] - 1.5 : y1 + 1, hi = inCorridor ? t.pos[i].y + t.h[i] + 1.5 : y1 + 1, seg = (a, b, col) => { if (b - a > 0.05) g.at(x, (a + b) / 2, z, QX(90)).cyl(r, r, b - a, 18, col, false); };
+      seg(y0, Math.min(lo, y1), steel); seg(Math.max(hi, y0), y1, steel);
+      for (let y = Math.max(y0, lo), k = 0; y < Math.min(y1, hi); y += 2.2, k++) seg(y, Math.min(y + 2.2, Math.min(y1, hi)), HZB[k % 2]);
+      for (let y = y0 + 4; y < y1 - 2; y += 5.5) if (y < lo - 1 || y > hi + 1) g.at(x, y, z, QX(90)).cyl(r * 1.12, r * 1.12, 0.5, 18, steel, false);
+      if (y0 < SEA) { g.at(x, SEA + 1.4, z, QX(90)).cyl(r * 1.45, r * 1.45, 5, 18, SPLASH); foamSrc.push({ x, z, r: r * 1.6, k: 0.9 }); }
+      for (const y of [lo, hi]) if (y > y0 && y < y1) gl.at(x, y, z).box(r * 0.9, 0.5, r * 0.9, RED); // a red lamp where it enters and leaves the corridor
+    };
+    // the skim deck's drilling risers: from the sea up through the corridor to tensioner frames under the deck
+    for (const rec of (t.solids || []).filter(r => r.kind === 'riser')) {
+      const i = rec.hint, a = rec.pts[0], b = rec.pts[1], g = stCh.get(i, 'stl'), r = rec.rad[0];
+      column(g, bigLit, i, a.x, a.z, a.y, b.y, r, LEGC, rec.spheres.length > 0); // a riser beside the corridor has no hazard bands
+      g.mat(0.55, 0.6, 1, 0).at(a.x, b.y + 1.6, a.z).bbox(r * 4.2, 3.2, r * 4.2, 0.4, STEEL[1]); // tensioner frame
+      for (const s of [-1, 1]) pipe(g, v3(a.x + s * r * 1.6, b.y + 3, a.z), v3(a.x + s * r * 1.6, b.y + 9, a.z), 0.35, STEEL[2], 8); // its rams up to the deck
+      g.at(a.x, b.y - 2, a.z, QX(90)).cyl(r * 1.35, r * 1.35, 1.2, 18, PAINT[1]); // flex joint
+    }
+    // the rack over the return straight: towers on both sides carrying pipes over the corridor; its lowest pipe crosses
+    // the corridor (the obstacle), and further on one of its legs stands in it
+    for (const o of t.obstacles) if (o.kind === 'pipe' || o.kind === 'rackleg') {
+      const i = o.i, g = stCh.get(i, 'stl'), top = t.h[i] + 9, W = t.w[i];
+      const towerAt = x => { const foot = P(t, i, x, 0); foot.y = SEA - 8; const head = P(t, i, x, top + 2); lattice(g.mat(0.55, 0.6, 1, 0), foot, head.y - foot.y, 6.5, STEEL[1], 0.7, 5);
+        g.at(foot.x, SEA + 1.4, foot.z, QX(90)).cyl(4, 4, 5, 16, SPLASH); foamSrc.push({ x: foot.x, z: foot.z, r: 4.2, k: 0.8 }); return head; };
+      if (o.kind === 'pipe') {
+        const L = towerAt(-W - 9), R = towerAt(W + 9);
+        bar(g, P(t, i, -W - 11, top), P(t, i, W + 11, top), 1.6, 2.2, STEEL[3]);
+        for (const [dy, r, col] of [[1.6, 1.1, PAINT[3]], [1.4, 0.8, PAINT[1]], [1.2, 0.6, STEEL[2]]]) pipe(g, P(t, i, -W - 14, top + dy + r, 0), P(t, i, W + 14, top + dy + r, 0), r, col, 12);
+        // the low pipe beyond the corridor's walls, into the towers (inside the walls the course kit's hazard pipe)
+        for (const s of [-1, 1]) { pipe(g, P(t, i, s * (W + 4), o.y), P(t, i, s * (W + 13), o.y), o.r * 0.98, LEGC, 16); for (const yy of [o.y, top]) { const c = P(t, i, s * (W + 9), yy); g.at(c.x, c.y, c.z, frameQ(i)).bbox(2.4, 2.6, 2.4, 0.3, STEEL[1]); } }
+        void L; void R;
+      } else {
+        const foot = P(t, i, o.x, 0); foot.y = SEA - 8; const hiY = t.pos[i].y + t.h[i] + 4, loY = t.pos[i].y - t.h[i] - 4;
+        g.mat(0.5, 0.6, 1, 0).at(foot.x, (foot.y + loY) / 2, foot.z, QX(90)).cyl(o.r * 1.05, o.r * 1.15, loY - foot.y, 18, LEGC, false);
+        const head = P(t, i, o.x, top); g.at(head.x, (hiY + head.y) / 2, head.z, QX(90)).cyl(o.r * 0.98, o.r * 0.98, head.y - hiY, 18, LEGC, false);
+        g.at(foot.x, SEA + 1.4, foot.z, QX(90)).cyl(o.r * 1.7, o.r * 1.7, 5, 18, SPLASH); foamSrc.push({ x: foot.x, z: foot.z, r: o.r * 1.8, k: 0.9 });
+        towerAt(-W - 9); bar(g, P(t, i, -W - 11, top), P(t, i, o.x + 3, top), 1.6, 2.2, STEEL[3]);
+        for (const [dy, r, col] of [[1.6, 1.1, PAINT[3]], [1.4, 0.8, PAINT[1]]]) pipe(g, P(t, i, -W - 14, top + dy + r, 0), P(t, i, o.x + 4, top + dy + r, 0), r, col, 12);
+      }
+    }
+    // spar buoys of the extraction field: banded spars with a top mark and a lantern, riding the swell (moved per frame)
+    for (const rec of (t.solids || []).filter(r => r.kind === 'buoy')) {
+      const i = rec.hint, a = rec.pts[0], b = rec.pts[1], r = rec.rad[0], g = new Geo().mat(0.3, 0.55, 1, 0), gl = new Geo().mat(0, 0.4, 4, 0);
+      for (let y = a.y, k = 0; y < b.y; y += 3, k++) g.at(a.x, Math.min(y + 1.5, (y + b.y) / 2), a.z, QX(90)).cyl(r, r, Math.min(3, b.y - y), 16, k % 2 ? [0.82, 0.8, 0.76, 0] : [0.72, 0.14, 0.1, 0], false);
+      g.at(a.x, SEA + 0.9, a.z, QX(90)).cyl(r * 1.25, r * 1.25, 3, 16, [0.12, 0.13, 0.13, 0]); // the dark waterline band
+      g.at(a.x, b.y + 0.4, a.z, QX(90)).cyl(r * 0.5, r * 0.5, 0.8, 12, STEEL[1]); g.at(a.x, b.y + 2.6, a.z, QX(90)).cyl(0.18, 0.18, 4, 6, STEEL[2]);
+      for (const ang of [45, -45]) g.at(a.x, b.y + 4.8, a.z, QY(heading(i)).multiply(QZ(ang))).box(0.25, 2.4, 0.25, [0.9, 0.75, 0.1, 0]); // the X top mark of a special mark
+      gl.at(a.x, b.y + 3.4, a.z).box(0.6, 0.6, 0.6, [1, 0.8, 0.3, 1]);
+      foamSrc.push({ x: a.x, z: a.z, r: r * 1.8, k: 0.8 });
+      const it = { mesh: gfx.mesh(g.merge(gl).build()), pos: new Vec3(), quat: new Quat(), scale: 1, visible: true, br: 30 };
+      items.push(it); v12moving.push({ it, kind: 'bob', o: rec.spheres[0] });
+    }
+    // the crane barge by the island turn: a barge on the sea beside the course, a lattice boom up to its tip over the
+    // corridor, the load (a subsea module) on its cable swinging under the tip (moved per frame)
+    for (const rec of (t.solids || []).filter(r => r.kind === 'load')) {
+      const i = rec.i, tip = P(t, i, rec.px, rec.py), side = rec.px >= 0 ? 1 : -1, g = stCh.get(i, 'stl');
+      let bx = t.w[i] + 70, base; for (; bx < t.w[i] + 200; bx += 10) { base = beside(i, side * bx); base.y = SEA + 9; let ok = true; for (let u = 0.05; u < 0.95; u += 0.05) if (!clear.sphere(new Vec3().lerpVectors(base, tip, u), 4, 4)) { ok = false; break; } if (ok) break; }
+      const hq = QY(heading(i)), barge = beside(i, side * (bx + 14)); barge.y = SEA;
+      g.mat(0.5, 0.6, 1, 0).at(barge.x, SEA + 2, barge.z, hq).bbox(46, 7, 28, 1.2, [0.22, 0.24, 0.26, 0]); g.at(barge.x, SEA + 5.8, barge.z, hq).box(44, 0.6, 26, GRATE);
+      g.at(barge.x, SEA + 1, barge.z, hq).bbox(48, 2.4, 30, 0.8, [0.55, 0.16, 0.1, 0]); // the boot top
+      for (const [lx, lz, sx, sy, sz, col] of [[-14, -6, 10, 7, 9, PAINT[2]], [-14, 7, 8, 4, 8, STEEL[2]], [12, 8, 12, 3, 6, PAINT[3]]]) { const c = new Vec3(lx, 0, lz).applyQuat(hq).add(v3(barge.x, SEA + 6 + sy / 2, barge.z)); g.at(c.x, c.y, c.z, hq).bbox(sx, sy, sz, 0.3, col); }
+      g.at(base.x, SEA + 7, base.z, QX(90)).cyl(5, 5.5, 4, 20, PAINT[1]); g.at(base.x, SEA + 11, base.z, hq).bbox(9, 6, 9, 0.4, PAINT[1]); // slewing ring and the crane house
+      truss(g.mat(0.6, 0.5, 1, 0), v3(base.x, SEA + 12, base.z), tip, 3.2, 6, PAINT[1]); // the boom
+      const aTop = v3(base.x, SEA + 34, base.z); truss(g, v3(base.x, SEA + 13, base.z), aTop, 2.2, 5, PAINT[1]); pipe(g, aTop, tip, 0.25, STEEL[2], 6); // A-frame and pendant
+      bigLit.at(tip.x, tip.y + 1.5, tip.z).box(1.2, 1.2, 1.2, RED); bigLit.at(aTop.x, aTop.y + 1, aTop.z).box(1, 1, 1, RED);
+      foamSrc.push({ x: barge.x, z: barge.z, r: 30, k: 0.6 });
+      // the swinging part, built along +x from the pivot (the boom tip): sheave, cable, hook block, the module
+      const m = new Geo().mat(0.5, 0.55, 1, 0), L = rec.L0, R = rec.r1;
+      m.at(0, 0, 0, QY(0)).cyl(1.1, 1.1, 1.6, 14, STEEL[1]);
+      m.at((L - R - 1.2) / 2, 0, 0, QY(90)).cyl(0.16, 0.16, L - R - 1.2, 6, [0.08, 0.08, 0.08, 0], false); // the cable
+      m.at(L - R - 1.6, 0, 0).bbox(1.4, 1.4, 1.8, 0.2, PAINT[1]); // hook block
+      m.at(L, 0, 0).sphere(R * 0.94, 18, 12, [0.86, 0.42, 0.12, 0]); // the module: a subsea pressure vessel, orange
+      for (const ang of [0, 60, 120]) m.at(L, 0, 0, QZ(ang)).torus(R * 0.97, 0.16, 28, 6, STEEL[1]); // its cage
+      const ml = new Geo().mat(0, 0.4, 4, 0); for (const s of [-1, 1]) ml.at(L, s * R * 0.95, 0).box(0.5, 0.5, 0.5, RED);
+      const it = { mesh: gfx.mesh(m.merge(ml).build()), pos: tip.clone(), quat: frameQ(i), scale: 1, visible: true, br: L + R + 4 };
+      items.push(it); v12moving.push({ it, kind: 'swing', rec, q0: frameQ(i) });
+    }
+  }
+
   // ---------------------------------------------------------------- the course kit: energy walls, gates on stilts, pickups,
   // the platform columns in the narrows, route lights
   const hex = hexField(gfx, t, (i, f) => t.loopId[i] < 0 || f === 'T', [0.35, 0.85, 1]); // in the loops the rails and the keel mark the walls; only the inner face glows
@@ -403,6 +490,9 @@ export function buildPelagos(gfx, t) {
     hexState: me => { hex.state.ship.copy(me ? me.ship.pos : v3(0, 0, 0)); return hex.state; }, hexHit: (p, time) => hex.hit(p, time),
     update(dt, time, race, fx, cam) {
       gt.update(race, time); pk.update(dt, time, fx); hz.update(dt, time, race, fx, cam); mv.update(dt, time, fx); rg.update(fx, cam, race, time);
+      // V12: the buoys ride the swell and the crane's load swings, exactly as the simulation moves them (race clock)
+      { const rt = race ? race.time : time; for (const m of v12moving) { if (m.kind === 'bob') { if (!race) t.updateObstacles(rt); m.it.pos.subVectors(m.o.p, m.o.base); }
+        else { const th = m.rec.rot.th0 + (m.rec.rot.amp != null ? m.rec.rot.amp * Math.sin(rt * m.rec.rot.w + (m.rec.rot.ph || 0)) : rt * m.rec.rot.w); m.it.quat.copy(m.q0).multiply(new Quat().setAxisAngle(0, 0, 1, th)); } } }
       const c = cam.pos; ocean.pos.set(Math.round(c.x / 4) * 4, 0, Math.round(c.z / 4) * 4); dome.pos.set(c.x, 0, c.z); pickFoam(c);
       // lightning: a flicker of 3-4 pulses, the bolt and its branches drawn as glowing streaks, the deck and the sea lit around it
       if ((nextBolt -= dt) < 0 && !flash) { strike(cam); nextBolt = 3 + Math.random() * 6; }

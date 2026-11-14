@@ -1,10 +1,15 @@
 // AI pilot: flies the same physics as the player by producing control inputs.
+// V12: a pilot with a driving profile (config.js DIFFICULTY: Elite, Master, Legend) drives better with the same senses
+// and the same controls: steadier, more precise steering (fewer wall scrapes, fewer crashes), boost in full bursts
+// instead of dribbles, more room around obstacles and rivals, later braking. Rookie, Pro and Ace have no profile and
+// drive exactly as before. A profile only changes how a pilot drives: the ship, its physics, the course and every
+// collision are the same as everybody else's, and nothing depends on where the player is.
 import { Vec3, Quat, clamp } from '../math.js';
 
 const tmp = new Vec3(), tgt = new Vec3(), qi = new Quat(), near = [];
 
 export class AIPilot {
-  constructor(racer, race, skill, rng) {
+  constructor(racer, race, skill, rng, drive) {
     this.r = racer; this.race = race; this.skill = skill; this.rng = rng;
     this.ph = rng() * 10; this.px = 0; this.py = 0; this.obs = []; this.fireCD = 3 + rng() * 4;
     this.ctrl = { pitch: 0, yaw: 0, roll: 0, brake: false, boost: false, drift: false, fire: false, shield: false };
@@ -13,6 +18,10 @@ export class AIPilot {
     this.decel = d.brakeDecel * 0.7;
     this.maxThrottle = 0.86 + 0.14 * skill;
     this.margin = 0.84 + 0.14 * skill;
+    if (drive) { // V12 driving profile
+      this.dv = drive; this.decel = d.brakeDecel * drive.brake; this.maxThrottle = 1;
+      this.margin = drive.corner - (1 - skill) * drive.spread; this.bursting = false;
+    }
   }
 
   cornerSpeed(i) {
@@ -24,6 +33,7 @@ export class AIPilot {
   }
 
   update(dt) {
+    if (this.dv) return this.update12(dt);
     const race = this.race, t = race.track, r = this.r, s = r.ship, c = this.ctrl, N = t.N;
     const speed = s.vel.len(), i0 = r.ti;
     // --- speed planning: brake early for upcoming corners
@@ -43,7 +53,7 @@ export class AIPilot {
       const di = t.deltaS(i0 * t.D, o.i * t.D);
       if (di < 2 || di > 170) continue;
       let x = o.x, y = o.y;
-      if (o.move) { const a = (race.time + arrive(di)) * o.move.w + o.move.ph; x += Math.sin(a) * o.move.ax; y += Math.cos(a * 0.8) * o.move.ay; }
+      if (o.move) { if (o.move.rot) [x, y] = t.rotAt(o.move, race.time + arrive(di)); else { const a = (race.time + arrive(di)) * o.move.w + o.move.ph; x += Math.sin(a) * o.move.ax; y += Math.cos(a * 0.8) * o.move.ay; } } // V12: rot, a swinging or turning part
       obs.push({ di, i: o.i, k: o.type === 'sphere' ? 0 : o.type === 'hbeam' ? 1 : 2, x, y, r: o.r });
     }
     for (const g of t.lasers) {
@@ -109,6 +119,104 @@ export class AIPilot {
     const boostOK = s.boost > (this.skill > 0.7 ? 20 : 60) && straight > s.def.maxSpeed * 1.15 && needTurn < 0.25 && !c.drift;
     c.boost = boostOK && (this.skill > 0.4 || s.boost > s.def.boostCap * 0.9);
     // --- weapons
+    this.fireCD -= dt; c.fire = false; c.shield = false;
+    if (this.fireCD <= 0 && r.ammo > 0) {
+      const tg = race.findTarget(r, 0.22, 320);
+      if (tg && this.rng() < 0.5 + this.skill * 0.4) { c.fire = true; this.fireCD = 5 + this.rng() * 6; } else this.fireCD = 0.5;
+    }
+    for (const p of race.projectiles) if (p.target === r && p.pos.dist(s.pos) < 110 && r.shieldCharges > 0 && this.rng() < this.skill * 0.08) c.shield = true;
+    return c;
+  }
+
+  // V12: update() with the profile's numbers (config.js DIFFICULTY explains each): the same course line, the same speed
+  // planning and the same obstacle senses
+  update12(dt) {
+    const race = this.race, t = race.track, r = this.r, s = r.ship, c = this.ctrl, N = t.N, dv = this.dv;
+    const speed = s.vel.len(), i0 = r.ti;
+    let vTarget = Infinity, straight = Infinity;
+    for (let k = 2; k < 100; k += 2) {
+      const i = (i0 + k) % N, dist = k * t.D, vc = this.cornerSpeed(i);
+      vTarget = Math.min(vTarget, Math.sqrt(vc * vc + 2 * this.decel * dist));
+      if (k < 70) straight = Math.min(straight, vc);
+    }
+    const la = clamp(dv.look[0] + speed * dv.look[1], dv.look[2], dv.look[3]);
+    let ti = (i0 + Math.round(la / t.D)) % N;
+    const obs = this.obs; obs.length = 0;
+    const arrive = d => d / Math.max(speed, 30);
+    t.obstaclesNear(i0 + 24, near, 2);
+    for (const o of near) {
+      const di = t.deltaS(i0 * t.D, o.i * t.D);
+      if (di < 2 || di > 170) continue;
+      let x = o.x, y = o.y;
+      if (o.move) { if (o.move.rot) [x, y] = t.rotAt(o.move, race.time + arrive(di)); else { const a = (race.time + arrive(di)) * o.move.w + o.move.ph; x += Math.sin(a) * o.move.ax; y += Math.cos(a * 0.8) * o.move.ay; } } // V12: rot, a swinging or turning part
+      obs.push({ di, i: o.i, k: o.type === 'sphere' ? 0 : o.type === 'hbeam' ? 1 : 2, x, y, r: o.r });
+    }
+    for (const g of t.lasers) {
+      const di = t.deltaS(i0 * t.D, g.i * t.D);
+      if (di < 2 || di > 190 || !race.laserActive(g, race.time + arrive(di))) continue;
+      obs.push({ di, i: g.i, k: 3, side: g.side, r: 0 });
+    }
+    for (const lane of t.traffic) {
+      const di = t.deltaS(i0 * t.D, lane.i * t.D);
+      if (di < 2 || di > 150) continue;
+      for (let k = 0; k < lane.n; k++) obs.push({ di, i: lane.i, k: 0, x: t.trafficCarX(lane, k, race.time + arrive(di)), y: lane.y, r: lane.r + 1.5 });
+    }
+    for (const o of race.racers) {
+      if (o === r || o.wrecked) continue;
+      const di = o.prog - r.prog;
+      if (di > 4 && di < 50) obs.push({ di, i: o.ti, k: 0, x: o.lx, y: o.ly, r: 2.8 });
+    }
+    const lx = t.lineX[ti], ly = t.lineY[ti];
+    let bx = lx, by = ly, nearI = -1, nearD = Infinity;
+    if (obs.length) {
+      const W = Math.min(t.w[i0], t.w[ti]) * 0.66, H = Math.min(t.h[i0], t.h[ti]) * 0.66, pad = dv.pad;
+      const pen = (cx, cy) => {
+        let p = 0;
+        for (const o of obs) {
+          const wgt = 1.6 - o.di / 170;
+          let d;
+          if (o.k === 0) d = Math.hypot(cx - o.x, cy - o.y) - o.r - pad;
+          else if (o.k === 1) d = Math.abs(cy - o.y) - o.r - pad;
+          else if (o.k === 2) d = Math.abs(cx - o.x) - o.r - pad;
+          else d = (o.side === 'L' ? cx : o.side === 'R' ? -cx : o.side === 'T' ? -cy : cy) - 4;
+          if (d < 0) p += (2 - d) * wgt;
+        }
+        return p;
+      };
+      let best = Infinity;
+      const tryC = (cx, cy) => {
+        const sc = pen(cx, cy) * 6 + Math.hypot(cx - lx, cy - ly) * 0.05 + Math.hypot(cx - this.px, cy - this.py) * 0.14;
+        if (sc < best) { best = sc; bx = cx; by = cy; }
+      };
+      tryC(lx, ly); tryC(this.px, this.py);
+      for (let gx = -3; gx <= 3; gx++) for (let gy = -2; gy <= 2; gy++) tryC((gx / 3) * W, (gy / 2) * H);
+      this.blocked = best > 6;
+      if (bx !== lx || by !== ly) for (const o of obs) if (o.di < nearD && o.k !== 3) { nearD = o.di; nearI = o.i; }
+    } else this.blocked = false;
+    const ka = Math.min(1, (obs.length ? 7 : 4) * dt);
+    this.px += (bx - this.px) * ka; this.py += (by - this.py) * ka;
+    if (nearI >= 0 && nearD < la) ti = t.wrapIdx(nearI + 2);
+    const mw = dv.wallT, wantX = clamp(this.px, -t.w[ti] + mw, t.w[ti] - mw), wantY = clamp(this.py, -t.h[ti] + mw, t.h[ti] - mw);
+    t.pointAt(ti, wantX, wantY, tgt);
+    tmp.subVectors(tgt, s.pos).applyQuat(qi.copy(s.quat).conjugate());
+    const yawErr = Math.atan2(-tmp.x, tmp.z), pitchErr = Math.atan2(tmp.y, tmp.z);
+    const wob = dv.wobble * Math.sin(race.time * 1.3 + this.ph);
+    const damp = dv.damp;
+    c.yaw = clamp(yawErr * dv.gain - s.ang.y * damp + wob, -1, 1);
+    c.pitch = clamp(pitchErr * dv.gain - s.ang.x * damp, -1, 1);
+    c.roll = 0;
+    const lim = this.blocked ? Math.min(vTarget, 120) : vTarget;
+    s.throttle = clamp(Math.min(lim, s.def.maxSpeed) / s.def.maxSpeed, 0.35, 1);
+    c.brake = speed > lim + dv.slack;
+    const needTurn = Math.max(Math.abs(yawErr), Math.abs(pitchErr));
+    c.drift = false;
+    // boost in bursts: a burst starts once the tank holds dv.burst of its capacity and runs until it is empty (no
+    // dribbles that keep the tank from recharging), and only while the boosted speed fits what is coming
+    const boostSpeed = s.def.maxSpeed * s.def.boostMult;
+    const fits = Math.min(vTarget, straight * dv.boostFit) > boostSpeed && needTurn < 0.3 && !this.blocked;
+    if (!this.bursting && s.boost >= s.def.boostCap * dv.burst) this.bursting = true;
+    if (s.boost <= 0.6) this.bursting = false;
+    c.boost = this.bursting && fits;
     this.fireCD -= dt; c.fire = false; c.shield = false;
     if (this.fireCD <= 0 && r.ammo > 0) {
       const tg = race.findTarget(r, 0.22, 320);

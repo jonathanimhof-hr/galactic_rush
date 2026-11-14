@@ -38,11 +38,11 @@ test('single race reward = base x difficulty x laps x placement, from one centra
     assert.equal(r.credits, Math.round(SINGLE_RACE.base * SINGLE_RACE.difficulty[diff] * LAP_MULT[laps] * SINGLE_RACE.placement[place - 1]));
     assert.ok(Number.isInteger(r.credits) && r.credits > 0, 'every finisher is paid a whole number of credits');
   }
-  assert.deepEqual(SINGLE_RACE.difficulty, { rookie: 1.0, pro: 1.3, ace: 1.6 });
+  assert.deepEqual(SINGLE_RACE.difficulty, { rookie: 1.0, pro: 1.3, ace: 1.6, elite: 1.9, master: 2.2, legend: 2.5 }); // V12: Rookie-Ace as V7, three levels added after them
 });
 test('higher difficulty pays more; more laps pay more; better placement pays more; last place is still paid', () => {
   for (const laps of [1, 3, 5]) for (let p = 1; p <= 6; p++) {
-    const [a, b, c] = DIFF_ORDER.map(diff => singleRaceReward({ diff, laps, place: p }).credits); assert.ok(a < b && b < c, `difficulty order at ${laps} laps P${p}`); }
+    const v = DIFF_ORDER.map(diff => singleRaceReward({ diff, laps, place: p }).credits); assert.ok(v.every((x, k) => !k || x > v[k - 1]), `difficulty order at ${laps} laps P${p}`); }
   for (const diff of DIFF_ORDER) { const v = [1, 2, 3, 5].map(laps => singleRaceReward({ diff, laps, place: 3 }).credits); assert.ok(v.every((x, k) => !k || x > v[k - 1]), `laps increase reward (${v})`);
     const pl = [1, 2, 3, 4, 5, 6].map(place => singleRaceReward({ diff, laps: 3, place }).credits); assert.ok(pl.every((x, k) => !k || x < pl[k - 1]), `placement order (${pl})`);
     assert.ok(pl[5] >= pl[0] * 0.7, 'P6 earns at least 70% of a win: lower places are still rewarded'); }
@@ -83,17 +83,21 @@ test('Style Tokens come from existing systems (wins, course records, championshi
 });
 
 // ---------------- 16.2 championships ----------------
-test('championship ladder: Rookie first, Rookie unlocks Pro, Pro unlocks Ace, Ace is the highest', () => {
+test('championship ladder: Rookie first, Rookie unlocks Pro, Pro unlocks Ace (V12: Ace unlocks Elite, then Master, then Legend, the highest)', () => {
   const { P } = fresh(); assert.deepEqual(P.profile.championships.unlocked, ['rookie']);
   assert.equal(P.startRun({ diff: 'pro', laps: 3, ship: 'kestrel' }).code, 'locked'); assert.equal(P.startRun({ diff: 'ace', laps: 3, ship: 'kestrel' }).code, 'locked');
+  for (const d of ['elite', 'master', 'legend']) assert.equal(P.startRun({ diff: d, laps: 3, ship: 'kestrel' }).code, 'locked');
   assert.equal(P.startRun({ diff: 'extreme', laps: 3, ship: 'kestrel' }).code, 'bad-diff', 'only the existing difficulty names');
   let c = runChamp(P, 'rookie').last.completion; assert.ok(c.ok); assert.equal(c.newlyUnlocked, 'pro'); assert.deepEqual(P.profile.championships.unlocked, ['rookie', 'pro']);
   c = runChamp(P, 'pro').last.completion; assert.equal(c.newlyUnlocked, 'ace'); assert.deepEqual(P.profile.championships.unlocked, ['rookie', 'pro', 'ace']);
-  c = runChamp(P, 'ace').last.completion; assert.equal(c.newlyUnlocked, null); assert.equal(c.isHighest, true); assert.equal(c.next, null);
+  c = runChamp(P, 'ace').last.completion; assert.equal(c.newlyUnlocked, 'elite'); assert.equal(c.isHighest, false); assert.deepEqual(P.profile.championships.unlocked, ['rookie', 'pro', 'ace', 'elite']);
+  c = runChamp(P, 'elite').last.completion; assert.equal(c.newlyUnlocked, 'master');
+  c = runChamp(P, 'master').last.completion; assert.equal(c.newlyUnlocked, 'legend'); assert.deepEqual(P.profile.championships.unlocked, DIFF_ORDER);
+  c = runChamp(P, 'legend').last.completion; assert.equal(c.newlyUnlocked, null); assert.equal(c.isHighest, true); assert.equal(c.next, null);
 });
 test('championship races use the championship reward table; completion bonus scales with difficulty', () => {
   for (const diff of DIFF_ORDER) for (let p = 1; p <= 6; p++) assert.equal(champRaceReward({ diff, laps: 3, place: p }).credits, Math.round(CHAMPIONSHIP_REWARDS.race.base * CHAMPIONSHIP_REWARDS.race.difficulty[diff] * CHAMPIONSHIP_REWARDS.race.placement[p - 1]));
-  const b = DIFF_ORDER.map(diff => champCompletionReward({ diff, laps: 3, standing: 4 }).completion); assert.ok(b[0] < b[1] && b[1] < b[2], `completion ${b}`);
+  const b = DIFF_ORDER.map(diff => champCompletionReward({ diff, laps: 3, standing: 4 }).completion); assert.ok(b.every((x, k) => !k || x > b[k - 1]), `completion ${b}`);
   const { P } = fresh(); const { last } = runChamp(P, 'rookie', 3, 2), run = last.completion.run;
   assert.equal(run.credits.races, CHAMPIONSHIP.length * champRaceReward({ diff: 'rookie', laps: 3, place: 2 }).credits); // V9: one race reward per round (six rounds)
   assert.equal(run.credits.completion, CHAMPIONSHIP_REWARDS.completion.rookie); assert.equal(run.credits.standing, Math.round(CHAMPIONSHIP_REWARDS.completion.rookie * CHAMPIONSHIP_REWARDS.standing[1]));
@@ -171,7 +175,7 @@ test('upgrades reach the race physics exactly once, however often a race is star
   for (let k = 0; k < 5; k++) assert.ok(Math.abs(mk().player.ship.def.maxSpeed - want) < 1e-9);
   // AI pilots and difficulty are untouched by the player's upgrades
   const ai = r.racers.filter(x => !x.isPlayer); for (const a of ai) { const base = SHIPS.find(s => s.id === a.ship.def.id); assert.ok(Math.abs(a.ship.def.maxSpeed - base.maxSpeed * HANDLING.relaxed.speed) < 1e-9, a.name); }
-  assert.deepEqual(DIFFICULTY, JSON.parse(readFileSync(new URL('specs/v6-gameplay.json', import.meta.url))).difficulty);
+  const v6d = JSON.parse(readFileSync(new URL('specs/v6-gameplay.json', import.meta.url))).difficulty; assert.deepEqual(Object.fromEntries(Object.keys(v6d).map(k => [k, DIFFICULTY[k]])), v6d); // V12: Rookie, Pro and Ace exactly V6
 });
 test('upgrades persist after reload and each ship keeps its own profile', () => {
   const { P, storage } = fresh(); earn(P, 3000); assert.ok(P.buyUpgrade('halberd', 'stability', 0).ok); assert.ok(P.buyUpgrade('halberd', 'accel', 0).ok);
@@ -244,7 +248,13 @@ test('no real-money payment code anywhere in the game', () => {
   const files = [], walk = d => { for (const f of readdirSync(d)) { const p = d + '/' + f; if (statSync(p).isDirectory()) walk(p); else if (/\.(js|html)$/.test(f)) files.push(p); } };
   walk(ROOT + 'src'); files.push(ROOT + 'index.html'); assert.ok(files.length > 30, `scanned ${files.length} files`);
   const banned = [/PaymentRequest/, /\bfetch\s*\(/, /XMLHttpRequest/, /sendBeacon/, /checkout/i, /paypal/i, /stripe\.com|Stripe\(/, /apple\s?pay|google\s?pay/i, /card\s?number|cvv|cvc\b/i, /autocomplete=["']cc-/i, /billing/i, /in-app purchase/i, /\$\s?\d+(\.\d\d)?\b/, /\bUSD\b|\bEUR\b|€/];
-  for (const f of files) { const t = readFileSync(f, 'utf8'); for (const b of banned) assert.ok(!b.test(t), `${f.replace(ROOT, '')} matches ${b}`); }
+  // V12: player accounts make network requests, only from the two account modules: sign-in (Firebase Authentication)
+  // and the game's own account server. Everything else in the game still makes none, and nothing anywhere is payment code.
+  const NET_OK = new Set(['src/account/firebase.js', 'src/account/api.js']);
+  for (const f of files) { const t = readFileSync(f, 'utf8'), rel = f.replace(ROOT, ''); for (const b of banned) if (!(NET_OK.has(rel) && String(b) === String(/\bfetch\s*\(/))) assert.ok(!b.test(t), `${rel} matches ${b}`); }
+  const fb = readFileSync(ROOT + 'src/account/firebase.js', 'utf8'), hosts = [...fb.matchAll(/https:\/\/([a-z0-9.-]+)/g)].map(m => m[1]);
+  assert.deepEqual([...new Set(hosts)].sort(), ['identitytoolkit.googleapis.com', 'securetoken.googleapis.com'], 'sign-in talks to Firebase Authentication only');
+  assert.ok(!/https?:\/\//.test(readFileSync(ROOT + 'src/account/api.js', 'utf8').replace(/\/\/.*$/gm, '')), 'the account server address comes from the site configuration, not from the code');
 });
 
 // ---------------- save system ----------------
@@ -293,7 +303,8 @@ test('tracks, handling modes, ships, difficulty, championship and AI roster are 
   for (const d of TRACK_DEFS.slice(0, 4)) { const t = getTrack(d.id), e = v6.tracks[d.id];
     assert.equal(t.N, e.N); assert.equal(+t.length.toFixed(6), e.length); assert.equal(h(t.pos.map(p => [p.x, p.y, p.z].map(v => v.toFixed(4)).join(',')).join(';')), e.pos, `${d.id} centreline`);
     assert.equal(h(t.w.join(',')), e.w); assert.equal(h(t.h.join(',')), e.h); assert.equal(t.cpS.join(','), e.cp); assert.equal(t.obstacles.length, e.obstacles); }
-  assert.deepEqual(JSON.parse(JSON.stringify(HANDLING)), v6.handling); assert.deepEqual(JSON.parse(JSON.stringify(SHIPS)), v6.ships); assert.deepEqual(DIFFICULTY, v6.difficulty);
+  assert.deepEqual(JSON.parse(JSON.stringify(HANDLING)), v6.handling); assert.deepEqual(JSON.parse(JSON.stringify(SHIPS)), v6.ships); assert.deepEqual(Object.fromEntries(Object.keys(v6.difficulty).map(k => [k, DIFFICULTY[k]])), v6.difficulty);
+  assert.deepEqual(Object.keys(DIFFICULTY), [...Object.keys(v6.difficulty), 'elite', 'master', 'legend'], 'V12 adds Elite, Master and Legend after them');
   assert.deepEqual(CHAMPIONSHIP.slice(0, 4), v6.championship); assert.deepEqual(CHAMPIONSHIP.slice(4), ['pelagos', 'ignara'], 'V9: the new courses are rounds 5 and 6'); assert.deepEqual(POINTS, v6.points); assert.deepEqual(AI_ROSTER, v6.ai);
 });
 test('ship meshes are exactly V6 (silhouettes, normals, colours, control surfaces); only paint-region tags were added', () => {

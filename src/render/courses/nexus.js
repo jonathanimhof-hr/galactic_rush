@@ -92,8 +92,9 @@ export function buildNexus(gfx, t) {
   // ---------------------------------------------------------------- tunnels round the enclosed course sections
   // an octagonal shell just outside the corridor, built from the course frames (so it twists with a gravity roll),
   // ribs every 16 m, light strips along the upper corners; in a gravity section the floor is the plating (below)
+  const slots = new Set(); for (const rec of (t.solids || [])) if (rec.kind === 'sweeper') for (const k of [-2, 0]) slots.add(S(rec.i + k - (rec.i % 2))); // V12: the sweeper's slot in the shaft
   for (let i = 0; i < N; i += 2) {
-    if (!t.tunnel[i]) continue;
+    if (!t.tunnel[i] || slots.has(i)) continue;
     const j = S(i + 2), g = ch.get(i, 'tun'), gl = ch.get(i, 'tunLit'), w = t.w[i] + 2.2, h = t.h[i] + 2.2, c = 0.3, grav = t.grav[i] > 0.01;
     const oct = [[-w * (1 - c), -h], [w * (1 - c), -h], [w, -h * (1 - c)], [w, h * (1 - c)], [w * (1 - c), h], [-w * (1 - c), h], [-w, h * (1 - c)], [-w, -h * (1 - c)]];
     g.mat(0.55, 0.5, 1, PL); g.M = [0.55, 0.5, 1, PL];
@@ -237,6 +238,7 @@ export function buildNexus(gfx, t) {
   // the obstacles of the open and enclosed sections: the crane bridge over the launch straight, masts, pillars, clamps
   for (const o of t.obstacles) {
     const i = o.i, q = fq(t, i), g = ch.get(i, 'tun'), gl = ch.get(i, 'tunLit');
+    if (o.kind === 'conduit' || o.kind === 'radiator' || o.kind === 'door') continue; // V12: drawn below
     if (o.type === 'hbeam') { const a = P(t, i, -t.w[i] - 30, o.y), b = P(t, i, t.w[i] + 30, o.y), m = new Vec3().lerpVectors(a, b, 0.5); g.mat(0.65, 0.45, 1, HZ).at(m.x, m.y, m.z, qLook(new Vec3().subVectors(b, a), t.nrm[i])).cyl(o.r * 0.98, o.r * 0.98, a.dist(b), 18, ACC[2], true);
       for (let k = -4; k <= 4; k++) { const p = new Vec3().lerpVectors(a, b, 0.5 + k * 0.08); gl.at(p.x, p.y - o.r - 0.2, p.z, q).box(1.2, 0.3, 1.2, AMBER); } continue; }
     if (o.type !== 'vbeam' || o.kind === 'strut') continue;
@@ -244,6 +246,74 @@ export function buildNexus(gfx, t) {
     g.mat(0.6, 0.45, 1, o.kind === 'mast' ? PL : HZ).at(m.x, m.y, m.z, qLook(new Vec3().subVectors(b, a), t.tan[i])).cyl(o.r * 0.98, o.r * 0.98, a.dist(b), 18, o.kind === 'mast' ? HULL[2] : ACC[(i >> 2) % 3], true);
     for (let k = 0; k < 5; k++) { const p = new Vec3().lerpVectors(a, b, 0.2 + k * 0.15); gl.at(p.x, p.y, p.z, q).torus(o.r * 1.03, 0.1, 20, 4, k % 2 ? RED : AMBER); }
     if (o.kind === 'mast') { lights.push({ p: b.clone().addScaled(t.nrm[i], 2), c: [3.5, 0.4, 0.2], s: 4, blink: 0.8, ph: i * 0.1 }); gl.at(b.x, b.y, b.z).box(1.5, 1.5, 1.5, RED); }
+  }
+  // ---------------------------------------------------------------- V12: the station's new obstacles
+  // Each is drawn exactly where the simulation has it solid (tracks-v10.js nexus12, solids.js), in the station's plated
+  // steel, with hazard stripes and warning lights on what a ship can hit. The servicing arm swings and the Spindle's
+  // ring turns every frame with the race clock, the same motion the simulation gives them.
+  const v12moving = [];
+  { const frameQ = i => new Quat().fromBasis(t.bin[i], t.nrm[i], t.tan[i]), HZB = [ACC[2], [0.07, 0.07, 0.08, 0]];
+    // a straight member from a to b of radius r, hazard-banded where it is inside the corridor
+    const member = (g, a, b, r, col, i, band = true) => { const n = Math.max(1, Math.ceil(a.dist(b) / 2.4)), loc = {};
+      for (let k = 0; k < n; k++) { const p0 = new Vec3().lerpVectors(a, b, k / n), p1 = new Vec3().lerpVectors(a, b, (k + 1) / n), m = new Vec3().lerpVectors(p0, p1, 0.5);
+        t.locate(m, i, loc, 30); const inside = band && Math.abs(loc.x) < t.w[loc.i] + r && Math.abs(loc.y) < t.h[loc.i] + r;
+        g.mat(0.6, 0.45, 1, inside ? HZ : PL).at(m.x, m.y, m.z, qLook(new Vec3().subVectors(p1, p0), t.tan[i])).cyl(r, r, p0.dist(p1) + 0.02, 16, inside ? HZB[k % 2] : col, false); } };
+    for (const o of t.obstacles) {
+      const i = o.i, q = fq(t, i), g = ch.get(i, 'tun'), gl = ch.get(i, 'tunLit');
+      if (o.kind === 'door') { // a blast door leaf: a slab from the wall with a rounded leading edge where it collides
+        const s = Math.sign(o.x), wall = s * (t.w[i] + 3), mid = (wall + o.x) / 2, len = Math.abs(wall - o.x), c = P(t, i, mid, 0);
+        g.mat(0.6, 0.45, 1, PL).at(c.x, c.y, c.z, q).bbox(len, 2 * t.h[i] + 6, o.r * 1.8, 0.3, HULL[3]);
+        for (let k = -2; k <= 2; k++) for (const f of [-1, 1]) { const rc = P(t, i, mid, k * (t.h[i] + 3) * 0.38); const rp = rc.clone().addScaled(t.tan[i], f * o.r * 0.95); g.at(rp.x, rp.y, rp.z, q).bbox(len - 0.6, 0.7, 0.5, 0.15, HULL[2]); } // the leaf's stiffening ribs, both faces
+        { const ra = P(t, i, -t.w[i] - 4, 0), rb = P(t, i, t.w[i] + 4, 0); for (const yy of [-1, 1]) bar(g, ra.clone().addScaled(t.nrm[i], yy * (t.h[i] + 3.6)), rb.clone().addScaled(t.nrm[i], yy * (t.h[i] + 3.6)), 2.2, 1.6, HULL[1]); } // the track the leaves run in, floor and roof
+        member(g, P(t, i, o.x, -t.h[i] - 3), P(t, i, o.x, t.h[i] + 3), o.r * 0.98, HULL[2], i);
+        for (let k = -2; k <= 2; k++) { const lp = P(t, i, o.x - s * 0.4, k * t.h[i] * 0.4); gl.at(lp.x, lp.y, lp.z, q).box(0.5, 1.4, o.r * 2.02, k % 2 ? RED : AMBER); }
+        for (const yy of [-1, 1]) { const rp = P(t, i, wall, yy * (t.h[i] + 1)); g.at(rp.x, rp.y, rp.z, q).bbox(3, 2.4, o.r * 2.4, 0.3, HULL[3]); } // the leaf's runners
+      } else if (o.kind === 'conduit') { // a coolant conduit across the core run: steel with glowing coolant bands
+        const a = P(t, i, -t.w[i] - 26, o.y), b = P(t, i, t.w[i] + 26, o.y); member(g, a, b, o.r * 0.98, HULL[2], i);
+        for (let k = -6; k <= 6; k++) { const p0 = new Vec3().lerpVectors(a, b, 0.5 + k * 0.07); gl.at(p0.x, p0.y, p0.z, qLook(new Vec3().subVectors(b, a), t.tan[i])).torus(o.r * 1.04, 0.16, 20, 4, k % 3 ? CYAN : VIOLET); }
+        for (const e of [a, b]) g.mat(0.6, 0.45, 1, PL).at(e.x, e.y, e.z, q).bbox(5, 5, 5, 0.4, HULL[3]);
+      } else if (o.kind === 'radiator') { // a radiator truss over the hull: the beam across, its panels beyond the corridor's sides
+        const a = P(t, i, -t.w[i] - 50, o.y), b = P(t, i, t.w[i] + 50, o.y); member(g, a, b, o.r * 0.98, HULL[2], i);
+        for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const x = s * (t.w[i] + 12 + k * 13), c = P(t, i, x, o.y + 9);
+          g.mat(0.45, 0.4, 1, PL).at(c.x, c.y, c.z, q).bbox(11, 16, 0.6, 0.2, [0.8, 0.81, 0.82, 0]); g.at(c.x, c.y, c.z, q).bbox(11.6, 0.6, 0.9, 0.1, HULL[3]); bigLit.at(c.x, c.y - 7.5, c.z, q).box(10, 0.3, 0.7, AMBER); } // white radiator panels
+        for (const s of [-1, 1]) { const foot = P(t, i, s * (t.w[i] + 50), -t.h[i] - 30); member(g, foot, P(t, i, s * (t.w[i] + 50), o.y), 1.6, HULL[1], i, false); }
+      }
+    }
+    for (const rec of (t.solids || [])) {
+      if (rec.kind === 'main') { // the airlock's service main: across from the left wall, then down into the deck
+        const i = rec.hint, g = ch.get(i, 'tun'), gl = ch.get(i, 'tunLit');
+        for (let k = 0; k < rec.pts.length - 1; k++) member(g, rec.pts[k], rec.pts[k + 1], rec.rad[k] * 0.98, ACC[1], i);
+        for (const p0 of rec.pts) g.mat(0.6, 0.45, 1, PL).at(p0.x, p0.y, p0.z, fq(t, i)).sphere(rec.rad[0] * 1.12, 14, 10, HULL[3]); // elbows and the wall flange
+        const v = rec.pts[1]; gl.at(v.x, v.y + rec.rad[1] * 1.15, v.z).box(0.6, 0.6, 0.6, RED);
+      } else if (rec.kind === 'dockarm') { // a docking arm off the hull: pedestal, two booms, joints, the clamp at its head
+        const i = rec.hint, g = ch.get(i, 'tun'), gl = ch.get(i, 'tunLit');
+        for (let k = 0; k < rec.pts.length - 1; k++) member(g, rec.pts[k], rec.pts[k + 1], rec.rad[k + 1] * 0.98, ACC[0], i);
+        for (const [k, p0] of rec.pts.entries()) g.mat(0.6, 0.45, 1, PL).at(p0.x, p0.y, p0.z, fq(t, i)).sphere(rec.rad[k] * 1.12, 16, 10, HULL[2]);
+        const base = rec.pts[0], foot = base.clone().addScaled(t.nrm[i], -24); member(g, foot, base, 4.2, HULL[1], i, false); g.at(foot.x, foot.y, foot.z, fq(t, i)).bbox(14, 4, 14, 0.5, HULL[3]);
+        const head = rec.pts[rec.pts.length - 1]; for (const s of [-1, 1]) { const c = head.clone().addScaled(t.tan[i], s * 2.4); gl.at(c.x, c.y, c.z).box(0.7, 0.7, 0.7, s > 0 ? RED : AMBER); }
+        lights.push({ p: head.clone(), c: [3.5, 0.5, 0.2], s: 4, blink: 1.1, ph: 0.3 });
+      } else if (rec.kind === 'servo' || rec.kind === 'sweeper') { // built along +x from the pivot, then turned about the course tangent
+        const i = rec.i, pivot = P(t, i, rec.px, rec.py), m = new Geo(), ml = new Geo().mat(0, 0.4, 4, 0), L0 = rec.L0, L1 = rec.L1, r0 = rec.r0, r1 = rec.r1;
+        if (rec.kind === 'servo') { // a servicing arm: an upper arm from the gantry carriage, an elbow, the forearm through the corridor, a tool head
+          m.mat(0.6, 0.45, 1, PL).at(0, 0, 0, QY(0)).cyl(2.6, 2.6, 3.2, 20, HULL[3]);
+          m.at(L0 / 2, 0, 0).bbox(L0, 3.0, 3.0, 0.3, HULL[2]); for (const s of [-1, 1]) m.at(L0 * 0.5, s * 1.9, 0, QY(90)).cyl(0.35, 0.35, L0 * 0.7, 8, HULL[1], false); // hydraulics
+          m.at(L0, 0, 0, QY(0)).cyl(r0 * 1.15, r0 * 1.15, 3.6, 20, HULL[3]);
+          for (let k = 0, n = Math.ceil((L1 - L0) / 2.4); k < n; k++) { const x0 = L0 + (L1 - L0) * k / n, x1 = L0 + (L1 - L0) * (k + 1) / n, rr = r0 + (r1 - r0) * (k + 0.5) / n; m.mat(0.6, 0.45, 1, HZ).at((x0 + x1) / 2, 0, 0, QY(90)).cyl(rr, rr, x1 - x0 + 0.02, 16, HZB[k % 2], false); }
+          m.mat(0.6, 0.45, 1, PL).at(L1, 0, 0).bbox(r1 * 2.4, r1 * 2.6, r1 * 2.6, 0.3, HULL[1]); ml.at(L1 + r1 * 1.25, 0, 0).box(0.3, 1.8, 1.8, CYAN); ml.at(L0, 0, r0 * 1.2).box(0.6, 0.6, 0.6, RED);
+          // its gantry: a rail across the hangar roof the carriage runs on
+          const ga = P(t, i, -t.w[i] - 40, rec.py + 4.5), gb = P(t, i, t.w[i] + 40, rec.py + 4.5); truss(ch.get(i, 'tun').mat(0.6, 0.5, 1, DET.struct), ga, gb, 5, 8, ACC[2]); // like the hangar's roof cranes
+        } else { // the Spindle's sweeper: a ring round the shaft, the arm on it reaching in through the slot to 7 m from the axis
+          m.mat(0.6, 0.45, 1, PL).at(0, 0, 0).torus(L1 + 1.8, 1.4, 64, 8, HULL[2]);
+          for (let k = 0; k < 12; k++) { const a = k / 12 * 6.283; ml.at(Math.cos(a) * (L1 + 1.8), Math.sin(a) * (L1 + 1.8), 1.5).box(0.6, 0.6, 0.4, k % 3 ? CYAN : VIOLET); }
+          for (let k = 0, n = Math.ceil((L1 - L0) / 2.4); k < n; k++) { const x0 = L0 + (L1 - L0) * k / n, x1 = L0 + (L1 - L0) * (k + 1) / n, rr = r0 + (r1 - r0) * (k + 0.5) / n; m.mat(0.6, 0.45, 1, HZ).at((x0 + x1) / 2, 0, 0, QY(90)).cyl(rr, rr, x1 - x0 + 0.02, 16, HZB[k % 2], false); }
+          m.mat(0.6, 0.45, 1, PL).at(L0, 0, 0).sphere(r0 * 1.2, 16, 10, HULL[3]); ml.at(L0 - r0 * 1.1, 0, 0).box(0.4, 1.4, 1.4, RED);
+          // the slot's frame in the shaft wall
+          const g = ch.get(i, 'tun'); for (const k of [-2, 2]) { const c = P(t, S(i + k), 0, 0); g.mat(0.6, 0.5, 1, PL).at(c.x, c.y, c.z, frameQ(S(i + k))).torus(Math.hypot(t.w[i], t.h[i]) + 3.5, 1.1, 48, 6, HULL[3]); }
+        }
+        const it = { mesh: gfx.mesh(m.merge(ml).build()), pos: pivot.clone(), quat: frameQ(i), scale: 1, visible: true, br: L1 + 6 };
+        items.push(it); v12moving.push({ it, rec, q0: frameQ(i) });
+      }
+    }
   }
   // cargo pods (the moving obstacles): one mesh per pod, moved along their lane every frame
   const pods = [], podMesh = gfx.mesh(new Geo().mat(0.5, 0.5, 1, DET.container).bbox(5.6, 5.6, 5.6, 0.6, ACC[0]).merge(new Geo().mat(0, 0.4, 4, 0).at(0, 2.9, 0).box(4, 0.2, 4, AMBER)).build());
@@ -321,6 +391,7 @@ export function buildNexus(gfx, t) {
       coreItems[0].quat.setAxisAngle(0, 1, 0, time * 0.05);
       for (const s of spinners) s.it.quat.copy(s.q0).multiply(new Quat().setAxisAngle(0, 0, 1, time * s.w));
       hab.it.quat.copy(qLook(hab.ax)).multiply(new Quat().setAxisAngle(0, 0, 1, time * 0.02));
+      { const rt = race ? race.time : time; for (const m of v12moving) { const R = m.rec.rot, th = R.th0 + (R.amp != null ? R.amp * Math.sin(rt * R.w + (R.ph || 0)) : rt * R.w); m.it.quat.copy(m.q0).multiply(new Quat().setAxisAngle(0, 0, 1, th)); } } // V12
       if (race) for (const p of pods) { const l = p.lane, x = t.trafficCarX(l, p.k, race.time); P(t, l.i, x, l.y).clone(); p.it.pos.copy(P(t, l.i, x, l.y)); p.it.visible = Math.abs(x) < t.w[l.i] + 60; }
       // the core's corona and sparks along the plated decks near the camera
       if (coreC.dist(c) < 2500) { fx.bbAdd.add(coreC.x, coreC.y, coreC.z, 190, 0.5, 0.6, 1.6, 0.55); fx.bbAdd.add(coreC.x, coreC.y, coreC.z, 120, 1.2, 1.3, 2.4, 0.7); }

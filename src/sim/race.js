@@ -43,7 +43,7 @@ export class Race {
         stuckT: 0, stuckProg: 0, stuckCheck: 0, ammo: 3, shieldCharges: 2, fireCD: 0, resetCD: 0, ctrl: NOCTRL,
         hits: 0, splits: [],
       };
-      if (!cfg.isPlayer || o.autopilot) r.ai = new AIPilot(r, this, cfg.skill ?? 0.8, makeRng((o.seed || 1) * 31 + k));
+      if (!cfg.isPlayer || o.autopilot) r.ai = new AIPilot(r, this, cfg.skill ?? 0.8, makeRng((o.seed || 1) * 31 + k), cfg.drive); // V12: cfg.drive, the rivals' driving profile (Elite and up)
       return r;
     });
     this.player = this.racers.find(r => r.isPlayer) || null;

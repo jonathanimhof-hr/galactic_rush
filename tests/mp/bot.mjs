@@ -11,7 +11,8 @@ import { SIM_DT } from '../../src/config.js';
 import { localState } from '../../src/mp/sync.js';
 
 export class Bot {
-  constructor({ url, name, ship = 'kestrel', skill = 0.85, speed = 1, retryForMs = 30000, cheat = null, WebSocketImpl }) {
+  constructor({ url, name, ship = 'kestrel', skill = 0.85, speed = 1, retryForMs = 30000, cheat = null, WebSocketImpl, auth = undefined }) {
+    this.auth = auth; // V12: a signed-in pilot's Firebase ID token
     this.url = url; this.name = name; this.ship = ship; this.skill = skill; this.speed = speed; this.cheat = cheat; this.retryForMs = retryForMs; this.WS = WebSocketImpl;
     this.inbox = []; this.waiters = []; this.pid = null; this.token = null; this.lobby = null; this.race = null; this.rid = null; this.startLocal = 0;
     this.sendRace = true; this.finishSent = null; this.official = null; this.results = []; this.completes = []; this.complete = null; this.errors = []; this.notices = [];
@@ -20,7 +21,7 @@ export class Bot {
   log(...a) { if (process.env.BOT_LOG) console.log(`[${this.name}]`, ...a); }
   connect() {
     this.conn = new Connection({ url: this.url, now: () => performance.now(), retryForMs: this.retryForMs, ...(this.WS ? { WebSocketImpl: this.WS } : {}),
-      hello: () => ({ name: this.name, token: this.token || undefined, rid: this.race && !this.race.dead ? this.rid : undefined }) });
+      hello: () => ({ name: this.name, token: this.token || undefined, rid: this.race && !this.race.dead ? this.rid : undefined, auth: this.auth }) });
     for (const type of [...Object.values(S), 'conn']) this.conn.on(type, m => this.onMsg(type, m));
     this.conn.connect();
     return this.waitFor(S.WELCOME);

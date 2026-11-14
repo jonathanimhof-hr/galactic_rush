@@ -1,0 +1,35 @@
+# Render Blueprint for the Galactic Rush V12 server: online multiplayer (protocol 4) and player accounts, as a SEPARATE
+# service, so the V11 server keeps running unchanged for the V11 game. Render -> New -> Blueprint -> this repository,
+# Blueprint file: render-v12.yaml. It follows the review branch v12-dev until V12 is approved, then main.
+# With GR_SERVE_SITE=1 it also serves the V12 game itself at its own address, for testing before GitHub Pages.
+# Secrets (sync: false) are typed into Render's dashboard when asked. Never commit them, never paste them into a chat:
+#   FIREBASE_SERVICE_ACCOUNT  the whole JSON key file of a Firebase service account (Firebase console -> Project
+#                             settings -> Service accounts -> Generate new private key)
+# Public values (also sync: false, so they are asked for):
+#   FIREBASE_PROJECT_ID, GR_FIREBASE_API_KEY (Firebase console -> Project settings -> General -> Web API key)
+#   ALLOWED_ORIGINS           https://galactic-rush-v12.onrender.com (and, once V12 is live, https://<you>.github.io)
+services:
+  - type: web
+    name: galactic-rush-v12
+    runtime: node
+    plan: free
+    region: frankfurt   # near the players in Europe and a European Firestore location
+    branch: v12-dev
+    buildCommand: npm install --prefix server --omit=dev --no-audit --no-fund && GR_MP_SERVER=same-origin node build.mjs
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TOKEN_SECRET
+        generateValue: true
+      - key: GR_SERVE_SITE
+        value: "1"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: GR_FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false

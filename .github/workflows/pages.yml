@@ -7,7 +7,8 @@
 #   GR_MP_SERVER_V12        the V12 server's address, e.g. wss://galactic-rush-v12.onrender.com
 #   GR_FIREBASE_API_KEY     the Firebase project's Web API key
 #   GR_FIREBASE_PROJECT_ID  the Firebase project's id
-# (or put them into config.js). Without them the build stops and the published site stays as it was.
+# Or put them into config.js, as this repository does (the variables, when set, take precedence). Without either the
+# build stops and the published site stays as it was.
 name: Deploy to GitHub Pages
 on:
   push:
